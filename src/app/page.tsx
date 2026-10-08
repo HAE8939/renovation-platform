@@ -22,7 +22,7 @@ export default function HomePage() {
           {PLATFORM.tagline}
         </h1>
         <p className="mt-4 max-w-prose text-[15px] leading-[1.85] text-secondary">
-          一个仓库、可插拔模块的装修行业管理平台。模块共享登录、主数据与视觉语言，
+          一个仓库、可插拔模块的装修经营管理数字化平台。模块共享登录、主数据与视觉语言，
           每个功能都是平台里的一块功能区，而不是独立系统。
         </p>
 
