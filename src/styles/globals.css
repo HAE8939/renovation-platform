@@ -1,0 +1,51 @@
+@import "./tokens.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 默认无阴影（V0.3 §4 L0）。本仓不使用任何 box-shadow：
+   分层靠底色差（2–3%）与气声描边 + 留白，不用阴影做层级。 */
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--canvas);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.75; /* 中文正文 1.75–1.9（V0.3 §3.1） */
+  font-feature-settings: "tnum" 0;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  /* 避头尾：行首不落收尾标点、行末不落起始标点 */
+  line-break: strict;
+}
+
+/* 数字统一等宽，数位竖向对齐（V0.3 §3.1 数字对齐） */
+.num,
+td.num,
+.num-td {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  font-family: var(--font-mono);
+  letter-spacing: 0;
+}
+
+/* 焦点态：2px accent-ink 外描边（V0.3 §5.1 无障碍），用 outline 而非阴影 */
+:focus-visible {
+  outline: 2px solid var(--accent-ink);
+  outline-offset: 2px;
+}
+
+/* 表单控件去掉浏览器默认外观，交给组件控制 */
+input,
+select,
+textarea,
+button {
+  font-family: inherit;
+}

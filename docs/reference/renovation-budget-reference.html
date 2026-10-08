@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能装修预算管理系统 - 企业标准模板 V5.0 Final</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+        
+        :root {
+            --primary: #4F46E5;
+            --slate-800: #1E293B;
+        }
+
+        body { 
+            font-family: 'Plus Jakarta Sans', 'PingFang SC', 'Microsoft YaHei', sans-serif; 
+            background-color: #F8FAFC;
+            color: #334155;
+            overflow: hidden;
+        }
+
+        .sidebar-active {
+            background-color: var(--primary);
+            color: white !important;
+            box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.3);
+        }
+
+        .glass-header {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(16px);
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 10px; }
+        
+        .nav-item:hover:not(.sidebar-active) {
+            background-color: rgba(79, 70, 229, 0.05);
+            transform: translateX(4px);
+        }
+
+        @media print {
+            @page { size: A4; margin: 12mm; }
+            .no-print { display: none !important; }
+            body { background-color: white !important; overflow: visible !important; height: auto !important; }
+            #main-scroll { overflow: visible !important; height: auto !important; background-color: white !important; padding: 0 !important; }
+            .print-only { display: block !important; }
+            .page-break { page-break-before: always; }
+            .print-container { width: 100% !important; margin: 0 !important; padding: 0 !important; }
+            table { width: 100% !important; table-layout: fixed; border-collapse: collapse; margin-bottom: 10px; }
+            th, td { border: 1px solid #cbd5e1 !important; padding: 6px 10px !important; font-size: 8pt !important; line-height: 1.3; }
+            .print-title { font-size: 14pt !important; font-weight: 800 !important; margin-bottom: 10px !important; color: #1e293b; }
+            .signature-box { border: 1px solid #e2e8f0; padding: 15px; margin-top: 20px; }
+        }
+
+        .print-only { display: none; }
+        .table-container { overflow-x: auto; }
+        
+        /* 内部库输入框样式 */
+        .library-input { border: 1px solid transparent; transition: all 0.2s; padding: 6px 8px; border-radius: 8px; }
+        .library-input:hover { background: #f1f5f9; }
+        .library-input:focus { background: white; border-color: var(--primary); outline: none; box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.1); }
+        .library-textarea { min-height: 80px; resize: vertical; }
+        
+        /* Logo 约束 */
+        .logo-container { overflow: hidden; display: flex; align-items: center; justify-content: center; background-color: #EEF2FF; border: 1px dashed #C7D2FE; }
+        .logo-container img { width: 100%; height: 100%; object-fit: contain; }
+        .header-mode-btn {
+            color: #64748B;
+            background: transparent;
+            border: 1px solid transparent;
+        }
+        .header-mode-btn:hover {
+            background: #F8FAFC;
+            color: #0F172A;
+        }
+        .header-mode-btn-active {
+            background: #0F172A !important;
+            color: white !important;
+            box-shadow: 0 16px 30px -18px rgba(15, 23, 42, 0.7);
+            border-color: #0F172A;
+            transform: translateY(-1px);
+        }
+        .header-mode-btn-active svg { color: white; }
+        .focus-shell {
+            max-width: none !important;
+            width: 100% !important;
+        }
+        .focus-panel {
+            border-radius: 2.25rem;
+            border: 1px solid #E2E8F0;
+            box-shadow: 0 28px 60px -40px rgba(15, 23, 42, 0.35);
+        }
+        .focus-toolbar {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            backdrop-filter: blur(14px);
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col">
+
+    <!-- 顶部导航 -->
+    <header class="h-16 glass-header px-6 flex items-center justify-between z-30 shrink-0 no-print">
+        <div class="flex items-center space-x-4">
+            <div id="company-logo-preview" class="w-10 h-10 logo-container rounded-xl text-indigo-600 font-bold text-lg">V</div>
+            <div>
+                <h1 id="display-company-name" class="text-base font-black text-slate-800 tracking-tight">室内设计风向标</h1>
+                <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">全案装修预算标准系统 V5.0</p>
+            </div>
+        </div>
+
+        <div class="flex items-center space-x-3">
+            <button id="header-library-btn" onclick="switchTab('library')" class="header-mode-btn flex items-center space-x-2 px-4 py-2 rounded-xl transition-all">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                <span class="text-xs font-bold">零件库</span>
+            </button>
+            <button id="header-settings-btn" onclick="switchTab('settings')" class="header-mode-btn flex items-center space-x-2 px-4 py-2 rounded-xl transition-all">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path></svg>
+                <span class="text-xs font-bold">项目设置</span>
+            </button>
+        </div>
+    </header>
+
+    <main class="flex-1 flex overflow-hidden">
+        <!-- 左侧导航 -->
+        <nav id="workspace-nav" class="w-64 bg-white border-r border-slate-200 p-5 flex flex-col no-print shrink-0 overflow-y-auto custom-scrollbar">
+            <div class="space-y-1 mb-8">
+                <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-item w-full flex items-center px-4 py-3 rounded-xl text-sm font-bold transition-all sidebar-active">
+                    <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+                    数据中心
+                </button>
+            </div>
+
+            <h2 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4 px-4">工程科目库</h2>
+            <div id="category-list" class="space-y-1 flex-1"></div>
+            
+            <div class="mt-6 p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                <div class="text-[10px] font-bold text-slate-400 mb-3 uppercase tracking-wider flex items-center">
+                    <svg class="w-3 h-3 mr-1.5 text-indigo-500" fill="currentColor" viewBox="0 0 20 20"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"></path></svg>
+                    填报完整度
+                </div>
+                <div class="w-full bg-slate-200 h-1 rounded-full overflow-hidden mb-2">
+                    <div id="completion-bar" class="bg-indigo-500 h-full transition-all duration-500" style="width: 0%"></div>
+                </div>
+                <div class="flex justify-between text-[8px] text-slate-500 font-bold">
+                    <span id="completion-text">0/11 科目已填</span>
+                </div>
+            </div>
+        </nav>
+
+        <!-- 主体内容 -->
+        <section id="main-scroll" class="flex-1 overflow-y-auto bg-[#F8FAFC] p-8 print-container custom-scrollbar">
+            
+            <!-- A4 打印封面 -->
+            <div id="print-cover" class="print-only text-center flex flex-col items-center justify-center min-h-[96vh] space-y-10">
+                <div id="print-logo-box" class="w-32 h-32 logo-container rounded-[2.5rem] flex items-center justify-center text-indigo-600 text-6xl font-black shadow-2xl">V</div>
+                <div>
+                    <h1 class="text-5xl font-black text-slate-900 mb-4 tracking-tighter" id="p-company-name">室内设计风向标</h1>
+                    <p class="text-2xl font-bold text-slate-400 uppercase tracking-[0.4em]">全案装修预算清单报价表</p>
+                </div>
+                
+                <div class="w-full max-w-xl border-y border-slate-200 py-10 space-y-5 text-left text-lg font-medium">
+                    <div class="grid grid-cols-2 gap-y-5">
+                        <div class="text-slate-400">项目名称:</div><div class="text-slate-800 font-bold text-right" id="p-project-name">--</div>
+                        <div class="text-slate-400">项目编号:</div><div class="text-slate-800 font-mono text-right" id="p-project-id">--</div>
+                        <div class="text-slate-400 border-t pt-5">客户姓名:</div><div class="text-slate-800 font-bold text-right border-t pt-5" id="p-client-name">--</div>
+                        <div class="text-slate-400">客户电话:</div><div class="text-slate-800 font-bold text-right" id="p-client-phone">--</div>
+                        <div class="text-slate-400 border-t pt-5">建筑面积:</div><div class="text-slate-800 font-bold text-right border-t pt-5" id="p-area">--</div>
+                        <div class="text-slate-400">主创设计师:</div><div class="text-slate-800 font-bold text-right" id="p-designer">--</div>
+                        <div class="text-slate-400">项目经理:</div><div class="text-slate-800 font-bold text-right" id="p-pm">--</div>
+                        <div class="text-slate-400">编制日期:</div><div class="text-slate-800 font-bold text-right" id="p-date">--</div>
+                    </div>
+                </div>
+
+                <div class="w-full max-w-xl grid grid-cols-2 gap-10 text-left mt-10">
+                    <div class="space-y-4">
+                        <div class="text-sm font-black text-slate-800">甲方签字：</div>
+                        <div class="h-14 border-b border-slate-900"></div>
+                        <div class="text-[10px] text-slate-400">日期：202  年  月  日</div>
+                    </div>
+                    <div class="space-y-4">
+                        <div class="text-sm font-black text-slate-800">乙方签章：</div>
+                        <div class="h-14 border-b border-slate-900"></div>
+                        <div class="text-[10px] text-slate-400">日期：202  年  月  日</div>
+                    </div>
+                </div>
+                
+                <div class="text-slate-400 text-[9px] mt-auto italic text-center">* 声明：本报价单基于实测数据及约定材料品牌编制，签字即视为正式合同附件。</div>
+            </div>
+
+            <!-- 仪表盘 -->
+            <div id="tab-dashboard" class="max-w-5xl mx-auto space-y-10 no-print">
+                <div class="bg-white p-12 rounded-[3.5rem] shadow-xl border border-slate-100 overflow-hidden relative">
+                    <div class="relative z-10">
+                        <div class="flex items-center space-x-8 mb-10">
+                            <div id="dashboard-logo-preview" class="w-24 h-24 logo-container rounded-[2.5rem] text-indigo-600 font-black text-4xl shadow-lg">V</div>
+                            <div>
+                                <span class="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-full uppercase tracking-widest" id="d-project-id">--</span>
+                                <h2 class="text-5xl font-black text-slate-800 mt-4 tracking-tight leading-tight" id="d-project-name">--</h2>
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-8 py-8 border-y border-slate-100">
+                            <div><div class="text-[10px] text-slate-400 font-bold uppercase">Client</div><div id="d-client-name" class="font-bold text-slate-800 text-lg">--</div></div>
+                            <div><div class="text-[10px] text-slate-400 font-bold uppercase">Area</div><div id="d-area" class="font-bold text-slate-800 text-lg">--</div></div>
+                            <div><div class="text-[10px] text-slate-400 font-bold uppercase">Designer</div><div id="d-designer" class="font-bold text-slate-800 text-lg">--</div></div>
+                            <div><div class="text-[10px] text-slate-400 font-bold uppercase">Date</div><div id="d-date" class="font-bold text-slate-800 text-lg text-nowrap">--</div></div>
+                        </div>
+
+                        <div class="mt-10 flex space-x-12">
+                            <div class="space-y-2 flex-1 p-6 bg-slate-50 rounded-3xl border border-slate-100">
+                                <div class="text-[10px] text-slate-400 font-bold uppercase">甲方确认 (Customer Signature)</div>
+                                <div class="h-10 border-b border-dashed border-slate-300"></div>
+                            </div>
+                            <div class="space-y-2 flex-1 p-6 bg-slate-50 rounded-3xl border border-slate-100">
+                                <div class="text-[10px] text-slate-400 font-bold uppercase">乙方签章 (Seal/Signature)</div>
+                                <div class="h-10 border-b border-dashed border-slate-300"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    <div class="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm col-span-2">
+                        <h3 class="text-xl font-black text-slate-800 mb-8 flex justify-between">科目分布统计</h3>
+                        <div id="summary-table-container"></div>
+                    </div>
+                    <div class="bg-slate-900 p-10 rounded-[3rem] text-white shadow-2xl flex flex-col justify-between min-h-[350px]">
+                        <div>
+                            <p class="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-2 italic">Budget Summary</p>
+                            <div id="stat-grand-total" class="text-4xl font-black tracking-tighter italic text-indigo-400 leading-none">¥ 0.00</div>
+                        </div>
+                        <div class="pt-8 border-t border-white/10 space-y-4">
+                            <div class="flex justify-between text-xs font-bold"><span class="text-slate-500">直接费合计</span><span id="stat-subtotal-text">¥ 0.00</span></div>
+                            <div class="flex justify-between text-xs font-bold"><span class="text-slate-500">增值税率 (3%)</span><span id="stat-tax">¥ 0.00</span></div>
+                            <div class="flex justify-between text-sm font-black text-indigo-400 pt-4 border-t border-white/5 uppercase"><span>单方造价/㎡</span><span id="stat-avg-cost">¥ 0.00</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 编辑器 -->
+            <div id="tab-editor" class="hidden max-w-5xl mx-auto space-y-8 no-print">
+                <h2 id="current-category-name" class="text-4xl font-black text-slate-800 italic">--</h2>
+                <div class="bg-white rounded-[2.5rem] shadow-xl border border-slate-100 table-container">
+                    <table class="w-full text-left">
+                        <thead><tr class="bg-slate-50 text-slate-400 text-[10px] font-bold uppercase border-b"><th class="px-8 py-5 w-16">#</th><th class="px-8 py-5">项目特征描述</th><th class="px-6 py-5 text-center w-20">单位</th><th class="px-6 py-5 text-center w-24">单价</th><th class="px-6 py-5 text-center w-32">数量</th><th class="px-8 py-5 text-right w-36">小计</th></tr></thead>
+                        <tbody id="item-table-body" class="divide-y divide-slate-50 text-sm"></tbody>
+                    </table>
+                </div>
+                <div id="standard-info" class="grid grid-cols-1 md:grid-cols-2 gap-8 opacity-0 translate-y-4 transition-all">
+                    <div class="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm"><div class="text-indigo-600 font-bold mb-4 uppercase text-xs italic flex items-center"><div class="w-2 h-2 bg-indigo-500 rounded-full mr-2"></div>SOP 工艺标准</div><ul id="sop-list" class="space-y-3 text-slate-500 text-xs leading-relaxed"></ul></div>
+                    <div class="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm"><div class="text-emerald-600 font-bold mb-4 uppercase text-xs italic flex items-center"><div class="w-2 h-2 bg-emerald-500 rounded-full mr-2"></div>辅材特征描述</div><div id="material-content" class="text-xs text-slate-500 bg-slate-50 p-6 rounded-2xl border border-slate-100"></div></div>
+                </div>
+            </div>
+
+            <!-- 零件库 -->
+            <div id="tab-library" class="hidden max-w-6xl mx-auto space-y-8 no-print">
+                <div class="focus-toolbar bg-white/80 rounded-[2rem] px-6 py-5 border border-slate-200 flex flex-col gap-4">
+                    <div>
+                        <div class="text-[10px] font-bold uppercase tracking-[0.3em] text-indigo-500">Focus Mode</div>
+                        <h2 class="text-3xl font-black text-slate-800 mt-2">零件库管理</h2>
+                        <p class="text-sm text-slate-400 mt-2">支持调价、改材料说明、新增/删减项目以及科目，还能复制与排序。</p>
+                    </div>
+                    <div class="flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+                        <div class="flex flex-col md:flex-row md:items-center gap-3 flex-1">
+                            <div class="relative flex-1 max-w-xl">
+                                <input id="library-search-input" type="text" placeholder="搜索科目、项目、编号、材料说明..." oninput="updateLibrarySearch(this.value)" class="w-full pl-11 pr-4 py-3 bg-slate-50 rounded-2xl border border-slate-200 outline-none focus:border-indigo-400 text-sm font-medium text-slate-700">
+                                <svg class="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 21l-4.35-4.35m1.85-5.15a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <button onclick="toggleAllCategories(true)" class="px-4 py-3 border border-slate-200 text-slate-500 rounded-2xl text-xs font-bold">全部展开</button>
+                                <button onclick="toggleAllCategories(false)" class="px-4 py-3 border border-slate-200 text-slate-500 rounded-2xl text-xs font-bold">全部折叠</button>
+                                <div id="library-save-hint" class="text-xs font-bold text-emerald-600 opacity-0 transition-opacity">已自动保存</div>
+                            </div>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-3">
+                            <button onclick="switchTab('dashboard')" class="px-5 py-3 border border-slate-200 text-slate-500 rounded-2xl text-xs font-bold">完成编辑</button>
+                            <button onclick="restoreDefaultLibrary()" class="px-5 py-3 border border-slate-200 text-slate-500 rounded-2xl text-xs font-bold">恢复默认库</button>
+                            <button onclick="addCategory()" class="px-5 py-3 bg-slate-900 text-white rounded-2xl text-xs font-bold shadow-xl">新增科目</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="library-manager" class="space-y-6"></div>
+            </div>
+
+            <!-- 设置 -->
+            <div id="tab-settings" class="hidden max-w-5xl mx-auto no-print">
+                <div class="focus-panel bg-white p-8 md:p-12 space-y-10">
+                    <div class="focus-toolbar bg-white/80 rounded-[2rem] px-2 py-2 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                        <div>
+                            <div class="text-[10px] font-bold uppercase tracking-[0.3em] text-indigo-500">Focus Mode</div>
+                            <h2 class="text-3xl font-black text-slate-800 mt-2">项目设置</h2>
+                            <p class="text-sm text-slate-400 mt-2">集中维护项目基础信息，保存后会回到数据中心。</p>
+                        </div>
+                        <div class="flex flex-wrap gap-3">
+                            <button onclick="switchTab('dashboard')" class="px-5 py-3 border border-slate-200 text-slate-500 rounded-2xl text-xs font-bold">取消返回</button>
+                            <button id="settings-save-btn" onclick="saveSettings()" class="px-6 py-3 bg-slate-900 text-white rounded-2xl font-bold shadow-xl transition-all text-sm">保存并返回</button>
+                        </div>
+                    </div>
+                    <div class="flex flex-col items-center space-y-5 pb-10 border-b border-slate-100">
+                        <div id="settings-logo-preview" class="w-28 h-28 logo-container rounded-[2.5rem] text-indigo-600 font-black text-5xl shadow-2xl">V</div>
+                        <div class="flex space-x-3"><input type="file" id="cfg-logo-file" accept="image/*" class="hidden" onchange="handleLogoUpload(this)"><button onclick="document.getElementById('cfg-logo-file').click()" class="px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-bold shadow-lg">更换企业 Logo</button><button onclick="resetLogo()" class="px-5 py-2.5 text-slate-400 border border-slate-200 rounded-xl text-xs font-bold">清除</button></div>
+                    </div>
+                    <div class="grid grid-cols-1 xl:grid-cols-2 gap-8">
+                        <div class="space-y-6">
+                            <div class="bg-slate-50 rounded-[2rem] p-6 border border-slate-100 space-y-5">
+                                <div class="text-[10px] font-bold uppercase tracking-[0.3em] text-slate-400">项目主体</div>
+                                <div class="space-y-2"><label class="text-[10px] font-bold text-slate-400 uppercase">公司名称</label><input type="text" id="cfg-company-name" class="w-full px-5 py-4 bg-white rounded-2xl font-bold outline-none border-2 border-transparent focus:border-indigo-400"></div>
+                                <div class="space-y-2"><label class="text-[10px] font-bold text-slate-400 uppercase">项目编号</label><input type="text" id="cfg-project-id" class="w-full px-5 py-4 bg-white rounded-2xl font-bold outline-none border-2 border-transparent focus:border-indigo-400"></div>
+                                <div class="space-y-2"><label class="text-[10px] font-bold text-slate-400 uppercase">小区/项目全称</label><input type="text" id="cfg-project-name" class="w-full px-5 py-4 bg-white rounded-2xl font-bold outline-none border-2 border-transparent focus:border-indigo-400"></div>
+                            </div>
+                            <div class="bg-slate-50 rounded-[2rem] p-6 border border-slate-100 space-y-5">
+                                <div class="text-[10px] font-bold uppercase tracking-[0.3em] text-slate-400">人员信息</div>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                    <div class="space-y-2"><label class="text-[10px] font-bold text-slate-400 uppercase">客户姓名</label><input type="text" id="cfg-client-name" class="w-full px-5 py-4 bg-white rounded-2xl font-bold outline-none border-2 border-transparent focus:border-indigo-400"></div>
+                                    <div class="space-y-2"><label class="text-[10px] font-bold text-slate-400 uppercase">客户电话</label><input type="text" id="cfg-client-phone" class="w-full px-5 py-4 bg-white rounded-2xl font-bold outline-none border-2 border-transparent focus:border-indigo-400"></div>
+                                    <div class="space-y-2"><label class="text-[10px] font-bold text-slate-400 uppercase">设计师</label><input type="text" id="cfg-designer" class="w-full px-5 py-4 bg-white rounded-2xl font-bold outline-none border-2 border-transparent focus:border-indigo-400"></div>
+                                    <div class="space-y-2"><label class="text-[10px] font-bold text-slate-400 uppercase">项目经理</label><input type="text" id="cfg-pm" class="w-full px-5 py-4 bg-white rounded-2xl font-bold outline-none border-2 border-transparent focus:border-indigo-400"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="space-y-6">
+                            <div class="bg-slate-900 rounded-[2rem] p-6 text-white space-y-5">
+                                <div class="text-[10px] font-bold uppercase tracking-[0.3em] text-indigo-300">预算基准</div>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                    <div class="space-y-2"><label class="text-[10px] font-bold text-white/50 uppercase">建筑面积 (㎡)</label><input type="number" id="cfg-area" class="w-full px-5 py-4 bg-white/10 rounded-2xl font-black text-white outline-none border border-white/10 focus:border-indigo-300"></div>
+                                    <div class="space-y-2"><label class="text-[10px] font-bold text-white/50 uppercase">编制日期</label><input type="date" id="cfg-date" class="w-full px-5 py-4 bg-white/10 rounded-2xl font-bold text-white outline-none border border-white/10 focus:border-indigo-300"></div>
+                                </div>
+                                <div class="text-sm leading-7 text-white/70">这里维护的是封面、看板和导出报表都共用的基础信息。保存后会即时更新整套预算界面。</div>
+                            </div>
+                            <div class="bg-gradient-to-br from-indigo-50 to-white rounded-[2rem] p-6 border border-indigo-100">
+                                <div class="text-[10px] font-bold uppercase tracking-[0.3em] text-indigo-500">操作提示</div>
+                                <div class="mt-4 space-y-3 text-sm text-slate-500">
+                                    <p>进入项目设置后，左右侧栏会自动收起，便于专注填写。</p>
+                                    <p>保存成功后，按钮会变成“已保存”，随后自动返回数据中心。</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 打印输出容器 -->
+            <div id="print-summary-list" class="print-only"></div>
+            <div id="print-detailed-list" class="print-only"></div>
+        </section>
+
+        <!-- 右侧看板 -->
+        <aside id="workspace-aside" class="w-80 bg-white border-l border-slate-200 p-8 flex flex-col no-print shrink-0">
+            <h2 class="text-2xl font-black text-slate-800 mb-8 italic tracking-tighter">实时预算看板</h2>
+            <div class="flex-1 space-y-8 overflow-y-auto custom-scrollbar pr-2">
+                <div class="p-8 bg-indigo-600 rounded-[2.5rem] text-white shadow-2xl relative overflow-hidden">
+                    <p class="text-indigo-100 text-[10px] font-bold uppercase tracking-widest mb-1 italic">Subtotal</p>
+                    <div id="aside-total" class="text-3xl font-black tracking-tighter leading-none">¥ 0.00</div>
+                    <div class="mt-6 pt-6 border-t border-white/10 flex justify-between items-center text-[10px] font-bold"><span class="text-indigo-200">TAX 3% INCL</span><span id="aside-tax" class="text-white">¥ 0.00</span></div>
+                </div>
+                <div id="aside-breakdown" class="space-y-5"></div>
+            </div>
+            <div class="mt-10"><button onclick="handlePrint()" class="w-full bg-slate-900 text-white py-5 rounded-[1.5rem] font-bold shadow-xl hover:bg-black transition-all flex items-center justify-center space-x-3 group active:scale-95 uppercase tracking-widest text-xs">
+                <svg class="w-5 h-5 group-hover:rotate-12 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                <span>导出清单报表</span></button></div>
+        </aside>
+    </main>
+
+    <script>
+        const safeSetText = (id, text) => { const el = document.getElementById(id); if (el) el.innerText = text; };
+        const safeSetHTML = (id, html) => { const el = document.getElementById(id); if (el) el.innerHTML = html; };
+        const escapeHTML = (value) => String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        const hasOwn = (obj, key) => Object.prototype.hasOwnProperty.call(obj, key);
+        const getItemQty = (item) => hasOwn(state.quantities, item.id) ? state.quantities[item.id] : 0;
+        const getItemPrice = (item) => hasOwn(state.prices, item.id) ? state.prices[item.id] : item.price;
+        const getItemMaterials = (item) => hasOwn(state.materialDescs, item.id) ? state.materialDescs[item.id] : item.materials;
+
+        // 全量补全数据库：严格核对20份CSV内容
+        let budgetDatabase = [
+            { id: '0', name: '开工准备', items: [
+                { id: '0.1', name: '入户门保护', unit: '项', price: 150, defaultQty: 1, sop: ['入户门套全包覆保护','门扇及门套转角加装防撞护角','完工前保持保护层完整无破损'], materials: '加厚珍珠棉门套、PVC护角、警示标识' },
+                { id: '0.2', name: '门槛保护条', unit: '道', price: 35, defaultQty: 2, sop: ['门槛石及压条位置满铺缓冲层','高频通行区域加装防滑防撞条'], materials: 'EVA缓冲垫、防撞保护条' },
+                { id: '0.3', name: '电梯轿厢保护', unit: '项', price: 300, defaultQty: 1, sop: ['轿厢侧壁及地面铺设成品保护层','按物业要求张贴施工告知'], materials: '瓦楞板、珍珠棉、地面保护膜' },
+                { id: '0.4', name: '楼道地面保护', unit: '项', price: 200, defaultQty: 1, sop: ['公共通道分段铺设保护膜','材料转运动线重点加厚'], materials: '编织布、保护膜、纸胶带' },
+                { id: '0.5', name: '燃气表保护', unit: '项', price: 50, defaultQty: 1, sop: ['燃气表及阀门独立包覆防尘防撞','保留检修操作空间'], materials: 'PVC保护罩、珍珠棉' },
+                { id: '0.6', name: '强弱电箱保护', unit: '项', price: 80, defaultQty: 1, sop: ['箱体四周封护防止粉尘侵入','标记回路信息避免误操作'], materials: '瓦楞板、警示贴、封护膜' },
+                { id: '0.7', name: '窗框保护', unit: '樘', price: 45, defaultQty: 6, sop: ['原窗框及玻璃边口满贴保护膜','高空作业面增设缓冲护角'], materials: '静电保护膜、珍珠棉护角' },
+                { id: '0.8', name: '地漏及排污口临时封堵', unit: '处', price: 20, defaultQty: 4, sop: ['施工前完成排水口封堵','防止建渣掉入造成堵塞'], materials: '专用封堵盖、胶带' },
+                { id: '0.9', name: '临时马桶', unit: '个', price: 30, defaultQty: 1, sop: ['施工期临时排污设施安装定位','每日清洁消杀并保持畅通'], materials: '塑料成品马桶、密封袋' },
+                { id: '0.10', name: '烟道止逆阀', unit: '个', price: 80, defaultQty: 1, sop: ['烟道口基层修整后安装止逆阀','接口位置密封防串味'], materials: 'ABS止逆阀、密封胶' },
+                { id: '0.11', name: '隔音棉包覆', unit: '处', price: 120, defaultQty: 2, sop: ['下水立管满缠隔音棉','外层阻尼胶带固定成型'], materials: '高密度隔音棉、阻尼胶带' },
+                { id: '0.12', name: '临时照明布置', unit: '项', price: 150, defaultQty: 1, sop: ['施工区设置安全照明回路','潮湿区域使用防护灯具'], materials: 'LED临时灯、护套线、插排' },
+                { id: '0.13', name: '施工放线', unit: '㎡', price: 10, defaultQty: 138, sop: ['按设计图进行1:1全屋定位放线','墙地顶三维基准线统一复核'], materials: '激光放线仪、墨斗、定位贴' },
+                { id: '0.14', name: '密码盒安装', unit: '项', price: 60, defaultQty: 1, sop: ['现场钥匙统一纳入密码盒管理','交底后登记启用责任人'], materials: '机械密码盒、不锈钢膨胀件' }
+            ]},
+            { id: '1', name: '综合项目', items: [
+                { id: '1.1', name: '工程管理费', unit: '项', price: 3000, defaultQty: 1, sop: ['按计税前工程直接费10%计取','实施工序巡检与节点验收管理','施工日志及进度协调同步归档'], materials: '项目管理体系、巡检记录表' },
+                { id: '1.2', name: '图纸设计费', unit: '项', price: 2000, defaultQty: 1, sop: ['完成方案图、施工图与交底图输出','按建筑面积与设计师级别计费'], materials: '方案图纸、施工深化文件' },
+                { id: '1.3', name: '成品保护费', unit: '项', price: 500, defaultQty: 1, sop: ['楼梯及楼板口围边防护','消防设施与电气设备专项保护','施工照明及安全防护用品布置'], materials: '保护膜、防撞条、围挡、警示物料' },
+                { id: '1.4', name: '材料运输费用', unit: '项', price: 2000, defaultQty: 1, sop: ['乙方材料统一运输至施工现场','不含业主自购主材搬运'], materials: '物流运输、人工装卸' },
+                { id: '1.5', name: '室内日常除渣费', unit: '项', price: 200, defaultQty: 1, sop: ['施工期间室内建渣归集清洁','保持现场通道及作业面整洁'], materials: '人工保洁、垃圾袋、清运工具' },
+                { id: '1.6', name: '垃圾清运费（有电梯）', unit: '项', price: 2000, defaultQty: 1, sop: ['装修垃圾集中清运至物业指定地点','含人工辅材及装袋外运'], materials: '清运车、编织袋、人工' }
+            ]},
+            { id: '2', name: '拆除工程', items: [
+                { id: '2.1', name: '阳台与厨房隔墙拆除', unit: '㎡', price: 65, defaultQty: 65.3, sop: ['拆除前复核非承重属性','分段切割拆除并严禁破坏梁柱结构','拆后基层及时清理外运'], materials: '专业电镐、切割机、防尘保护膜' },
+                { id: '2.2', name: '全屋地面瓷砖拆除（包含厨卫）', unit: '项', price: 1500, defaultQty: 1, sop: ['地砖与抹灰层同步铲除','拆除前完成周边成品保护'], materials: '电镐、地面保护膜、编织袋' },
+                { id: '2.3', name: '卫生间墙砖拆除', unit: '㎡', price: 40, defaultQty: 120, sop: ['按立面分区拆除瓷砖饰面','半干砂浆基层同步清理'], materials: '电镐、铲刀、防尘布' },
+                { id: '2.4', name: '厨房墙砖拆除', unit: '㎡', price: 40, defaultQty: 30, sop: ['湿作业区墙砖分层拆除','基层残留砂浆清理至结构面'], materials: '电镐、铲刀、防护膜' },
+                { id: '2.5', name: '天花吊顶拆除', unit: '㎡', price: 30, defaultQty: 85, sop: ['拆除前确认上方管线走向','轻钢龙骨及石膏板分层拆卸'], materials: '人工拆除、防尘布、垃圾袋' },
+                { id: '2.6', name: '铲除乳胶漆', unit: '㎡', price: 4, defaultQty: 180, sop: ['墙面天花铲除至原始基层','空鼓及松散层同步清除'], materials: '铲刀、喷壶、砂纸' },
+                { id: '2.7', name: '门拆除', unit: '樘', price: 120, defaultQty: 5, sop: ['原门及门套整体拆除','拆卸过程保护洞口结构'], materials: '手动工具、保护膜' },
+                { id: '2.8', name: '原建筑窗拆除', unit: '樘', price: 120, defaultQty: 6, sop: ['原窗分体拆除并做好高空防护','洞口残留胶体与膨胀件清理'], materials: '拆窗工具、安全绳、防护用品' },
+                { id: '2.9', name: '卫生洁具拆除', unit: '套', price: 120, defaultQty: 4, sop: ['洁具拆卸前关闭水源并排空','拆后排口临时封堵'], materials: '扳手、封堵盖、保护膜' },
+                { id: '2.10', name: '灯具拆除', unit: '项', price: 200, defaultQty: 2, sop: ['断电后拆卸原有灯具','预留线路端头绝缘处理'], materials: '绝缘胶布、登高工具' },
+                { id: '2.11', name: '柜体拆除', unit: '个', price: 150, defaultQty: 8, sop: ['板式柜体分件拆解外运','保留墙体基层完整'], materials: '电动螺丝刀、撬棒、保护膜' },
+                { id: '2.12', name: '空调开孔', unit: '个', price: 80, defaultQty: 2, sop: ['孔径100mm以外600mm以内定位开孔','孔边成型并清理粉尘'], materials: '水钻设备、封边材料' }
+            ]},
+            { id: '3', name: '新建墙体', items: [
+                { id: '3.1', name: '主卧实心砖墙（60mm）', unit: '㎡', price: 120, defaultQty: 20, sop: ['红砖错缝砌筑','拉结筋植筋深度按10d控制','顶部斜砌挤紧并挂网防裂'], materials: '红砖、M10水泥砂浆、拉结筋' },
+                { id: '3.2', name: '次卧实心砖墙（120mm）', unit: '㎡', price: 120, defaultQty: 30, sop: ['120mm实心砖墙双面挂线砌筑','新旧墙交接处设拉结筋','顶部斜砌并做挂网防裂'], materials: '红砖、M10水泥砂浆、钢筋拉结件' },
+                { id: '3.3', name: '厨房砌块墙（100mm）', unit: '㎡', price: 120, defaultQty: 18, sop: ['加气砌块专用粘结砂浆砌筑','厨区墙体根部设置防潮构造层'], materials: '加气混凝土砌块、专用粘结砂浆' },
+                { id: '3.4', name: '阳台砌块墙（200mm）', unit: '㎡', price: 220, defaultQty: 6.28, sop: ['200mm加气砌块挂线砌筑','洞口边及交接部位加强处理'], materials: '200mm加气砌块、专用粘结砂浆' },
+                { id: '3.5', name: '局部砌砖（卫生间壁龛）', unit: '项', price: 1500, defaultQty: 1, sop: ['按图纸尺寸砌筑壁龛基层','阴阳角方正并预留防水收口'], materials: '红砖、M10水泥砂浆' },
+                { id: '3.6', name: '局部砌砖（主卫墙面加固）', unit: '项', price: 1100, defaultQty: 1, sop: ['受力墙面局部砌筑加固','后续面层前完成挂网防裂'], materials: '红砖、M10水泥砂浆、钢丝网' },
+                { id: '3.7', name: '局部砌砖（主卫浴缸基础）', unit: '项', price: 1350, defaultQty: 1, sop: ['浴缸基础按承重定位砌筑','完成找平并预留检修空间'], materials: '红砖、M10水泥砂浆' }
+            ]},
+            { id: '4', name: '防水工程', items: [
+                { id: '4.1', name: '客卫墙面砂浆防水', unit: '㎡', price: 40, defaultQty: 34.1, sop: ['基层清理后墙面涂刷2遍防水','阴阳角与管根附加层加强'], materials: '雨虹防水涂料、附加增强网' },
+                { id: '4.2', name: '客卫地面砂浆防水', unit: '㎡', price: 40, defaultQty: 8, sop: ['地面防水满刷3遍','完成48小时闭水试验'], materials: '雨虹防水涂料、密封材料' },
+                { id: '4.3', name: '主卫墙面砂浆防水', unit: '㎡', price: 40, defaultQty: 26, sop: ['主卫墙面涂刷2遍防水','淋浴区重点加强处理'], materials: '雨虹防水涂料、附加增强网' },
+                { id: '4.4', name: '主卫地面砂浆防水', unit: '㎡', price: 40, defaultQty: 6, sop: ['地面防水满刷3遍','门槛及地漏口重点收头'], materials: '雨虹防水涂料、密封材料' }
+            ]},
+            { id: '5', name: '地面工程', items: [
+                { id: '5.1', name: '地面砂浆找平', unit: '㎡', price: 50, defaultQty: 100, sop: ['地面找平找坡同步完成','1:3水泥砂浆压实收面'], materials: '海螺水泥、中砂、界面剂' },
+                { id: '5.2', name: '瓷砖地面（不含卫生间湿区）', unit: '㎡', price: 145, defaultQty: 95, sop: ['1500×750地砖薄贴法铺贴','砖缝统一控制2mm并十字定位'], materials: '东鹏陶瓷、德高瓷砖胶、找平器' },
+                { id: '5.3', name: '卫生间湿区地面', unit: '㎡', price: 120, defaultQty: 5, sop: ['600×1200地砖湿区排版铺贴','向地漏方向找坡'], materials: '东鹏陶瓷、瓷砖胶、十字卡' },
+                { id: '5.4', name: '金属踢脚线', unit: 'm', price: 20, defaultQty: 60, sop: ['4mm黑色铝合金嵌入式安装','接口顺直并用结构胶粘结'], materials: '黑色铝合金踢脚线、结构胶' },
+                { id: '5.5', name: '卫生间地面美缝', unit: '㎡', price: 16, defaultQty: 50, sop: ['砖缝清理后填充环氧彩砂','缝面压实修整平顺'], materials: '环氧彩砂填缝剂' },
+                { id: '5.6', name: '客厅卧室地面美缝', unit: 'm', price: 16, defaultQty: 100, sop: ['砖缝除尘后连续填缝','成品保护至完全固化'], materials: '环氧彩砂填缝剂' }
+            ]},
+            { id: '6', name: '墙面工程', items: [
+                { id: '6.1', name: '墙面腻子灰基础', unit: '㎡', price: 65, defaultQty: 180, sop: ['基层裂缝贴白布条或牛皮纸处理','腻子三遍找平并砂光打磨'], materials: '腻子粉、白布条、牛皮纸' },
+                { id: '6.2', name: '立面砂浆找平层', unit: '㎡', price: 55, defaultQty: 50, sop: ['厨卫墙面归方找平','M20预拌砂浆分层压实'], materials: 'M20预拌砂浆、界面剂' },
+                { id: '6.3', name: '客卫瓷砖墙面', unit: '㎡', price: 120, defaultQty: 50, sop: ['600×1200墙砖薄贴施工','砖缝统一控制2mm'], materials: '东鹏陶瓷、瓷砖胶、找平器' },
+                { id: '6.4', name: '主卫瓷砖墙面', unit: '㎡', price: 120, defaultQty: 55, sop: ['大板墙砖薄贴法施工','阴阳角通缝对缝排版'], materials: '东鹏陶瓷、瓷砖胶、十字卡' },
+                { id: '6.5', name: '厨房瓷砖墙面', unit: '㎡', price: 280, defaultQty: 9, sop: ['750×1500墙砖薄贴安装','门洞及转角部位整砖优先'], materials: '东鹏陶瓷、瓷砖胶、找平器' },
+                { id: '6.6', name: '阳台瓷砖墙面', unit: '㎡', price: 280, defaultQty: 6, sop: ['750×1500墙砖薄贴施工','收边顺直并预留伸缩缝'], materials: '东鹏陶瓷、瓷砖胶、找平器' },
+                { id: '6.7', name: '墙面瓷砖美缝', unit: 'm', price: 18, defaultQty: 80, sop: ['RG等级环氧树脂填缝','缝面压实防污染'], materials: 'RG等级环氧树脂填缝剂' },
+                { id: '6.8', name: '墙面造型（客厅电视墙）', unit: '项', price: 2200, defaultQty: 1, sop: ['OSB基层固定成型','9.5mm纸面石膏板双层收口'], materials: 'OSB板、9.5mm纸面石膏板' },
+                { id: '6.9', name: '墙面造型（沙发背景墙）', unit: '项', price: 2400, defaultQty: 1, sop: ['基层找直后分层造型','接缝处嵌缝防裂处理'], materials: 'OSB板、9.5mm纸面石膏板' },
+                { id: '6.10', name: '墙面护墙板', unit: '项', price: 1500, defaultQty: 1, sop: ['基层加固后护墙板分格安装','收口位置顺平'], materials: 'OSB板、9.5mm纸面石膏板' },
+                { id: '6.11', name: '墙面造型（主卧背景墙）', unit: '项', price: 2400, defaultQty: 1, sop: ['背景墙基层造型放样定位','饰面层接缝做嵌缝抗裂'], materials: 'OSB板、9.5mm纸面石膏板' }
+            ]},
+            { id: '7', name: '天花工程', items: [
+                { id: '7.1', name: '天花抹灰', unit: '㎡', price: 45, defaultQty: 330.5, sop: ['石膏板及抹面砂浆基层找平','耐碱玻纤网格带配嵌缝石膏处理拼缝'], materials: '嵌缝石膏、玻纤网格带、轻质找平石膏' },
+                { id: '7.2', name: '平面吊顶天花', unit: '㎡', price: 195, defaultQty: 81.3, sop: ['Φ8吊杆固定','主龙骨600mm副龙骨400mm排布','转角采用七字型整板套裁'], materials: 'Φ8吊杆、50卡式龙骨、双层9.5mm纸面石膏板' },
+                { id: '7.3', name: '平面吊顶天花（卫生间）', unit: '㎡', price: 220, defaultQty: 17.5, sop: ['卫浴吊顶采用耐水石膏板','龙骨间距按600/400mm控制'], materials: 'Φ8吊杆、50卡式龙骨、双层9.5mm耐水石膏板' },
+                { id: '7.4', name: '叠级吊顶天花', unit: '㎡', price: 220, defaultQty: 15.6, sop: ['叠级造型分层放样定位','转角及侧板处加设OSB加固'], materials: 'Φ8吊杆、50卡式龙骨、OSB板、双层9.5mm纸面石膏板' },
+                { id: '7.5', name: '艺术造型吊顶天花（餐厅）', unit: '项', price: 6600, defaultQty: 1, sop: ['异形吊顶按图放样制作','主副龙骨与基层结构同步加固'], materials: 'Φ8吊杆、50卡式龙骨、OSB板、双层9.5mm纸面石膏板' },
+                { id: '7.6', name: '艺术造型吊顶天花（厨房）', unit: '项', price: 1800, defaultQty: 1, sop: ['厨房异形顶面分段制作','板缝处做V型槽抗裂处理'], materials: 'Φ8吊杆、50卡式龙骨、OSB板、双层9.5mm纸面石膏板' },
+                { id: '7.7', name: '天花其他装饰（灯槽）', unit: 'm', price: 38, defaultQty: 33.14, sop: ['灯槽位置预留灯带安装空间','槽口顺直并完成封板收边'], materials: 'OSB板、双层9.5mm纸面石膏板' },
+                { id: '7.8', name: '天花其他装饰（窗帘盒）', unit: 'm', price: 130, defaultQty: 12.5, sop: ['窗帘盒采用双层OSB基层加固','预留轨道安装尺寸'], materials: 'OSB板、双层9.5mm纸面石膏板' },
+                { id: '7.9', name: '天花其他装饰（投影幕槽）', unit: 'm', price: 110, defaultQty: 5, sop: ['投影幕槽按设备尺寸精准开槽','预留电源与检修空间'], materials: 'OSB板、双层9.5mm纸面石膏板' },
+                { id: '7.10', name: '天花其他装饰（磁吸灯轨道）', unit: 'm', price: 95, defaultQty: 5.5, sop: ['轨道槽体与吊顶结构一体化预埋','通长位置校直'], materials: 'OSB板、双层9.5mm纸面石膏板' },
+                { id: '7.11', name: '天花其他装饰（口袋门轨道）', unit: 'm', price: 110, defaultQty: 1.7, sop: ['轨道位吊顶局部加固','门轨安装区保持水平'], materials: 'OSB板、双层9.5mm纸面石膏板' },
+                { id: '7.12', name: '天花其他装饰（空调艺术风口）', unit: '项', price: 3300, defaultQty: 1, sop: ['风口造型与风管出风口精确套位','检修空间同步预留'], materials: 'OSB板、双层9.5mm纸面石膏板' },
+                { id: '7.13', name: '天花其他装饰（检修口）', unit: '项', price: 220, defaultQty: 1, sop: ['检修口成品安装并与吊顶齐平','边口收边牢固'], materials: 'OSB板、成品检修口' },
+                { id: '7.14', name: '天花其他装饰（零星加固）', unit: '项', price: 1100, defaultQty: 1, sop: ['吊灯和投影设备位置独立加固','基层承载节点复核'], materials: 'OSB板、双层9.5mm纸面石膏板' }
+            ]},
+            { id: '8', name: '乳胶漆工程', items: [
+                { id: '8.1', name: '主卧室艺术漆', unit: '㎡', price: 200, defaultQty: 8, sop: ['基层修补完成后进行肌理打底','艺术涂层分遍施工成型'], materials: '肌理厚质艺术涂料' },
+                { id: '8.2', name: '女儿房艺术漆', unit: '㎡', price: 200, defaultQty: 6, sop: ['基层平整度复核后分层批涂','肌理纹理均匀控制'], materials: '肌理厚质艺术涂料' },
+                { id: '8.3', name: '墙面涂料', unit: '㎡', price: 55, defaultQty: 150, sop: ['石膏基层处理完成后腻子2遍','乳胶漆一底两面滚涂'], materials: '墙面乳胶漆底漆、面漆、腻子粉' },
+                { id: '8.4', name: '天花涂料', unit: '㎡', price: 55, defaultQty: 80, sop: ['天花基层修补找平','乳胶漆底漆1遍面漆2遍'], materials: '天花乳胶漆底漆、面漆、腻子粉' },
+                { id: '8.5', name: '天花涂料（防水）', unit: '㎡', price: 60, defaultQty: 8, sop: ['防水石膏基层配仿水腻子2遍','防水乳胶漆底漆1遍面漆2遍'], materials: '防水乳胶漆、仿水腻子' }
+            ]},
+            { id: '9', name: '定制工程', items: [
+                { id: '9.1', name: '玄关鞋柜', unit: '㎡', price: 650, defaultQty: 1.65, sop: ['柜体按图深化下单制作','现场安装并校正门缝'], materials: '柜体1.8mm冰醛板、背板1.2厚、1.8mm门板、基础五金' },
+                { id: '9.2', name: '阳台柜', unit: '㎡', price: 650, defaultQty: 3.73, sop: ['柜体防潮分区制作','靠窗及设备位尺寸精准复尺'], materials: '柜体1.8mm冰醛板、背板1.2厚、1.8mm门板、基础五金' },
+                { id: '9.3', name: '餐边柜', unit: '㎡', price: 650, defaultQty: 2.41, sop: ['柜体与墙面垂平对位安装','收口位保持顺直'], materials: '柜体1.8mm冰醛板、背板1.2厚、1.8mm门板、基础五金' },
+                { id: '9.4', name: '女孩子房衣柜', unit: '㎡', price: 650, defaultQty: 4.38, sop: ['衣柜通体结构现场拼装','门板平整度与缝隙复核'], materials: '柜体1.8mm冰醛板、背板1.2厚、1.8mm门板、基础五金' },
+                { id: '9.5', name: '男孩子房衣柜', unit: '㎡', price: 650, defaultQty: 5, sop: ['柜体结构件定位安装','五金件调试后交付'], materials: '柜体1.8mm冰醛板、背板1.2厚、1.8mm门板、基础五金' },
+                { id: '9.6', name: '主卧书桌', unit: '㎡', price: 780, defaultQty: 9.78, sop: ['台面与柜体整体定制安装','连接件加固并校正水平'], materials: '柜体1.8mm冰醛板、背板1.2厚、1.8mm门板、基础五金' },
+                { id: '9.7', name: '主卧衣柜', unit: '㎡', price: 650, defaultQty: 1, sop: ['按现场净尺寸完成定制安装','柜门开启角度及阻尼调试'], materials: '柜体1.8mm冰醛板、背板1.2厚、1.8mm门板、基础五金' },
+                { id: '9.8', name: '厨房（吊柜）', unit: '㎡', price: 650, defaultQty: 6.58, sop: ['吊柜分段固定并校正标高','水槽区柜体按防潮要求升级'], materials: '柜体1.8mm防潮板、背板1.2厚、1.8mm门板、基础五金、水槽柜多层铝板升级' }
+            ]},
+            { id: '10', name: '水电工程', items: [
+                { id: '10.1', name: '强电箱', unit: '项', price: 500, defaultQty: 1, sop: ['强电箱定位安装','漏保及空开按回路配置'], materials: '强电箱、漏保、断路器' },
+                { id: '10.2', name: '强电布线', unit: '㎡', price: 80, defaultQty: 138, sop: ['PVC电管暗敷','照明线BV2.5平方、插座线BV4平方敷设','活线大弯工艺便于后期抽换'], materials: 'PVC线管、线盒、BV电线' },
+                { id: '10.3', name: '强电布线（中央空调）', unit: '项', price: 2500, defaultQty: 1, sop: ['中央空调专线独立回路敷设','大功率设备采用BV6平方'], materials: 'PVC线管、线盒、BV6平方电线' },
+                { id: '10.4', name: '弱电箱', unit: '项', price: 1100, defaultQty: 1, sop: ['弱电箱安装定位','交换机及弱电模块配置'], materials: '弱电箱、交换机、模块件' },
+                { id: '10.5', name: '弱电布线', unit: '㎡', price: 45, defaultQty: 226.4, sop: ['弱电管线独立敷设并与强电分槽','超六类非屏蔽网线穿管'], materials: 'PVC线管、线盒、超六类非屏蔽线' },
+                { id: '10.6', name: '给水布管', unit: '㎡', price: 30, defaultQty: 226.4, sop: ['PP-R给水管热熔连接','试压标准按8-10kg保持24小时'], materials: 'PP-R水管、管件、保温套' },
+                { id: '10.7', name: '排水布管', unit: '㎡', price: 20, defaultQty: 226.4, sop: ['PVC排水管按坡度要求铺设','转弯及存水弯位置优化'], materials: 'PVC排水管、管件、胶水' },
+                { id: '10.8', name: '净水给水布管', unit: '项', price: 650, defaultQty: 1, sop: ['净水管穿PVC套管敷设','净水设备接口位置预留'], materials: 'PVC套管、净水管、管件' },
+                { id: '10.9', name: '地暖', unit: '㎡', price: 55, defaultQty: 100, sop: ['分水器安装定位','保温板反射膜与PE-RT盘管系统铺设'], materials: '分水器、20mmXPS板、反射膜、PE-RT管、硅晶网' },
+                { id: '10.10', name: '照明灯具', unit: '项', price: 800, defaultQty: 1, sop: ['普通灯具安装固定','回路通电测试'], materials: '劳务安装、辅材' },
+                { id: '10.11', name: '开关、插座', unit: '项', price: 600, defaultQty: 1, sop: ['开关插座面板统一安装调平','通断功能逐一测试'], materials: '安装辅材、面板紧固件' },
+                { id: '10.12', name: '卫生器具', unit: '项', price: 500, defaultQty: 1, sop: ['普通洁具及地漏安装','接口密封并做排水测试'], materials: '安装辅材、密封胶、五金件' },
+                { id: '10.13', name: '金属阀门', unit: '项', price: 300, defaultQty: 1, sop: ['角阀及配套阀件安装','接口打压检查'], materials: '角阀、密封带、接头件' }
+            ]}
+        ];
+        const defaultBudgetDatabase = JSON.parse(JSON.stringify(budgetDatabase));
+
+        let state = {
+            tab: 'dashboard', category: 0,
+            project: { 
+                company: '室内设计风向标', id: 'FXB-001', name: '小西圣泽苑室内全案', area: 138, 
+                client: '王先生', clientPhone: '138-0000-0000', designer: '设计师A', pm: '风向标精工经理', 
+                date: '2025-09-17', logo: null 
+            },
+            quantities: {}, prices: {}, materialDescs: {},
+            libraryUI: { search: '', collapsed: {} }
+        };
+
+        function init() { loadState(); renderCategories(); updateDisplay(); calculate(); switchTab(state.tab || 'dashboard'); }
+
+        function updateHeaderModes(tab) {
+            const libraryBtn = document.getElementById('header-library-btn');
+            const settingsBtn = document.getElementById('header-settings-btn');
+            if (libraryBtn) libraryBtn.classList.toggle('header-mode-btn-active', tab === 'library');
+            if (settingsBtn) settingsBtn.classList.toggle('header-mode-btn-active', tab === 'settings');
+        }
+
+        function setFocusLayout(tab) {
+            const nav = document.getElementById('workspace-nav');
+            const aside = document.getElementById('workspace-aside');
+            const mainScroll = document.getElementById('main-scroll');
+            const libraryTab = document.getElementById('tab-library');
+            const settingsTab = document.getElementById('tab-settings');
+            const isFocusMode = tab === 'library' || tab === 'settings';
+
+            if (nav) nav.classList.toggle('hidden', isFocusMode);
+            if (aside) aside.classList.toggle('hidden', isFocusMode);
+            if (mainScroll) {
+                mainScroll.classList.toggle('px-8', !isFocusMode);
+                mainScroll.classList.toggle('md:px-12', isFocusMode);
+                mainScroll.classList.toggle('py-10', isFocusMode);
+            }
+            if (libraryTab) libraryTab.classList.toggle('focus-shell', tab === 'library');
+            if (settingsTab) settingsTab.classList.toggle('focus-shell', tab === 'settings');
+            updateHeaderModes(tab);
+        }
+
+        function switchTab(tab) {
+            state.tab = tab;
+            ['dashboard', 'editor', 'settings', 'library'].forEach(t => { const el = document.getElementById(`tab-${t}`); if (el) el.classList.add('hidden'); });
+            document.getElementById(`tab-${tab}`).classList.remove('hidden');
+            document.getElementById('nav-dashboard').classList.toggle('sidebar-active', tab === 'dashboard');
+            if(tab === 'editor') renderEditor();
+            if(tab === 'library') renderLibrary();
+            setFocusLayout(tab);
+            document.getElementById('main-scroll').scrollTop = 0;
+            renderCategories();
+        }
+
+        function renderCategories() {
+            const list = document.getElementById('category-list');
+            list.innerHTML = budgetDatabase.map((cat, index) => `
+                <button onclick="switchCategory(${index})" class="nav-item w-full flex items-center justify-between px-4 py-3 rounded-xl text-[11px] font-bold transition-all ${index === state.category && state.tab === 'editor' ? 'sidebar-active' : 'text-slate-500'}">
+                    <span>${cat.name}</span>
+                    <span class="opacity-30">${cat.items.length}项</span>
+                </button>
+            `).join('');
+        }
+
+        function switchCategory(i) { state.category = i; switchTab('editor'); }
+
+        function renderEditor() {
+            const cat = budgetDatabase[state.category];
+            if (!cat) {
+                safeSetText('current-category-name', '暂无科目');
+                safeSetHTML('item-table-body', `<tr><td colspan="6" class="px-8 py-10 text-center text-slate-400">请先在零件库中新增科目和项目。</td></tr>`);
+                safeSetHTML('sop-list', '');
+                safeSetText('material-content', '暂无材料说明');
+                return;
+            }
+            safeSetText('current-category-name', cat.name);
+            const body = document.getElementById('item-table-body');
+            if (!cat.items.length) {
+                body.innerHTML = `<tr><td colspan="6" class="px-8 py-10 text-center text-slate-400">当前科目暂无项目，请到零件库新增。</td></tr>`;
+                safeSetHTML('sop-list', '');
+                safeSetText('material-content', '暂无材料说明');
+                return;
+            }
+            body.innerHTML = cat.items.map(item => {
+                const qty = getItemQty(item);
+                const price = getItemPrice(item);
+                return `<tr class="hover:bg-slate-50 transition-colors cursor-pointer" onclick="showStandard('${item.id}')">
+                    <td class="px-8 py-4 text-slate-300 font-mono text-[10px]">${item.id}</td>
+                    <td class="px-8 py-4 font-bold text-slate-700">${item.name}</td>
+                    <td class="px-6 py-4 text-center text-slate-400 font-medium">${item.unit}</td>
+                    <td class="px-6 py-4 text-center font-bold text-slate-900">¥${price}</td>
+                    <td class="px-6 py-4 text-center"><input type="number" step="0.1" value="${qty || ''}" placeholder="${item.defaultQty}" onchange="updateQty('${item.id}', this.value)" onclick="event.stopPropagation()" class="w-20 bg-slate-50 border-2 border-transparent rounded-lg px-2 py-1.5 text-center font-black text-indigo-600 outline-none focus:border-indigo-400"></td>
+                    <td class="px-8 py-4 text-right font-black text-slate-800 italic">¥${(price * qty).toLocaleString(undefined,{minimumFractionDigits:2})}</td></tr>`;
+            }).join('');
+            if(cat.items.length > 0) showStandard(cat.items[0].id);
+        }
+
+        function renderLibrary() {
+            const container = document.getElementById('library-manager');
+            const search = (state.libraryUI?.search || '').trim().toLowerCase();
+            const searchInput = document.getElementById('library-search-input');
+            if (searchInput && searchInput.value !== (state.libraryUI?.search || '')) searchInput.value = state.libraryUI?.search || '';
+            if (!budgetDatabase.length) {
+                container.innerHTML = `<div class="bg-white rounded-[2rem] border border-slate-100 shadow-sm p-12 text-center text-slate-400">暂无科目，点击右上角“新增科目”开始维护零件库。</div>`;
+                return;
+            }
+            let html = '';
+            budgetDatabase.forEach((cat, catIndex) => {
+                const filteredItems = cat.items.filter(item => {
+                    if (!search) return true;
+                    const haystack = [cat.id, cat.name, item.id, item.name, item.unit, item.materials, ...(item.sop || [])].join(' ').toLowerCase();
+                    return haystack.includes(search);
+                });
+                const isCollapsed = !!state.libraryUI?.collapsed?.[cat.id];
+                const itemCountText = search ? `${filteredItems.length}/${cat.items.length}项` : `${cat.items.length}项`;
+                if (search && !filteredItems.length && !cat.name.toLowerCase().includes(search) && !String(cat.id).toLowerCase().includes(search)) return;
+                html += `
+                    <div class="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden">
+                        <div class="px-6 py-5 border-b border-slate-100 bg-slate-50 flex items-center justify-between gap-4">
+                            <div class="flex items-center gap-3 flex-1">
+                                <button onclick="toggleCategoryCollapse('${cat.id}')" class="w-10 h-10 rounded-2xl border border-slate-200 bg-white text-slate-500 text-sm font-black">${isCollapsed ? '+' : '-'}</button>
+                                <span class="text-[10px] font-black text-slate-400 uppercase">科目</span>
+                                <input type="text" value="${escapeHTML(cat.name)}" onchange="updateCategoryField(${catIndex}, 'name', this.value)" class="library-input flex-1 font-black text-slate-800 bg-white">
+                                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">${itemCountText}</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button onclick="moveCategory(${catIndex}, -1)" class="px-3 py-2 rounded-xl border border-slate-200 text-slate-500 text-xs font-bold" ${catIndex === 0 ? 'disabled' : ''}>上移</button>
+                                <button onclick="moveCategory(${catIndex}, 1)" class="px-3 py-2 rounded-xl border border-slate-200 text-slate-500 text-xs font-bold" ${catIndex === budgetDatabase.length - 1 ? 'disabled' : ''}>下移</button>
+                                <button onclick="addItem(${catIndex})" class="px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold">新增项目</button>
+                                <button onclick="removeCategory(${catIndex})" class="px-4 py-2 rounded-xl border border-rose-200 text-rose-500 text-xs font-bold">删除科目</button>
+                            </div>
+                        </div>
+                        <div class="overflow-x-auto ${isCollapsed ? 'hidden' : ''}">
+                            <table class="w-full text-left text-sm">
+                                <thead class="bg-white text-[10px] font-bold text-slate-400 uppercase border-b">
+                                    <tr>
+                                        <th class="px-6 py-4 w-28">编号</th>
+                                        <th class="px-6 py-4 w-44">项目名称</th>
+                                        <th class="px-6 py-4 w-20">单位</th>
+                                        <th class="px-6 py-4 w-24">单价</th>
+                                        <th class="px-6 py-4 w-24">默认量</th>
+                                        <th class="px-6 py-4 w-56">材料说明</th>
+                                        <th class="px-6 py-4 w-56">SOP工艺</th>
+                                        <th class="px-6 py-4 w-20 text-right">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-50">
+                                    ${filteredItems.length ? filteredItems.map((item) => {
+                                        const itemIndex = cat.items.findIndex(entry => entry.id === item.id);
+                                        return `
+                                        <tr class="align-top">
+                                            <td class="px-6 py-4"><input type="text" value="${escapeHTML(item.id)}" onchange="updateItemField(${catIndex}, ${itemIndex}, 'id', this.value)" class="library-input w-full font-mono text-[12px] text-slate-500 bg-slate-50"></td>
+                                            <td class="px-6 py-4"><input type="text" value="${escapeHTML(item.name)}" onchange="updateItemField(${catIndex}, ${itemIndex}, 'name', this.value)" class="library-input w-full font-bold text-slate-700 bg-slate-50"></td>
+                                            <td class="px-6 py-4"><input type="text" value="${escapeHTML(item.unit)}" onchange="updateItemField(${catIndex}, ${itemIndex}, 'unit', this.value)" class="library-input w-full text-center bg-slate-50"></td>
+                                            <td class="px-6 py-4"><input type="number" step="0.01" value="${item.price}" onchange="updateItemField(${catIndex}, ${itemIndex}, 'price', this.value)" class="library-input w-full font-bold text-indigo-600 bg-slate-50"></td>
+                                            <td class="px-6 py-4"><input type="number" step="0.01" value="${item.defaultQty}" onchange="updateItemField(${catIndex}, ${itemIndex}, 'defaultQty', this.value)" class="library-input w-full bg-slate-50"></td>
+                                            <td class="px-6 py-4"><textarea onchange="updateItemField(${catIndex}, ${itemIndex}, 'materials', this.value)" class="library-input library-textarea w-full text-slate-500 bg-slate-50">${escapeHTML(item.materials)}</textarea></td>
+                                            <td class="px-6 py-4"><textarea onchange="updateItemField(${catIndex}, ${itemIndex}, 'sop', this.value)" class="library-input library-textarea w-full text-slate-500 bg-slate-50">${escapeHTML((item.sop || []).join('\n'))}</textarea></td>
+                                            <td class="px-6 py-4 text-right">
+                                                <div class="flex justify-end gap-2">
+                                                    <button onclick="moveItem(${catIndex}, ${itemIndex}, -1)" class="px-3 py-2 rounded-xl border border-slate-200 text-slate-500 text-xs font-bold" ${itemIndex === 0 ? 'disabled' : ''}>上移</button>
+                                                    <button onclick="moveItem(${catIndex}, ${itemIndex}, 1)" class="px-3 py-2 rounded-xl border border-slate-200 text-slate-500 text-xs font-bold" ${itemIndex === cat.items.length - 1 ? 'disabled' : ''}>下移</button>
+                                                    <button onclick="duplicateItem(${catIndex}, ${itemIndex})" class="px-3 py-2 rounded-xl border border-emerald-200 text-emerald-600 text-xs font-bold">复制</button>
+                                                    <button onclick="removeItem(${catIndex}, ${itemIndex})" class="px-3 py-2 rounded-xl border border-rose-200 text-rose-500 text-xs font-bold">删除</button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    `;
+                                    }).join('') : `<tr><td colspan="8" class="px-6 py-8 text-center text-slate-400">${search ? '没有匹配到搜索结果。' : '当前科目还没有项目，点击右上角“新增项目”。'}</td></tr>`}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        function findItemById(id) {
+            for (const cat of budgetDatabase) {
+                const item = cat.items.find(entry => entry.id === id);
+                if (item) return item;
+            }
+            return null;
+        }
+
+        function syncItemState(oldId, newId) {
+            ['quantities', 'prices', 'materialDescs'].forEach(key => {
+                if (hasOwn(state[key], oldId)) {
+                    state[key][newId] = state[key][oldId];
+                    delete state[key][oldId];
+                }
+            });
+        }
+
+        function clearItemState(id) {
+            delete state.quantities[id];
+            delete state.prices[id];
+            delete state.materialDescs[id];
+        }
+
+        function showLibrarySaveHint() {
+            const hint = document.getElementById('library-save-hint');
+            if (!hint) return;
+            hint.classList.remove('opacity-0');
+            hint.classList.add('opacity-100');
+            clearTimeout(showLibrarySaveHint.timer);
+            showLibrarySaveHint.timer = setTimeout(() => {
+                hint.classList.remove('opacity-100');
+                hint.classList.add('opacity-0');
+            }, 1200);
+        }
+
+        function persistAndRefreshLibrary(keepLibrary = true) {
+            renderCategories();
+            calculate();
+            if (state.tab === 'editor') renderEditor();
+            if (keepLibrary && state.tab === 'library') renderLibrary();
+            saveState();
+            showLibrarySaveHint();
+        }
+
+        function updateLibrarySearch(value) {
+            state.libraryUI.search = value;
+            renderLibrary();
+            saveState();
+        }
+
+        function toggleCategoryCollapse(categoryId) {
+            const collapsed = state.libraryUI.collapsed || {};
+            collapsed[categoryId] = !collapsed[categoryId];
+            state.libraryUI.collapsed = collapsed;
+            renderLibrary();
+            saveState();
+        }
+
+        function toggleAllCategories(expand) {
+            const collapsed = {};
+            budgetDatabase.forEach(cat => { collapsed[cat.id] = !expand; });
+            state.libraryUI.collapsed = collapsed;
+            renderLibrary();
+            saveState();
+        }
+
+        function getNextCategoryId() {
+            const ids = budgetDatabase.map(cat => parseInt(cat.id, 10)).filter(Number.isFinite);
+            return String((ids.length ? Math.max(...ids) : -1) + 1);
+        }
+
+        function getNextItemId(category) {
+            const suffixes = category.items
+                .map(item => parseInt(String(item.id).split('.').pop(), 10))
+                .filter(Number.isFinite);
+            return `${category.id}.${(suffixes.length ? Math.max(...suffixes) : 0) + 1}`;
+        }
+
+        function addCategory() {
+            const id = getNextCategoryId();
+            budgetDatabase.push({ id, name: `新科目${id}`, items: [] });
+            state.category = budgetDatabase.length - 1;
+            persistAndRefreshLibrary();
+        }
+
+        function moveCategory(index, direction) {
+            const target = index + direction;
+            if (target < 0 || target >= budgetDatabase.length) return;
+            [budgetDatabase[index], budgetDatabase[target]] = [budgetDatabase[target], budgetDatabase[index]];
+            if (state.category === index) state.category = target;
+            else if (state.category === target) state.category = index;
+            persistAndRefreshLibrary();
+        }
+
+        function removeCategory(index) {
+            const cat = budgetDatabase[index];
+            if (!cat) return;
+            if (!confirm(`确认删除科目“${cat.name}”及其全部项目吗？`)) return;
+            cat.items.forEach(item => clearItemState(item.id));
+            budgetDatabase.splice(index, 1);
+            state.category = Math.max(0, Math.min(state.category, budgetDatabase.length - 1));
+            if (!budgetDatabase.length) state.tab = 'dashboard';
+            persistAndRefreshLibrary();
+            if (!budgetDatabase.length) switchTab('dashboard');
+        }
+
+        function updateCategoryField(index, field, value) {
+            const cat = budgetDatabase[index];
+            if (!cat) return;
+            cat[field] = value.trim() || cat[field];
+            persistAndRefreshLibrary();
+        }
+
+        function addItem(catIndex) {
+            const cat = budgetDatabase[catIndex];
+            if (!cat) return;
+            cat.items.push({
+                id: getNextItemId(cat),
+                name: '新项目',
+                unit: '项',
+                price: 0,
+                defaultQty: 1,
+                sop: ['待补充工艺标准'],
+                materials: '待补充材料说明'
+            });
+            state.category = catIndex;
+            persistAndRefreshLibrary();
+        }
+
+        function duplicateItem(catIndex, itemIndex) {
+            const cat = budgetDatabase[catIndex];
+            const item = cat?.items[itemIndex];
+            if (!item) return;
+            const duplicated = JSON.parse(JSON.stringify(item));
+            duplicated.id = getNextItemId(cat);
+            duplicated.name = `${item.name}（副本）`;
+            cat.items.splice(itemIndex + 1, 0, duplicated);
+            state.category = catIndex;
+            persistAndRefreshLibrary();
+        }
+
+        function moveItem(catIndex, itemIndex, direction) {
+            const cat = budgetDatabase[catIndex];
+            if (!cat) return;
+            const target = itemIndex + direction;
+            if (target < 0 || target >= cat.items.length) return;
+            [cat.items[itemIndex], cat.items[target]] = [cat.items[target], cat.items[itemIndex]];
+            persistAndRefreshLibrary();
+        }
+
+        function removeItem(catIndex, itemIndex) {
+            const cat = budgetDatabase[catIndex];
+            if (!cat || !cat.items[itemIndex]) return;
+            const item = cat.items[itemIndex];
+            if (!confirm(`确认删除项目“${item.name}”吗？`)) return;
+            clearItemState(item.id);
+            cat.items.splice(itemIndex, 1);
+            persistAndRefreshLibrary();
+        }
+
+        function updateItemField(catIndex, itemIndex, field, value) {
+            const cat = budgetDatabase[catIndex];
+            const item = cat?.items[itemIndex];
+            if (!item) return;
+
+            if (field === 'id') {
+                const newId = value.trim();
+                if (!newId) {
+                    alert('项目编号不能为空。');
+                    renderLibrary();
+                    return;
+                }
+                const existing = findItemById(newId);
+                if (existing && existing !== item) {
+                    alert(`项目编号 ${newId} 已存在，请更换。`);
+                    renderLibrary();
+                    return;
+                }
+                const oldId = item.id;
+                item.id = newId;
+                syncItemState(oldId, newId);
+            } else if (field === 'price' || field === 'defaultQty') {
+                item[field] = parseFloat(value) || 0;
+                if (field === 'price') delete state.prices[item.id];
+            } else if (field === 'materials') {
+                item.materials = value;
+                delete state.materialDescs[item.id];
+            } else if (field === 'sop') {
+                item.sop = value.split('\n').map(line => line.trim()).filter(Boolean);
+            } else {
+                item[field] = value;
+            }
+            persistAndRefreshLibrary();
+        }
+
+        function restoreDefaultLibrary() {
+            if (!confirm('确认恢复默认零件库吗？当前新增、排序和库内编辑会被重置，但项目设置和已录入工程量会保留。')) return;
+            Object.keys(state.prices).forEach(key => delete state.prices[key]);
+            Object.keys(state.materialDescs).forEach(key => delete state.materialDescs[key]);
+            const validIds = new Set(defaultBudgetDatabase.flatMap(cat => cat.items.map(item => item.id)));
+            Object.keys(state.quantities).forEach(key => {
+                if (!validIds.has(key)) delete state.quantities[key];
+            });
+            budgetDatabase = JSON.parse(JSON.stringify(defaultBudgetDatabase));
+            state.category = Math.min(state.category, Math.max(budgetDatabase.length - 1, 0));
+            persistAndRefreshLibrary();
+        }
+
+        function updateQty(id, val) { state.quantities[id] = parseFloat(val) || 0; calculate(); renderEditor(); saveState(); }
+
+        function getBudgetSnapshot() {
+            let subtotal = 0;
+            let filledCount = 0;
+            const breakdown = {};
+            budgetDatabase.forEach(cat => {
+                let catTotal = 0;
+                let hasValue = false;
+                cat.items.forEach(item => {
+                    const qty = getItemQty(item);
+                    const price = getItemPrice(item);
+                    if (qty > 0) hasValue = true;
+                    catTotal += price * qty;
+                });
+                if (hasValue) filledCount++;
+                breakdown[cat.name] = catTotal;
+                subtotal += catTotal;
+            });
+            const tax = subtotal * 0.03;
+            const grand = subtotal + tax;
+            return { subtotal, tax, grand, filledCount, breakdown };
+        }
+
+        function calculate() {
+            const { subtotal, tax, grand, filledCount, breakdown } = getBudgetSnapshot();
+            safeSetText('stat-subtotal-text', `¥ ${subtotal.toLocaleString()}`);
+            safeSetText('stat-grand-total', `¥ ${grand.toLocaleString()}`);
+            safeSetText('stat-tax', `¥ ${tax.toLocaleString()}`);
+            safeSetText('stat-avg-cost', `¥ ${(grand / (state.project.area || 1)).toFixed(0)}`);
+            safeSetText('aside-total', `¥ ${grand.toLocaleString()}`);
+            safeSetText('aside-tax', `¥ ${tax.toLocaleString()}`);
+            const bar = document.getElementById('completion-bar'); if (bar) bar.style.width = `${budgetDatabase.length ? (filledCount / budgetDatabase.length) * 100 : 0}%`;
+            safeSetText('completion-text', `${filledCount}/${budgetDatabase.length} 科目已填`);
+            
+            const asideBreakdown = document.getElementById('aside-breakdown');
+            asideBreakdown.innerHTML = Object.keys(breakdown).map(k => {
+                const p = subtotal > 0 ? (breakdown[k]/subtotal*100).toFixed(1) : 0;
+                return `<div><div class="flex justify-between text-[10px] font-bold mb-1"><span class="text-slate-400 uppercase tracking-tighter">${k}</span><span>${p}%</span></div>
+                <div class="w-full bg-slate-50 h-1 rounded-full overflow-hidden"><div class="bg-indigo-500 h-full transition-all duration-500" style="width: ${p}%"></div></div></div>`;
+            }).join('');
+
+            safeSetHTML('summary-table-container', `<table class="w-full text-left text-xs font-bold"><tr class="bg-slate-50 text-[10px] text-slate-400 uppercase border-b tracking-widest"><th class="px-6 py-4">分项科目</th><th class="px-6 py-4 text-right">分项合价</th><th class="px-6 py-4 text-right">占比</th></tr>
+                ${Object.keys(breakdown).map(k => `<tr class="border-b hover:bg-slate-50"><td class="px-6 py-4 text-slate-700">${k}</td><td class="px-6 py-4 text-right">¥${breakdown[k].toLocaleString()}</td><td class="px-6 py-4 text-right text-slate-400 font-mono italic">${subtotal > 0 ? (breakdown[k]/subtotal*100).toFixed(1) : '0.0'}%</td></tr>`).join('')}</table>`);
+        }
+
+        function showStandard(id) {
+            const all = budgetDatabase.flatMap(c => c.items); const item = all.find(i => i.id === id); if (!item) return;
+            safeSetHTML('sop-list', item.sop.map(s => `<li class="flex items-start"><span class="text-indigo-500 mr-2 font-black">•</span>${s}</li>`).join(''));
+            safeSetText('material-content', getItemMaterials(item));
+            document.getElementById('standard-info').classList.remove('opacity-0', 'translate-y-4');
+        }
+
+        function handlePrint() {
+            const { subtotal, tax, grand } = getBudgetSnapshot();
+            let summaryHTML = `<h2 class="print-title border-b-4 border-slate-900 pb-2 uppercase tracking-widest">0. 项目预算概况汇总表</h2>` + document.getElementById('summary-table-container').innerHTML;
+            summaryHTML += `<div class="mt-8 text-right font-black text-slate-900 text-lg">工程直接费合计: ¥${subtotal.toLocaleString()}<br>增值税 (3%): ¥${tax.toLocaleString()}<br><span class="text-xl text-indigo-700 underline decoration-double">项目报审总金额: ¥${grand.toLocaleString()}</span></div>`;
+            safeSetHTML('print-summary-list', `<div class="page-break"></div>` + summaryHTML);
+
+            let detailedHTML = "";
+            budgetDatabase.forEach((cat, idx) => {
+                detailedHTML += `<div class="page-break"></div><h2 class="print-title italic">${idx+1}. ${cat.name} 详细报价单</h2><table class="w-full"><thead><tr class="bg-slate-100 font-black"><th>ID</th><th>报价项及工艺材料特征描述</th><th class="w-16">单位</th><th class="w-20 text-right">单价</th><th class="w-14 text-center">数量</th><th class="w-24 text-right">合价</th></tr></thead><tbody>
+                    ${cat.items.map(item => {
+                        const qty = getItemQty(item); const p = getItemPrice(item); const mat = getItemMaterials(item);
+                        return `<tr><td class="text-center font-mono">${item.id}</td><td><strong>${item.name}</strong><br><small class="text-slate-500">${mat}</small></td><td class="text-center">${item.unit}</td><td class="text-right">¥${p}</td><td class="text-center font-bold">${qty}</td><td class="text-right font-bold">¥${(p*qty).toLocaleString()}</td></tr>`;
+                    }).join('')}</tbody></table>`;
+            });
+            safeSetHTML('print-detailed-list', detailedHTML);
+            switchTab('dashboard');
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    try {
+                        window.print();
+                    } catch (error) {
+                        alert('导出失败，请确认浏览器允许当前页面调用打印。');
+                    }
+                });
+            });
+        }
+
+        function handleLogoUpload(input) { if (input.files && input.files[0]) { const reader = new FileReader(); reader.onload = e => { state.project.logo = e.target.result; updateDisplay(); saveState(); }; reader.readAsDataURL(input.files[0]); } }
+        function resetLogo() { state.project.logo = null; updateDisplay(); saveState(); }
+
+        function saveSettings() {
+            const p = state.project;
+            const saveBtn = document.getElementById('settings-save-btn');
+            const fieldMap = {
+                'company-name': 'company',
+                'project-id': 'id',
+                'project-name': 'name',
+                'client-name': 'client',
+                'client-phone': 'clientPhone',
+                'designer': 'designer',
+                'pm': 'pm',
+                'date': 'date'
+            };
+            Object.keys(fieldMap).forEach(k => {
+                const el = document.getElementById(`cfg-${k}`);
+                if (el) p[fieldMap[k]] = el.value;
+            });
+            p.area = parseFloat(document.getElementById('cfg-area').value) || 0;
+            updateDisplay(); calculate(); saveState();
+            if (saveBtn) {
+                saveBtn.innerText = '已保存，返回中...';
+                saveBtn.classList.remove('bg-slate-900');
+                saveBtn.classList.add('bg-emerald-600');
+            }
+            setTimeout(() => {
+                if (saveBtn) {
+                    saveBtn.innerText = '保存并返回';
+                    saveBtn.classList.remove('bg-emerald-600');
+                    saveBtn.classList.add('bg-slate-900');
+                }
+                switchTab('dashboard');
+            }, 500);
+        }
+
+        function updateDisplay() {
+            const p = state.project;
+            const logoContent = p.logo ? `<img src="${p.logo}" alt="Logo">` : (p.company[0] || 'V');
+            ['company-logo-preview', 'print-logo-box', 'dashboard-logo-preview', 'settings-logo-preview'].forEach(id => { const el = document.getElementById(id); if (el) { el.innerHTML = logoContent; if (!p.logo) el.innerText = p.company[0] || 'V'; } });
+            
+            safeSetText('display-company-name', p.company);
+            safeSetText('d-project-id', p.id); safeSetText('d-project-name', p.name); safeSetText('d-client-name', p.client); safeSetText('d-area', `${p.area} ㎡`); safeSetText('d-designer', p.designer); safeSetText('d-date', p.date);
+            safeSetText('p-company-name', p.company); safeSetText('p-project-name', p.name); safeSetText('p-project-id', p.id); safeSetText('p-client-name', p.client); safeSetText('p-client-phone', p.clientPhone); safeSetText('p-designer', p.designer); safeSetText('p-pm', p.pm); safeSetText('p-area', `${p.area} ㎡`); safeSetText('p-date', p.date);
+        }
+
+        function saveState() { localStorage.setItem('v5_final_budget', JSON.stringify({ state, budgetDatabase })); }
+        function loadState() {
+            const saved = localStorage.getItem('v5_final_budget');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (parsed && parsed.state && Array.isArray(parsed.budgetDatabase)) {
+                    state = { ...state, ...parsed.state };
+                    budgetDatabase = parsed.budgetDatabase;
+                } else {
+                    state = {...state, ...parsed};
+                }
+                state.libraryUI = { search: '', collapsed: {}, ...(state.libraryUI || {}) };
+                const p = state.project;
+                const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
+                setVal('cfg-company-name', p.company); setVal('cfg-project-id', p.id); setVal('cfg-project-name', p.name); setVal('cfg-client-name', p.client); setVal('cfg-client-phone', p.clientPhone); setVal('cfg-designer', p.designer); setVal('cfg-pm', p.pm); setVal('cfg-area', p.area); setVal('cfg-date', p.date);
+            }
+            updateDisplay();
+        }
+        window.onload = init;
+    </script>
+</body>
+</html>

@@ -1,0 +1,43 @@
+/* ────────────────────────────────────────────────────────────────
+   MT Creator Design System V0.3 → CSS variables
+   首次落成。值以 V0.3 为唯一真源，禁止凭感觉改。
+   Accent 换钴蓝主题（V0.3 §2.4）：铁锈红默认色与 --danger 撞车，故整族替换。
+   只改 --accent 一族四个值，其余 token 保持 V0.3 默认。
+   ──────────────────────────────────────────────────────────────── */
+
+:root {
+  /* ── Surface（纸感底）────────────────────────────────────────── */
+  --canvas: #F4F1EA;        /* 页面底（纸） */
+  --surface: #FAF8F3;       /* 卡片 / 输入区（卡纸），比纸亮 2–3% */
+  --surface-sunken: #EDEAE2; /* 代码块底、引用块、表格斑马区 */
+
+  /* ── Text（三档对比度，层级靠字重而非更多灰阶）────────────────── */
+  --text-primary: #2B2A26;    /* 正文/标题（墨）对纸 12.7:1 */
+  --text-secondary: #6E6A5E;  /* 注释/元数据/时间戳，对纸 4.8:1 */
+  --text-disabled: #A8A294;   /* 禁用，2.5–3:1 */
+
+  /* ── Accent（钴蓝主题，V0.3 §2.4）───────────────────────────── */
+  --accent: #3368A0;       /* 选中块 / 主按钮，白字 5.8:1 */
+  --accent-ink: #2A4E7A;   /* accent 做文字 / 图标 / 小字 */
+  --accent-tint: #DCE8F4;  /* 选中行淡底 / hover 晕 / 标签底 */
+
+  /* ── Line（气声描边，对纸 ≈1.15:1，不许更重）─────────────────── */
+  --border: #E7E1D6;
+
+  /* ── Status（低饱和同族，与 accent 拉开辨识度）───────────────── */
+  --success: #3E7C5B;
+  --warning: #8A5F1B;
+  --danger: #A32821;
+
+  /* ── Geometry ────────────────────────────────────────────────── */
+  --radius-card: 10px;   /* 容器外圆角 */
+  --radius-inner: 6px;   /* 容器内元素圆角 */
+  /* 间距阶梯 4/8/12/16/24/32/48，长页 section 上探 64/96 */
+
+  /* ── Type ────────────────────────────────────────────────────── */
+  /* 中文字体栈必须含 Microsoft YaHei，否则 Windows 中文掉宋体（V0.3 §3.1） */
+  --font-sans: "Inter", "PingFang SC", "Microsoft YaHei", "HarmonyOS Sans SC",
+    "Noto Sans SC", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", "Maple Mono", ui-monospace, "SFMono-Regular",
+    Menlo, Consolas, monospace;
+}

@@ -1,0 +1,149 @@
+// Prisma schema — renovation-platform
+// SQLite for M1a; kept portable (no PG-only types: no String[], no dbgenerated,
+// no native enums) so P5 can switch provider to PostgreSQL in one step.
+// Enums are modeled as string + const in TS.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────
+// 共享核心域 (core/domain) — AGENTS §4
+// 预算 / 项目管理 / 设计管理 都挂在 Project 下，禁止模块重复定义。
+// ─────────────────────────────────────────────────────────────
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+
+  clients Client[]
+  users   User[]
+
+  @@map("organizations")
+}
+
+// 占位表：P4 接入登录。表先建、字段留足，暂不实现认证逻辑。
+model User {
+  id        String   @id @default(cuid())
+  orgId     String
+  name      String
+  email     String   @unique
+  role      String   @default("viewer") // owner / designer / pm / viewer（字符串常量，见 core/domain/types.ts）
+  createdAt DateTime @default(now())
+
+  org Organization @relation(fields: [orgId], references: [id])
+
+  @@map("users")
+}
+
+model Client {
+  id        String   @id @default(cuid())
+  orgId     String
+  name      String
+  phone     String?
+  email     String?
+  notes     String?
+  createdAt DateTime @default(now())
+
+  org      Organization @relation(fields: [orgId], references: [id])
+  projects Project[]
+
+  @@map("clients")
+}
+
+model Project {
+  id         String   @id @default(cuid())
+  code       String   @unique // 项目编号，如 RP-2026-001
+  name       String
+  address    String?
+  area       Float    @default(0) // 建筑面积㎡；0 时单方造价不可算
+  clientId   String
+  designer   String?
+  pm         String?
+  status     String   @default("draft") // draft / in_progress / completed / archived
+  startDate  DateTime?
+  endDate    DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  client Client       @relation(fields: [clientId], references: [id])
+  quotes BudgetQuote[]
+
+  @@map("projects")
+}
+
+// ─────────────────────────────────────────────────────────────
+// 预算模块自有实体 (modules/budget) — AGENTS §5
+// 模块表通过 projectId 外键引用核心域。
+// ─────────────────────────────────────────────────────────────
+
+model CatalogCategory {
+  id        String  @id @default(cuid())
+  name      String
+  order     Int     @default(0)
+  createdAt DateTime @default(now())
+
+  items CatalogItem[]
+
+  @@map("catalog_categories")
+}
+
+model CatalogItem {
+  id          String  @id @default(cuid())
+  categoryId  String
+  code        String
+  name        String
+  unit        String  @default("项")
+  defaultPrice Float  @default(0)
+  defaultQty   Float  @default(1)
+  materials   String  @default("") // 材料说明
+  sop         String  @default("") // 施工要求，多行文本按 \n 分行
+  order       Int     @default(0)
+  createdAt   DateTime @default(now())
+
+  category CatalogCategory @relation(fields: [categoryId], references: [id])
+
+  @@map("catalog_items")
+}
+
+model BudgetQuote {
+  id        String   @id @default(cuid())
+  projectId String   @unique // M1a：一项目一报价；多版本留 M1b
+  taxRate   Float    @default(0.03)
+  status    String   @default("draft") // draft / confirmed
+  note      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project    @relation(fields: [projectId], references: [id])
+  items   QuoteItem[]
+
+  @@map("budget_quotes")
+}
+
+// 报价明细：CatalogItem 的快照，非引用。
+// 改模板不回溯历史报价 —— 这是刻意的领域决策（AGENTS §5）。
+model QuoteItem {
+  id           String  @id @default(cuid())
+  quoteId      String
+  categoryName String // 快照科目名
+  code         String
+  name         String
+  unit         String  @default("项")
+  unitPrice    Float   @default(0)
+  quantity     Float   @default(1)
+  materials    String  @default("")
+  sop          String  @default("")
+  order        Int     @default(0)
+
+  quote BudgetQuote @relation(fields: [quoteId], references: [id])
+
+  @@map("quote_items")
+}
