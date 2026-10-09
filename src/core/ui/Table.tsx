@@ -26,7 +26,7 @@ export function Th({
 }: ThHTMLAttributes<HTMLTableCellElement> & { align?: ThAlign }) {
   return (
     <th
-      className={`border-b border-line px-3 py-2.5 text-left text-xs font-medium uppercase tracking-[0.08em] text-secondary ${alignClass[align]} ${className}`}
+      className={`whitespace-nowrap border-b border-line px-3 py-2.5 text-left text-xs font-medium uppercase tracking-[0.08em] text-secondary ${alignClass[align]} ${className}`}
       {...rest}
     />
   );
