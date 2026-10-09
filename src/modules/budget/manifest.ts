@@ -9,4 +9,5 @@ export const budgetManifest: ModuleManifest = {
   order: 1,
   entryPath: "/budget",
   requiresAuth: false,
+  nav: [{ label: "科目库", href: "/budget/catalog" }],
 };
