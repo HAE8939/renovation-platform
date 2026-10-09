@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import Link from "next/link";
 import { Nav, Topbar } from "@/core/ui";
 import { PLATFORM } from "@/core/platform";
 import { modules } from "@/modules/registry";
@@ -31,13 +32,15 @@ export default function RootLayout({
         <div className="flex min-h-screen flex-col bg-canvas md:flex-row">
           {/* 桌面侧栏 */}
           <aside className="hidden w-60 shrink-0 flex-col border-r border-line bg-surface md:flex">
-            <div className="border-b border-line px-5 py-5">
+            <Link href="/" className="block border-b border-line px-5 py-5">
               <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted">
                 Platform
               </p>
-              <p className="mt-1.5 text-sm font-semibold leading-snug">{PLATFORM.name}</p>
+              <p className="mt-1.5 text-sm font-semibold leading-snug transition-colors duration-150 hover:text-accent-ink">
+                {PLATFORM.name}
+              </p>
               <p className="mt-1 text-xs leading-relaxed text-secondary">{PLATFORM.tagline}</p>
-            </div>
+            </Link>
 
             <div className="py-2">
               <Nav modules={modules} />

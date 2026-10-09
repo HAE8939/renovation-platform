@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { PLATFORM } from "@/core/platform";
 import type { ModuleManifest } from "@/modules/types";
@@ -21,15 +22,22 @@ export function Topbar({ modules }: TopbarProps) {
   return (
     <header className="flex h-14 shrink-0 items-center justify-between border-b border-line bg-canvas px-4 sm:px-6">
       <div className="flex items-baseline gap-2.5">
-        <span className="text-sm font-semibold">{PLATFORM.name}</span>
-        <span aria-hidden className="text-sm text-muted">
-          /
-        </span>
-        <span
-          className={`text-sm ${active ? "font-medium text-primary" : "text-secondary"}`}
-        >
-          {active ? active.name : "平台首页"}
-        </span>
+        {active ? (
+          <>
+            <Link
+              href="/"
+              className="text-sm font-semibold transition-colors duration-150 hover:text-accent-ink"
+            >
+              {PLATFORM.name}
+            </Link>
+            <span aria-hidden className="text-sm text-muted">
+              /
+            </span>
+            <span className="text-sm font-medium text-primary">{active.name}</span>
+          </>
+        ) : (
+          <span className="text-sm font-semibold">{PLATFORM.name}</span>
+        )}
       </div>
       <span className="hidden text-xs text-muted sm:inline">{PLATFORM.status}</span>
     </header>
