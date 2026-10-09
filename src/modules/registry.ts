@@ -12,17 +12,44 @@ export const modules: ModuleManifest[] = [budgetManifest, crmManifest].sort(
   (a, b) => a.order - b.order
 );
 
-/** DEFERRED 占位模块：首页可见、不可点、不进导航。 */
+/** DEFERRED 占位模块：首页可见、不可点、不进导航。
+ *  对齐 docs/PLAN_FULL_SERVICE_V1.md v1.2 的模块清单（budget/crm 已上线，故不在此列）。
+ *  顺序即首页展示顺序（驾驶舱 → 项目 → 设计 → 工期 → 质量 → 财务 → 人员）。 */
 export const deferredModules: DeferredModule[] = [
   {
-    id: "pm",
-    name: "项目管理系统",
-    description: "施工计划、任务分派、现场验收与变更签证",
+    id: "dashboard",
+    name: "数据驾驶舱",
+    description: "在建项目、签单额、回款率、健康三色灯与全局待办的聚合首页",
+  },
+  {
+    id: "projects",
+    name: "项目管理",
+    description: "项目全生命周期与六合一详情（基础 / 设计 / 工期 / 质量 / 预算 / 人员）",
   },
   {
     id: "design",
-    name: "设计管理系统",
-    description: "方案版本、材料选型与图纸协同",
+    name: "设计管理",
+    description: "设计任务看板、提交审核与退回、设计日历",
+  },
+  {
+    id: "schedule",
+    name: "时间管控",
+    description: "工序排程、甘特图、按面积档模板与工期预警",
+  },
+  {
+    id: "quality",
+    name: "质量管控",
+    description: "验收节点、SOP 检查项、质量问题台账与整改闭环",
+  },
+  {
+    id: "finance",
+    name: "预算管控",
+    description: "合同预算锁定、变更管理、付款计划与收支台账",
+  },
+  {
+    id: "hr",
+    name: "人员管控",
+    description: "人员档案、绩效看板与考核算法（项目 / 月度双维度）",
   },
 ];
 
