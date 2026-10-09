@@ -18,6 +18,8 @@ import {
 import type { LeadListItem } from "@/modules/crm/server/leads";
 import { SignLeadButton } from "./SignLeadModal";
 
+export { isStale, canSign, STAGE_BADGE };
+
 type LeadDetailData = Awaited<ReturnType<typeof getLeadDetailAction>>;
 
 /** 阶段到达「已报价」及之后（且尚未签约建项）可发起签约。 */
@@ -184,7 +186,49 @@ function DrawerBody({ leadId, onAdded }: { leadId: string; onAdded: () => void }
           <AddFollowUpForm leadId={leadId} onAdded={onAdded} />
         </div>
       </section>
+
+      {/* 签约入口：方案报价及之后、且尚未签约建项时显示 */}
+      {detail.stage !== "signed" && canSign(detail.stage) && (
+        <section className="border-t border-line pt-4">
+          <h4 className="text-[13px] font-medium uppercase tracking-[0.08em] text-secondary">
+            签约建项
+          </h4>
+          <div className="mt-3">
+            <SignLeadButton leadId={leadId} />
+          </div>
+        </section>
+      )}
     </div>
+  );
+}
+
+/**
+ * 可复用的线索详情抽屉（M3-c 抽屉本体 + 外层 Drawer 壳）。
+ * 表格与看板共用同一抽屉，避免复制逻辑。
+ */
+export function LeadDrawer({
+  leadId,
+  open,
+  onClose,
+  onAdded,
+  name,
+}: {
+  leadId: string | null;
+  open: boolean;
+  onClose: () => void;
+  onAdded?: () => void;
+  name?: string;
+}) {
+  if (!leadId) return null;
+  const safeOnAdded = onAdded ?? (() => {});
+  return (
+    <Drawer
+      open={open}
+      onClose={onClose}
+      title={`线索详情 · ${name ?? ""}`}
+    >
+      <DrawerBody key={leadId} leadId={leadId} onAdded={safeOnAdded} />
+    </Drawer>
   );
 }
 
@@ -279,19 +323,13 @@ export function LeadsTable({ leads }: { leads: LeadListItem[] }) {
           </Table>
       </Card>
 
-      {openId && (
-        <Drawer
-          open
-          onClose={() => setOpenId(null)}
-          title={`线索详情 · ${leads.find((l) => l.id === openId)?.name ?? ""}`}
-        >
-          <DrawerBody
-            key={`${openId}-${reloadKey}`}
-            leadId={openId}
-            onAdded={handleAdded}
-          />
-        </Drawer>
-      )}
+      <LeadDrawer
+        leadId={openId}
+        open={openId !== null}
+        onClose={() => setOpenId(null)}
+        onAdded={handleAdded}
+        name={openId ? leads.find((l) => l.id === openId)?.name : undefined}
+      />
     </>
   );
 }

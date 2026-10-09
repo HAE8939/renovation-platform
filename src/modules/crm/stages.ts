@@ -27,3 +27,10 @@ export function nextStage(stage: LeadStage): LeadStage | null {
   if (idx < 0 || idx >= LEAD_STAGE_ORDER.length - 1) return null;
   return LEAD_STAGE_ORDER[idx + 1];
 }
+
+/** 意向等级标签（看板卡片展示用）。 */
+export const LEAD_INTENT_LABEL: Record<string, string> = {
+  high: "高",
+  medium: "中",
+  low: "低",
+};

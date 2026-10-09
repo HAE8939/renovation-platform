@@ -142,6 +142,7 @@ const targets = [
     : { name: "03-quote-detail", path: "/budget/__none__" },
   { name: "04-catalog", path: "/budget/catalog" },
   { name: "05-crm", path: "/crm" },
+  { name: "06-crm-list", path: "/crm?view=list" },
 ];
 
 const shot = (url, file) =>

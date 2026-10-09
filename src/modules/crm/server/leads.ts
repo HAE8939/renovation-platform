@@ -31,6 +31,8 @@ export interface LeadListItem {
   phone: string | null;
   estate: string | null;
   area: number;
+  budgetRange: string | null;
+  intentLevel: string;
   stage: LeadStage;
   assignee: string | null;
   lastFollowAt: Date | null;
@@ -51,6 +53,8 @@ export async function listLeads(): Promise<LeadListItem[]> {
     phone: l.phone,
     estate: l.estate,
     area: l.area,
+    budgetRange: l.budgetRange,
+    intentLevel: l.intentLevel,
     stage: l.stage as LeadStage,
     assignee: l.assignee,
     lastFollowAt: l.lastFollowAt,
