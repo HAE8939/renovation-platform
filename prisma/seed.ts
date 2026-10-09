@@ -289,10 +289,29 @@ async function main() {
     },
   });
 
-  // 先灌科目模板，再按 code 快照成报价明细
-  const catalog = await prisma.$transaction(
+  // 先灌科目模板（科目与其下的科目项一起写），再按 code 快照成报价明细。
+  // 教训：M1a 曾在此只创建了 catalogCategory，CatalogItem 一条没写，
+  // 而完成日志按源数组常量算数，把漏项盖住了 —— 故下面改为按真实入库行数报数并加断言。
+  await prisma.$transaction(
     CATALOG.map((c) =>
-      prisma.catalogCategory.create({ data: { name: c.name, order: c.order } })
+      prisma.catalogCategory.create({
+        data: {
+          name: c.name,
+          order: c.order,
+          items: {
+            create: c.items.map((it) => ({
+              code: it.code,
+              name: it.name,
+              unit: it.unit,
+              defaultPrice: it.defaultPrice,
+              defaultQty: it.defaultQty,
+              materials: it.materials,
+              sop: it.sop,
+              order: it.order,
+            })),
+          },
+        },
+      })
     )
   );
 
@@ -316,11 +335,24 @@ async function main() {
     ),
   });
 
+  // 报数一律取数据库真实行数，不取源数组长度 —— 否则漏写会被日志掩盖。
+  const [catCount, itemCount] = await Promise.all([
+    prisma.catalogCategory.count(),
+    prisma.catalogItem.count(),
+  ]);
+
   console.log(
-    `seed 完成：组织 1 · 用户 1 · 客户 1 · 项目 1 · 科目 ${catalog.length} · 模板 ${
-      CATALOG.reduce((n, c) => n + c.items.length, 0)
-    } 项 · 报价明细 ${quoteItems.count} 条`
+    `seed 完成：组织 1 · 用户 1 · 客户 1 · 项目 1 · 科目 ${catCount} · 模板 ${itemCount} 项 · 报价明细 ${quoteItems.count} 条`
   );
+
+  if (itemCount === 0) {
+    throw new Error("seed 自检失败：CatalogItem 实际写入 0 条，科目库页会是空壳");
+  }
+  if (itemCount !== CATALOG.reduce((n, c) => n + c.items.length, 0)) {
+    throw new Error(
+      `seed 自检失败：模板应 ${CATALOG.reduce((n, c) => n + c.items.length, 0)} 项，实际入库 ${itemCount} 项`
+    );
+  }
 }
 
 main()
