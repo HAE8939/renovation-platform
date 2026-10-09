@@ -167,6 +167,7 @@ const targets = [
   submittedTask
     ? { name: "13-design-review", path: `/design/${submittedTask.id}` }
     : { name: "13-design-review", path: "/design/__none__" },
+  { name: "14-design-calendar", path: "/design?view=calendar" },
 ];
 
 const shot = (url, file) =>

@@ -86,3 +86,69 @@ export async function listDesignTasks(
 export async function getDesignTaskCount(): Promise<number> {
   return prisma.designTask.count();
 }
+
+/** 日历色片视图模型：仅含日历所需字段。 */
+export interface DesignCalendarTask {
+  id: string;
+  code: string;
+  title: string;
+  type: string;
+  status: string;
+  deadline: Date;
+  overdue: boolean;
+  projectId: string;
+}
+
+/** 日历取数结果：当月有 deadline 的任务 + 未排期计数。 */
+export interface DesignCalendarData {
+  tasks: DesignCalendarTask[];
+  /** deadline 为 null 的任务数（供"未排期"诚实提示，不塞进网格造假）。 */
+  undatedCount: number;
+}
+
+/**
+ * 日历视图取数（M5-d）：返回该月有 deadline 的任务（按 deadline 升序），
+ * 另返回 deadline 为 null 的任务数（供"未排期"诚实提示）。
+ * year/month 由 parseMonthParam 校验后传入（0-based month）。
+ * 跨模块只走 prisma 直读，不 import 其他模块 server 内部。
+ */
+export async function listDesignTasksForCalendar(
+  year: number,
+  month: number
+): Promise<DesignCalendarData> {
+  // 月份区间：[该月1号, 下月1号)，本地时区
+  const start = new Date(year, month, 1);
+  const end = new Date(year, month + 1, 1);
+  const now = new Date();
+
+  const [rows, undatedCount] = await Promise.all([
+    prisma.designTask.findMany({
+      where: { deadline: { gte: start, lt: end } },
+      orderBy: { deadline: "asc" },
+      select: {
+        id: true,
+        code: true,
+        title: true,
+        type: true,
+        status: true,
+        deadline: true,
+        projectId: true,
+      },
+    }),
+    prisma.designTask.count({ where: { deadline: null } }),
+  ]);
+
+  return {
+    tasks: rows.map((r) => ({
+      id: r.id,
+      code: r.code,
+      title: r.title,
+      type: r.type,
+      status: r.status,
+      deadline: r.deadline as Date,
+      overdue: isOverdue(r.deadline, r.status, now),
+      projectId: r.projectId,
+    })),
+    undatedCount,
+  };
+}

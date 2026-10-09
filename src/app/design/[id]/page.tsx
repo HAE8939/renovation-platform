@@ -126,7 +126,23 @@ export default async function DesignTaskDetailPage({
 
   const rows: { label: string; value: React.ReactNode }[] = [
     { label: "类型", value: typeLabel },
-    { label: "项目", value: `${task.projectCode} · ${task.projectName}` },
+    {
+      label: "项目",
+      value: (
+        <span className="inline-flex flex-wrap items-center justify-end gap-2">
+          <span className="break-words">
+            {task.projectCode} · {task.projectName}
+          </span>
+          {/* 跳预算：放页面内部带真 id，不进 manifest.nav（拿不到 id 会成死链，TASK_M5 §5） */}
+          <Link
+            href={`/budget/${task.projectId}`}
+            className="text-[13px] text-accent-ink whitespace-nowrap underline-offset-4 hover:underline"
+          >
+            打开该项目报价单 →
+          </Link>
+        </span>
+      ),
+    },
     { label: "负责人", value: task.assigneeName ?? "待分配" },
     { label: "审核人", value: task.reviewerName ?? "—" },
     {

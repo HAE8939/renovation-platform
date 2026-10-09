@@ -11,13 +11,17 @@ import { DESIGN_TASK_TYPE_LABEL, type DesignTaskType } from "@/modules/design/ty
 import {
   getDesignTaskCount,
   listDesignTasks,
+  listDesignTasksForCalendar,
   type DesignTaskListItem,
 } from "@/modules/design/server/tasks";
+import { parseMonthParam } from "@/modules/design/calendar";
+import { DesignCalendar } from "./DesignCalendar";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "设计管理" };
 
 type Scope = "all" | "mine";
+type ViewMode = "board" | "calendar";
 
 function formatDate(d: Date | null): string {
   if (!d) return "—";
@@ -103,14 +107,78 @@ function ScopeToggle({ scope }: { scope: Scope }) {
   );
 }
 
+/**
+ * 视图切换：?view=board|calendar 深链（默认 board，保留现有 ?scope=）。
+ * board↔calendar 互相带上对方的 scope 参数（日历不用 scope，但切回看板要保留）。
+ * 服务端渲染、无客户端状态（仿 ScopeToggle 思路，不引客户端状态库）。
+ */
+function ViewModeToggle({ view, scope }: { view: ViewMode; scope: Scope }) {
+  const itemClass = (active: boolean) =>
+    `inline-flex h-8 items-center rounded-inner px-3 text-[13px] font-medium whitespace-nowrap transition-colors ${
+      active ? "bg-accent-tint text-accent-ink" : "text-secondary hover:text-primary"
+    }`;
+  const scopeQ = scope === "mine" ? "&scope=mine" : "";
+  const boardHref = `/design?view=board${scopeQ}`;
+  const calHref = `/design?view=calendar${scopeQ}`;
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-[13px] text-secondary whitespace-nowrap">视图</span>
+      <div className="flex items-center rounded-inner border border-line bg-surface p-1">
+        <Link href={boardHref} className={itemClass(view === "board")}>
+          看板
+        </Link>
+        <Link href={calHref} className={itemClass(view === "calendar")}>
+          日历
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 export default async function DesignBoardPage({
   searchParams,
 }: {
-  searchParams: { scope?: string };
+  searchParams: { scope?: string; view?: string; month?: string };
 }) {
   const scope: Scope = searchParams?.scope === "mine" ? "mine" : "all";
+  const view: ViewMode = searchParams?.view === "calendar" ? "calendar" : "board";
   const now = new Date();
 
+  // 日历视图：按 ?month= 取当月有 deadline 的任务，渲染 DesignCalendar。
+  // 日历不分 scope（mine/all），故隐藏 ScopeToggle；scope 参数仍由 ViewModeToggle 保留，
+  // 切回看板时不丢视角。
+  if (view === "calendar") {
+    const parsed = parseMonthParam(searchParams?.month, now);
+    const data = await listDesignTasksForCalendar(parsed.year, parsed.month);
+    return (
+      <div className="space-y-8">
+        <header>
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h1 className="text-[28px] font-semibold">设计管理</h1>
+              <p className="mt-2 max-w-prose text-[15px] leading-relaxed text-secondary">
+                按任务截止日期排布的月度日历：逾期任务标红，点击色片进入任务详情。
+                未设截止日期的任务不塞进网格，在下方诚实提示。
+              </p>
+            </div>
+            <ViewModeToggle view={view} scope={scope} />
+          </div>
+        </header>
+
+        <section>
+          <div className="flex items-baseline justify-between">
+            <h2 className="text-[15px] font-semibold">设计日历</h2>
+            <span className="text-[13px] text-secondary whitespace-nowrap">
+              本月到期 <span className="num text-primary">{data.tasks.length}</span>
+            </span>
+          </div>
+          <DesignCalendar data={data} parsed={parsed} now={now} />
+        </section>
+      </div>
+    );
+  }
+
+  // 看板视图（默认）：按状态分列推进，逾期标红。
   // 统计与看板分两次取数：统计永远看全量（任务池口径），看板按当前视角过滤。
   const [allTasks, tasks, totalCount, placeholder] = await Promise.all([
     listDesignTasks({ scope: "all" }),
@@ -140,7 +208,10 @@ export default async function DesignBoardPage({
               点击卡片进入任务详情（提交与审核在详情页进行）。
             </p>
           </div>
-          <ScopeToggle scope={scope} />
+          <div className="flex flex-wrap items-center gap-3">
+            <ScopeToggle scope={scope} />
+            <ViewModeToggle view={view} scope={scope} />
+          </div>
         </div>
 
         {/* 页头统计：全量口径，数字来自服务（DB 真值，非常量） */}
