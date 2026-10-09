@@ -150,6 +150,31 @@ export interface CreateProjectResult {
   code: string;
 }
 
+/** 项目设置页可改字段。日期用 "YYYY-MM-DD" 或空串；空 = 清除。 */
+export interface UpdateProjectInput {
+  name: string;
+  code: string;
+  clientName: string;
+  clientPhone?: string;
+  area: number;
+  address?: string;
+  designer?: string;
+  pm?: string;
+  status?: string;
+  startDate?: string | null;
+  endDate?: string | null;
+}
+
+/**
+ * "YYYY-MM-DD" → 本地零点 Date；空 / 非法 → null。
+ * 用 "T00:00:00" 构造本地时间，规避 UTC 零点在负时区被 toLocaleDateString 往前推一天。
+ */
+function parseDateInput(v?: string | null): Date | null {
+  if (!v) return null;
+  const d = new Date(`${v}T00:00:00`);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 export class ValidationError extends Error {}
 
 /** 新建项目（Server Action 落库）。code 为空时自动生成。 */
@@ -195,5 +220,64 @@ export async function createProject(
     });
 
     return { id: project.id, code: project.code };
+  });
+}
+
+/**
+ * 编辑项目基础信息（M1b-B3）。校验口径与 createProject 一致，
+ * 但 code 唯一性需排除自身：留空则沿用原编号（等同不改编号）。
+ * 客户名/电话就地更新到当前 Client（编辑非重建，保持 clientId 不变）。
+ */
+export async function updateProject(
+  projectId: string,
+  input: UpdateProjectInput
+): Promise<void> {
+  const name = input.name.trim();
+  const clientName = input.clientName.trim();
+  if (!name) throw new ValidationError("请填写项目名称");
+  if (!clientName) throw new ValidationError("请填写客户名称");
+
+  const area = Number(input.area);
+  if (!Number.isFinite(area) || area < 0) throw new ValidationError("建筑面积需为非负数字");
+
+  const code = input.code.trim();
+  if (!code) throw new ValidationError("请填写项目编号");
+
+  const status = input.status ?? PROJECT_STATUS.draft;
+
+  await prisma.$transaction(async (tx) => {
+    const project = await tx.project.findUnique({
+      where: { id: projectId },
+      include: { client: true },
+    });
+    if (!project) throw new ValidationError("项目不存在");
+
+    // 编号唯一性排除自身；只有编号真正变更时才查重
+    if (code !== project.code) {
+      const exists = await tx.project.findFirst({
+        where: { code, NOT: { id: projectId } },
+      });
+      if (exists) throw new ValidationError(`项目编号 ${code} 已存在，请更换`);
+    }
+
+    await tx.client.update({
+      where: { id: project.clientId },
+      data: { name: clientName, phone: input.clientPhone?.trim() || null },
+    });
+
+    await tx.project.update({
+      where: { id: projectId },
+      data: {
+        code,
+        name,
+        address: input.address?.trim() || null,
+        area,
+        designer: input.designer?.trim() || null,
+        pm: input.pm?.trim() || null,
+        status,
+        startDate: parseDateInput(input.startDate),
+        endDate: parseDateInput(input.endDate),
+      },
+    });
   });
 }

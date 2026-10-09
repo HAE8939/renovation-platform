@@ -336,6 +336,12 @@ export function QuoteBoard({ data }: { data: QuoteBoardData }) {
               </Button>
               {/* 项目级页面的入口只能放在这里 —— 全局导航是静态清单，拿不到 projectId。 */}
               <Link
+                href={`/budget/${project.id}/settings`}
+                className="text-xs text-accent-ink underline-offset-4 hover:underline"
+              >
+                项目设置
+              </Link>
+              <Link
                 href={`/budget/${project.id}/stats`}
                 className="text-xs text-accent-ink underline-offset-4 hover:underline"
               >

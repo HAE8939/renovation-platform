@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import type { QuoteItemRow } from "@/modules/budget/types";
-import { createProject, ValidationError } from "@/modules/budget/server/projects";
+import { createProject, updateProject, ValidationError } from "@/modules/budget/server/projects";
 import { saveQuoteItems, type QuoteItemPayload } from "@/modules/budget/server/quote";
 import {
   createCategory,
@@ -48,6 +48,41 @@ export async function createProjectAction(
   } catch (e) {
     if (e instanceof ValidationError) return { error: e.message };
     console.error("[createProjectAction]", e);
+    return { error: "保存失败，请稍后重试" };
+  }
+}
+
+/** 编辑项目基础信息。projectId 由路由层绑定；校验失败回中文文案。 */
+export async function updateProjectAction(
+  projectId: string,
+  _prev: ProjectFormState,
+  formData: FormData
+): Promise<ProjectFormState> {
+  try {
+    const text = (key: string) => String(formData.get(key) ?? "").trim();
+    const areaRaw = text("area");
+    const area = areaRaw === "" ? 0 : Number(areaRaw);
+
+    await updateProject(projectId, {
+      name: text("name"),
+      code: text("code"),
+      clientName: text("clientName"),
+      clientPhone: text("clientPhone"),
+      area,
+      address: text("address"),
+      designer: text("designer"),
+      pm: text("pm"),
+      status: text("status") || undefined,
+      startDate: String(formData.get("startDate") ?? "") || null,
+      endDate: String(formData.get("endDate") ?? "") || null,
+    });
+
+    revalidatePath(`/budget/${projectId}`);
+    revalidatePath(`/budget/${projectId}/settings`);
+    return { ok: true };
+  } catch (e) {
+    if (e instanceof ValidationError) return { error: e.message };
+    console.error("[updateProjectAction]", e);
     return { error: "保存失败，请稍后重试" };
   }
 }
