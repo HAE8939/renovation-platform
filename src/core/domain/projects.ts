@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import prisma from "@/core/db";
 import { PROJECT_STATUS } from "@/core/domain/types";
 
@@ -168,6 +169,7 @@ export interface CreateProjectInput {
   style?: string;
   source?: string;
   contractAmount?: number;
+  startDate?: string;
 }
 
 export interface CreateProjectResult {
@@ -202,9 +204,12 @@ function parseDateInput(v?: string | null): Date | null {
 
 export class ValidationError extends Error {}
 
-/** 新建项目（Server Action 落库）。code 为空时自动生成。 */
+/** 新建项目（Server Action 落库）。code 为空时自动生成。
+ *  externalTx：供 signLead 等上层在同一事务内调用（事务传播），
+ *  否则自开一个 $transaction。不传时行为与旧版完全一致。 */
 export async function createProject(
-  input: CreateProjectInput
+  input: CreateProjectInput,
+  externalTx?: Prisma.TransactionClient
 ): Promise<CreateProjectResult> {
   const name = input.name.trim();
   const clientName = input.clientName.trim();
@@ -220,7 +225,7 @@ export async function createProject(
 
   const orgId = await getDefaultOrgId();
 
-  return prisma.$transaction(async (tx) => {
+  const run = async (tx: Prisma.TransactionClient): Promise<CreateProjectResult> => {
     // Client 解析：若显式传入 clientId → 直接复用（先校验存在），跳过按名 findFirst；
     // 否则保持原「按客户名 findFirst/create」路径（预算调用方零改动）。
     let client: { id: string; phone: string | null };
@@ -257,6 +262,7 @@ export async function createProject(
         contractAmount: Number.isFinite(Number(input.contractAmount))
           ? Number(input.contractAmount)
           : 0,
+        startDate: input.startDate ? parseDateInput(input.startDate) : null,
       },
     });
 
@@ -266,7 +272,9 @@ export async function createProject(
     });
 
     return { id: project.id, code: project.code };
-  });
+  };
+
+  return externalTx ? run(externalTx) : prisma.$transaction(run);
 }
 
 /**

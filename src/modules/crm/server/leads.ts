@@ -37,6 +37,7 @@ export interface LeadListItem {
   stage: LeadStage;
   assignee: string | null;
   lastFollowAt: Date | null;
+  projectId: string | null;
   updatedAt: Date;
 }
 
@@ -56,6 +57,7 @@ export async function listLeads(): Promise<LeadListItem[]> {
     stage: l.stage as LeadStage,
     assignee: l.assignee,
     lastFollowAt: l.lastFollowAt,
+    projectId: l.projectId,
     updatedAt: l.updatedAt,
   }));
 }
@@ -131,6 +133,7 @@ export interface SignLeadContract {
   contractAmount: number;
   designer?: string;
   pm?: string;
+  startDate?: string;
 }
 
 export interface SignLeadResult {
@@ -171,19 +174,24 @@ export async function signLead(
           })
         ).id;
 
-    // c. 建项目（用归并到的 clientId，状态=筹备中）。
-    const { id: projectId } = await createProject({
-      clientId,
-      clientName: lead.name,
-      name: `${lead.name}·${lead.estate ?? "未知楼盘"}装修`,
-      area: lead.area,
-      style: lead.style ?? undefined,
-      source: lead.source ?? undefined,
-      contractAmount: contract.contractAmount,
-      designer: contract.designer,
-      pm: contract.pm,
-      status: PROJECT_STATUS.draft,
-    });
+    // c. 建项目（用归并到的 clientId，状态=筹备中）。传 tx 让 createProject 复用同一事务，
+    //    否则 createProject 自开独立事务、看不见本事务刚建的 Client（SQLite 隔离）。
+    const { id: projectId } = await createProject(
+      {
+        clientId,
+        clientName: lead.name,
+        name: `${lead.name}·${lead.estate ?? "未知楼盘"}装修`,
+        area: lead.area,
+        style: lead.style ?? undefined,
+        source: lead.source ?? undefined,
+        contractAmount: contract.contractAmount,
+        designer: contract.designer,
+        pm: contract.pm,
+        startDate: contract.startDate,
+        status: PROJECT_STATUS.draft,
+      },
+      tx
+    );
 
     // d. 回写 lead.projectId 与 stage=signed。
     await tx.lead.update({

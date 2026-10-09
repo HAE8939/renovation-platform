@@ -24,12 +24,13 @@
 | **M2-A** | **全案主脊 schema**：`Project` +7 可空列（合同额/户型/风格/渠道/巡检/预算员/实际完工）+ status 纯新增 design/acceptance 两态（零行迁移）；`Lead`/`FollowUp` 建表；`User.department` + `USER_ROLE` 11 角色常量；`BudgetQuote.lockedAt`；`core/domain/health.ts` 派生层（进度+三色灯，无 prisma、非 emoji） | build 绿 + verify-quote 17 + **新 verify-health 20** + 活库截图详情页 ¥61,990.76 一致 |
 | **M3-a1** | `createProject`/`updateProject`/`listProjects`/`suggestProjectCode` 从 budget 上收 `core/domain/projects.ts`（budget 留 re-export 兼容层，`QuoteItemRow` 在 core 内本地定义避免反向依赖）；新建 `crm` 模块（manifest+registry 接线、`rbac.ts` 骨架、`Lead` list/create/advanceStage、`/crm` 列表页+新建表单）。**M3 余 b-e（看板/抽屉/签约 Modal/漏斗）待续** | build 绿 + verify-quote 17（上收未破预算）+ verify-health 20 + `/crm` 活库截图列出 2 条 seed 线索 |
 | **M3-d1** | `createProject` 加可选 `clientId`/`clientPhone`/`style`/`source`/`contractAmount`（向后兼容，预算零改动）；`signLead` 事务内按手机号归并 Client（命中不覆盖 name）、幂等、建项目回写 `Lead.projectId`+stage=signed；抽 `leadMatch.ts` 纯函数 + 新 `verify-crm.mjs`。运行期 DB 归并行为待 d2 集成验 | build 绿 + verify-quote 17（扩展未破预算）+ verify-crm 11 + verify-health 20 |
+| **M3-d2** | 签约 UI 接 `signLead`：新 `core/ui/Modal.tsx`（V0.3 L1 遮罩+L3 浮层）、`SignLeadModal.tsx`、`signLeadAction`；`/crm` 加「签约/项目」列（quoted 及之后显签约、已签约显「查看项目」链接）。**集成测试抓出并修复真 bug**：`signLead` 与 `createProject` 各开独立事务、SQLite 下后者看不见前者未提交的 Client → 改为 `createProject(input, tx?)` 事务传播 | build 绿 + verify-quote 17 + verify-crm 11 + verify-health 20 + **新 `verify-sign.mts` 集成 12/12** + `/crm` 截图签约按钮按阶段门控正确 |
 
 **路由 7 条**（M2-A 无新增路由，纯数据层）：`/`、`/budget`、`/budget/[projectId]`、`/budget/[projectId]/print`、`/budget/[projectId]/stats`、`/budget/[projectId]/settings`、`/budget/catalog`。
 
 **数据基线**：4 科目 / 16 模板项 / 16 报价明细；直接费 ¥60,185.20 · 税 ¥1,805.56 · 总价 ¥61,990.76 · 单方 ¥482.04/㎡（128.6㎡）。
 
-## 2. 门禁与工具链（四个脚本，均可重跑）
+## 2. 门禁与工具链（五个脚本，均可重跑）
 
 | 脚本 | 拦什么 | 备注 |
 |---|---|---|
@@ -37,6 +38,7 @@
 | `scripts/qa-shots.mjs` | 起生产构建逐页无头截图，支持 `--viewport` | 已修两处：自动挑空闲端口 + 比对 `BUILD_ID` 防残留服务假绿；`execFileSync` 阻塞杀进程树防泄漏孤儿服务 |
 | `scripts/print-pdf.mjs` | 把打印视图导成真 A4 PDF | 屏幕截图看不出分页与打印媒体样式，打印类改动必须走这个 |
 | `scripts/verify-health.mjs` | **20 项断言**：`health.ts` 四纯函数（进度均值/工期灯/质量灯/预算灯）边界 + 输出不含 emoji | M2-A 新增；仿 verify-quote，Node 24 原生 import 生产 health.ts + 独立枚举预言机 |
+| `scripts/verify-sign.mts` | **签约端到端集成门禁**：真跑生产 `signLead`，断言幂等（签两次同项目不覆盖）+ 手机号归并（同 phone 只 1 Client、第二条 lead 复用同 Client 另建项目）+ lead 回写 | 需 tsx 解析 `@/` 别名 + 临时库；运行配方见脚本头。M3-d2 靠它抓出事务传播 bug。**纯函数断言覆盖不到这层** |
 
 **验收纪律**：`build` 绿 + 断言过 ≠ 页面正确。今天三个真缺陷全部由**截图 / PDF 目检**发现（科目库空壳、编辑器列宽挤压、打印 5 页），门禁一个都没拦住。
 
@@ -81,6 +83,7 @@
 - **`Client` 是 1—N 共享主数据**：项目设置页改客户名会连带改掉该客户名下所有项目的显示，且 `createProject` 也按客户名 `upsert`。行为合理（一处改处处生效）但属意外副作用，已在表单加 `hint` 明示。
 - **seed 日志按源数组常量算数**：M1a 的 `seed.ts` 只建了 `catalogCategory`、一条 `CatalogItem` 没写，日志却打印"模板 16 项"，漏项被自己的日志盖了一整天——报价明细是快照，详情页看不出模板库空，直到 M1b 建了第一个真读该表的页面才暴露。**报数一律取 DB `count` 并加自检断言。**
 - **残留服务造成假绿**：`next start` 没被真杀掉时，占端口的旧进程会应答探活，于是"服务就绪 ✓"截的是旧构建（实测两次截图字节数完全一致）。`spawn("taskkill")` 异步 + 立刻 `process.exit()` 等于没杀，必须 `execFileSync` 阻塞杀进程树。
+- **嵌套事务不共享连接（M3-d2 真 bug，集成门禁才抓得到）**：`signLead` 在 `prisma.$transaction` 内新建 Client，却调用 `createProject`——而后者又自开**独立** `$transaction`。SQLite 下内层事务看不见外层未提交的行 → 签约报「指定的客户不存在」。**正解：`createProject(input, tx?)` 接受外部事务客户端，`signLead` 把自己的 `tx` 传进去，全程一个事务**。教训：跨函数复用事务必须显式传 `tx`，别在事务里再调另一个开事务的服务；build/纯函数断言都拦不住，只有端到端集成能抓。
 - **免费编码通道有两种死法**：429 是 TPM 速率限制（非当日额度，冷却可续）、502 ECONNRESET 是传输层瞬断且**零写盘**。对策都是**一轮只给一个界面单元** + 失败原卡重跑。
 - **新建 git worktree 后 `pnpm install` 不会自动 `prisma generate`**：直接跑 seed 报 `@prisma/client did not initialize yet`。准备序列是 `install → prisma generate → migrate deploy → db seed`。
 - **linked worktree 不能放进主仓工作树内部**（git 视其为未跟踪目录，且与 `src/**` 构建 glob 冲突），必须同级；并行轨失效后及时 `git worktree remove` + 删目录，只留分支承载历史。

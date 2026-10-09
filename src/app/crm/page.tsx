@@ -1,12 +1,21 @@
+import Link from "next/link";
 import { Badge, Card, Table, Td, Th } from "@/core/ui";
 import {
   nextStage,
   listLeads,
+  LEAD_STAGE_ORDER,
   LEAD_STAGE_LABEL,
   type LeadStage,
 } from "@/modules/crm/server/leads";
 import { advanceStageAction } from "@/modules/crm/actions";
 import { NewLeadForm } from "./NewLeadForm";
+import { SignLeadButton } from "./SignLeadModal";
+
+/** 阶段到达「已报价」及之后（且尚未签约建项）可发起签约。 */
+const QUOTED_INDEX = LEAD_STAGE_ORDER.indexOf("quoted");
+function canSign(stage: LeadStage): boolean {
+  return LEAD_STAGE_ORDER.indexOf(stage) >= QUOTED_INDEX;
+}
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "商务线索" };
@@ -58,7 +67,7 @@ export default async function CrmListPage() {
         <h1 className="text-[28px] font-semibold">商务线索</h1>
         <p className="mt-2 max-w-prose text-[15px] leading-relaxed text-secondary">
           从线索录入、跟进推进到签约建项的商务全链路。本页为线索列表，阶段推进先做按钮推进，
-          看板与签约表单在后续单元实现。
+          看板与详情抽屉在后续单元实现。
         </p>
       </header>
 
@@ -87,6 +96,7 @@ export default async function CrmListPage() {
                   <Th>负责人</Th>
                   <Th align="right">最后跟进</Th>
                   <Th align="right">推进</Th>
+                  <Th align="right">签约 / 项目</Th>
                 </tr>
               </thead>
               <tbody>
@@ -111,6 +121,20 @@ export default async function CrmListPage() {
                       </Td>
                       <Td align="right">
                         <AdvanceButton leadId={l.id} stage={l.stage} next={next} />
+                      </Td>
+                      <Td align="right">
+                        {l.projectId ? (
+                          <Link
+                            href={`/budget/${l.projectId}`}
+                            className="text-[13px] font-medium text-accent-ink whitespace-nowrap hover:underline"
+                          >
+                            查看项目
+                          </Link>
+                        ) : canSign(l.stage) ? (
+                          <SignLeadButton leadId={l.id} />
+                        ) : (
+                          <span className="text-[13px] text-secondary">—</span>
+                        )}
                       </Td>
                     </tr>
                   );
