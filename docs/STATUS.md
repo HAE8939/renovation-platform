@@ -112,3 +112,13 @@
 - 配色决策产物：`docs/preview/theme-picker.html`（四套 accent × 同一张报价单，含无障碍实测与撞色风险）。
 - 本地产物（不入库）：`_scratch/logs/`、`_scratch/qa/`（截图与 PDF）、`_scratch/backup/`（dev.db 备份）。
 - 废弃分支（仅存档，勿参考勿 checkout）：`wip/m1b-a`、`feat/presentation`、`pre-m1b-checkpoint`。
+
+## 8. 下次接续（2026-10-09 日终 handoff）
+
+- **进度**：M2-A → M4 全部合入 master（见 §1），工作树干净、门禁全绿。crm 最小可用完整、项目中心六合一已上线。
+- **下一个里程碑 = M5 设计任务**（路线 B 执行链第一站）：任务看板（设计师/执行者双视角）+ 提交审核退回（版本历史→返修率）+ 设计日历。开工前先起草 `docs/TASK_M5.md`（照 `TASK_M3_CRM.md`/`TASK_M4.md` 的写法：范围 / 单元拆分 / 硬约束 / 门禁 / 诚实空状态）。⚠️ v5.1 把「预算报价单」误归设计管理——编制留 budget 模块，设计管理只放任务看板 + 跳预算链接。
+- **驱动 codebuddy 的命令（本会话验证可用，hy3 0 credits）**：
+  `codebuddy -p --model hy3 --session-id <id> --permission-mode bypassPermissions --disallowedTools "Bash(git:*),Bash(pnpm dev:*)" < _scratch/logs/cb_<单元>_prompt.md > _scratch/logs/cb_<单元>_out.log 2>&1`（后台跑）。纪律：一轮一个界面单元；429 冷却可续、失败原卡重跑；改动留工作区由集成者 commit；**codebuddy 自述不作数，集成者必独立复跑门禁**。
+- **门禁套件（合入前必跑）**：`pnpm build` + `node scripts/verify-quote.mjs`(17) + `verify-crm.mjs`(11) + `verify-health.mjs`(20) + `verify-sign.mts`(12，签约/事务改动时，跑法见脚本头) + `node scripts/qa-shots.mjs`（截图目检——真缺陷历史上全靠它抓，断言过≠对）。
+- **局域网预览（如需再开）**：`npx next start -H 0.0.0.0 -p 3000` + 防火墙入站规则；本机局域网 IP `192.168.3.29`（会变，用前 `Get-NetIPAddress` 复核）。
+- **遗留**：① 防火墙规则 `renovation-preview-3000` 仍在（服务已停、规则空转），要删下次一条命令 + UAC；② M3-e 商务漏斗延至 M9 驾驶舱；③ 单用户免登录，「角色切换模拟视角」尚未接（`rbac.ts` 有骨架）。
