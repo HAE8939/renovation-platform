@@ -1,9 +1,19 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { Badge, Card, Input, SectionTitle, Table, Td, Th } from "@/core/ui";
-import type { QuoteCategoryGroup, QuoteItemRow } from "@/modules/budget/types";
+import {
+  Badge,
+  Button,
+  Card,
+  Field,
+  Input,
+  SectionTitle,
+  Table,
+  Td,
+  Textarea,
+  Th,
+} from "@/core/ui";
 import {
   computeTotals,
   formatCny,
@@ -12,6 +22,13 @@ import {
   groupByCategory,
   lineTotal,
 } from "@/modules/budget/lib/quote";
+import type { QuoteItemRow } from "@/modules/budget/types";
+import type {
+  CatalogPickerCategory,
+  CatalogSnapshot,
+} from "@/modules/budget/server/catalog";
+import { saveQuoteItemsAction } from "../actions";
+import { CatalogPicker } from "./CatalogPicker";
 
 /** 服务端序列化后的报价数据（含展示用的中文标签）。 */
 export interface QuoteBoardData {
@@ -32,32 +49,234 @@ export interface QuoteBoardData {
   taxRate: number;
   quoteStatusLabel: string;
   items: QuoteItemRow[];
+  picker: CatalogPickerCategory[];
 }
 
 /**
- * 报价明细表 + 实时预算看板。
- * 数量可直接改并即时重算（M1a 约束：明细增删 / 保存 / 科目库管理留 M1b）。
- * 计算口径来自 modules/budget/lib/quote.ts，服务端渲染值与本页重算同源。
+ * 本地草稿行。
+ * 单价 / 数量存输入原文（字符串），只在算钱与提交前转数字 ——
+ * 这样用户在框里打 "1." 、"0." 不会被受控值截断。
+ * id 仅作 React key：保存后由数据库重新分配，整表替换时旧 id 一并丢弃。
+ */
+interface DraftRow {
+  id: string;
+  categoryName: string;
+  code: string;
+  name: string;
+  unit: string;
+  unitPrice: string;
+  quantity: string;
+  materials: string;
+  sop: string;
+}
+
+/** 数据库行 → 本地草稿。 */
+function toDraft(row: QuoteItemRow): DraftRow {
+  return {
+    id: row.id,
+    categoryName: row.categoryName,
+    code: row.code,
+    name: row.name,
+    unit: row.unit,
+    unitPrice: String(row.unitPrice),
+    quantity: String(row.quantity),
+    materials: row.materials,
+    sop: row.sop,
+  };
+}
+
+/** 输入原文 → 参与算钱的数字：空 / 非数字 / 负数一律按 0 处理，负数留给服务端报错。 */
+function toNumber(raw: string): number {
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+/** 草稿行 → 计算口径需要的行（金额仍走 lib/quote.ts，这里只补齐数字与 order）。 */
+function toItems(drafts: DraftRow[]): QuoteItemRow[] {
+  return drafts.map((row, i) => ({
+    id: row.id,
+    categoryName: row.categoryName,
+    code: row.code,
+    name: row.name,
+    unit: row.unit.trim() || "项",
+    unitPrice: toNumber(row.unitPrice),
+    quantity: toNumber(row.quantity),
+    materials: row.materials,
+    sop: row.sop,
+    order: i + 1,
+  }));
+}
+
+/** 内容指纹：比内容不比 id / order，用来判断有没有未保存改动。 */
+function fingerprint(rows: QuoteItemRow[]): string {
+  return JSON.stringify(
+    rows.map((r) => [
+      r.categoryName,
+      r.code,
+      r.name,
+      r.unit,
+      r.unitPrice,
+      r.quantity,
+      r.materials,
+      r.sop,
+    ])
+  );
+}
+
+/**
+ * 报价明细编辑器 + 实时预算看板。
+ *
+ * 数据流：科目库选入 / 新增空行 / 行内编辑 / 删除 / 上下排序都只改本地草稿 →
+ * 草稿派生成 QuoteItemRow[] → lib/quote.ts 算分组与汇总 → 点「保存」整表提交 →
+ * 用数据库返回的行整体替换本地草稿（id 与 order 重分配）。
  */
 export function QuoteBoard({ data }: { data: QuoteBoardData }) {
-  const { project, taxRate, quoteStatusLabel, items: initialItems } = data;
-  const [items, setItems] = useState<QuoteItemRow[]>(initialItems);
+  const { project, taxRate, quoteStatusLabel, picker } = data;
 
-  // 数量受控：本地临时值，不落库
-  const changeQuantity = (id: string, raw: string) => {
-    const value = raw === "" ? 0 : Math.max(0, Number(raw) || 0);
-    setItems((prev) => prev.map((it) => (it.id === id ? { ...it, quantity: value } : it)));
-  };
+  const draftSeq = useRef(0);
+  const [drafts, setDrafts] = useState<DraftRow[]>(() => data.items.map(toDraft));
+  const [baseline, setBaseline] = useState<QuoteItemRow[]>(data.items);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [saving, startSaving] = useTransition();
 
+  const items = useMemo(() => toItems(drafts), [drafts]);
   const groups = useMemo(() => groupByCategory(items), [items]);
   const totals = useMemo(
     () => computeTotals(items, taxRate, project.area),
     [items, taxRate, project.area]
   );
+  const indexById = useMemo(() => {
+    const map = new Map<string, number>();
+    drafts.forEach((row, i) => map.set(row.id, i));
+    return map;
+  }, [drafts]);
+
+  const dirty = fingerprint(items) !== fingerprint(baseline);
+
+  /* ── 本地草稿操作（都不落库） ─────────────────────────────── */
+
+  function nextId(): string {
+    draftSeq.current += 1;
+    return `draft-${draftSeq.current}`;
+  }
+
+  function patch(id: string, changes: Partial<Omit<DraftRow, "id">>) {
+    setNotice(null);
+    setDrafts((prev) => prev.map((row) => (row.id === id ? { ...row, ...changes } : row)));
+  }
+
+  /** 从科目库选入：按模板当前值整行复制成快照。 */
+  function pick(categoryName: string, item: CatalogSnapshot) {
+    setNotice(null);
+    setDrafts((prev) => [
+      ...prev,
+      {
+        id: nextId(),
+        categoryName,
+        code: item.code,
+        name: item.name,
+        unit: item.unit,
+        unitPrice: String(item.unitPrice),
+        quantity: String(item.quantity),
+        materials: item.materials,
+        sop: item.sop,
+      },
+    ]);
+  }
+
+  function addBlankRow() {
+    setNotice(null);
+    setDrafts((prev) => [
+      ...prev,
+      {
+        id: nextId(),
+        categoryName: "未分类",
+        code: "",
+        name: "",
+        unit: "项",
+        unitPrice: "0",
+        quantity: "1",
+        materials: "",
+        sop: "",
+      },
+    ]);
+  }
+
+  function moveRow(id: string, dir: -1 | 1) {
+    setNotice(null);
+    setDrafts((prev) => {
+      const from = prev.findIndex((row) => row.id === id);
+      const to = from + dir;
+      if (from < 0 || to < 0 || to >= prev.length) return prev;
+      const next = [...prev];
+      [next[from], next[to]] = [next[to], next[from]];
+      return next;
+    });
+  }
+
+  function deleteRow(id: string) {
+    setNotice(null);
+    setDrafts((prev) => prev.filter((row) => row.id !== id));
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  }
+
+  function toggleDetail(id: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  /* ── 保存：整表替换，返回行整体替换本地草稿 ────────────────── */
+
+  function save() {
+    setError(null);
+    startSaving(async () => {
+      const result = await saveQuoteItemsAction(
+        project.id,
+        drafts.map((row) => ({
+          id: row.id,
+          categoryName: row.categoryName,
+          code: row.code,
+          name: row.name,
+          unit: row.unit,
+          unitPrice: toNumber(row.unitPrice),
+          quantity: toNumber(row.quantity),
+          materials: row.materials,
+          sop: row.sop,
+        }))
+      );
+      if (!result.ok || !result.items) {
+        setError(result.error ?? "保存失败");
+        return;
+      }
+      setDrafts(result.items.map(toDraft));
+      setBaseline(result.items);
+      setExpanded(new Set());
+      setNotice(`已保存 ${result.items.length} 行`);
+    });
+  }
+
+  const statusText = saving
+    ? "保存中…"
+    : error
+      ? "上次保存失败，请查看错误后重试"
+      : dirty
+        ? "有未保存改动"
+        : notice ?? "全部已保存";
 
   return (
     <div className="space-y-6">
-      <header className="border-b border-line pb-5">
+      <header className="border-b border-line pb-4">
         <Link
           href="/budget"
           className="text-xs text-secondary underline-offset-4 hover:text-accent-ink hover:underline"
@@ -65,48 +284,93 @@ export function QuoteBoard({ data }: { data: QuoteBoardData }) {
           ← 返回项目列表
         </Link>
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
-          <h1 className="text-[22px] font-semibold leading-tight">
-            {project.name}
-          </h1>
-          <span className="num text-sm text-secondary">{project.code}</span>
+          <h1 className="text-xl font-semibold leading-tight">{project.name}</h1>
+          <span className="num text-xs text-secondary">{project.code}</span>
           <Badge variant="accent">{project.statusLabel}</Badge>
           <Badge variant="outline">{quoteStatusLabel}</Badge>
         </div>
-        {project.address && <p className="mt-1.5 text-sm text-secondary">{project.address}</p>}
+        {project.address && (
+          <p className="mt-1 text-[13px] text-secondary">{project.address}</p>
+        )}
       </header>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-        {/* 明细表 */}
+        {/* 明细编辑器 */}
         <section className="min-w-0">
-          <div className="flex items-baseline justify-between gap-3">
-            <h2 className="text-sm font-semibold">报价明细</h2>
-            <span className="text-xs text-secondary">
-              {totals.categoryCount} 个科目 · {totals.itemCount} 条
-            </span>
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-[15px] font-semibold">报价明细</h2>
+                <span className="text-xs text-secondary">
+                  {totals.categoryCount} 个科目 · {totals.itemCount} 条
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  variant="secondary"
+                  disabled={saving || picker.length === 0}
+                  onClick={() => setPickerOpen((v) => !v)}
+                  aria-expanded={pickerOpen}
+                >
+                  {pickerOpen ? "收起选入面板" : "从科目库选入"}
+                </Button>
+                <Button variant="secondary" disabled={saving} onClick={addBlankRow}>
+                  新增空行
+                </Button>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-3 px-1">
+              <span className="text-xs text-secondary">{statusText}</span>
+              <Button disabled={saving || !dirty} onClick={save}>
+                {saving ? "保存中…" : "保存"}
+              </Button>
+            </div>
           </div>
 
+          {error && (
+            <p
+              role="alert"
+              className="mt-3 rounded-inner border border-danger bg-surface px-3 py-2 text-[13px] text-danger"
+            >
+              {error}
+            </p>
+          )}
+
+          {pickerOpen && picker.length > 0 && (
+            <CatalogPicker catalog={picker} onPick={pick} />
+          )}
+
           {items.length === 0 ? (
-            <Card className="mt-3 py-10 text-center text-sm leading-relaxed text-secondary">
-              该项目还没有报价明细。
-              <br />
-              科目库选入与明细编辑在 M1b 提供。
+            <Card className="mt-3 py-6 text-center text-[13px] leading-relaxed text-secondary">
+              该项目还没有报价明细。从科目库选入，或新增空行后填编号与项目名称。
             </Card>
           ) : (
             <Card padded={false} className="mt-3">
               <Table>
                 <thead>
                   <tr>
-                    <Th>编号</Th>
-                    <Th>项目名称</Th>
+                    <Th>顺序</Th>
+                    <Th>编号 / 项目名称</Th>
                     <Th>单位</Th>
                     <Th align="right">单价</Th>
                     <Th align="right">数量</Th>
                     <Th align="right">小计</Th>
+                    <Th align="right">操作</Th>
                   </tr>
                 </thead>
                 <tbody>
-                  {groups.map((g) => (
-                    <CategoryBlock key={g.categoryName} group={g} onChangeQuantity={changeQuantity} />
+                  {groups.map((group) => (
+                    <GroupRows
+                      key={group.categoryName}
+                      group={group}
+                      drafts={drafts}
+                      indexById={indexById}
+                      expanded={expanded}
+                      onPatch={patch}
+                      onMove={moveRow}
+                      onDelete={deleteRow}
+                      onToggle={toggleDetail}
+                    />
                   ))}
                 </tbody>
               </Table>
@@ -119,7 +383,7 @@ export function QuoteBoard({ data }: { data: QuoteBoardData }) {
           <div className="space-y-4 xl:sticky xl:top-6">
             <Card>
               <SectionTitle>预算汇总</SectionTitle>
-              <dl className="mt-4 space-y-2.5">
+              <dl className="mt-4 space-y-3">
                 <TotalRow label="直接费" value={formatCny(totals.directSubtotal)} />
                 <TotalRow
                   label={`税金（${formatPercent(taxRate)}）`}
@@ -128,15 +392,15 @@ export function QuoteBoard({ data }: { data: QuoteBoardData }) {
               </dl>
               <div className="mt-4 border-t border-line pt-4">
                 <div className="flex items-baseline justify-between gap-3">
-                  <span className="text-sm font-medium">总价</span>
+                  <span className="text-[15px] font-medium">总价</span>
                   <span className="num text-xl font-semibold text-accent-ink">
                     {formatCny(totals.grand)}
                   </span>
                 </div>
               </div>
-              <div className="mt-3 flex items-baseline justify-between gap-3 border-t border-line pt-3">
+              <div className="mt-4 flex items-baseline justify-between gap-3 border-t border-line pt-4">
                 <span className="text-xs text-secondary">单方造价</span>
-                <span className="num text-sm text-secondary">
+                <span className="num text-[13px] text-secondary">
                   {totals.unitCost === null ? (
                     "面积缺失"
                   ) : (
@@ -151,7 +415,7 @@ export function QuoteBoard({ data }: { data: QuoteBoardData }) {
 
             <Card>
               <SectionTitle>项目信息</SectionTitle>
-              <dl className="mt-4 space-y-2 text-sm">
+              <dl className="mt-4 space-y-2 text-[13px]">
                 <Meta
                   label="客户"
                   value={`${project.clientName}${project.clientPhone ? ` · ${project.clientPhone}` : ""}`}
@@ -172,10 +436,6 @@ export function QuoteBoard({ data }: { data: QuoteBoardData }) {
                 <Meta label="项目经理" value={project.pm ?? "—"} />
               </dl>
             </Card>
-
-            <p className="px-1 text-xs leading-relaxed text-muted">
-              数量为临时修改，仅在本页实时重算，不会写回数据库；保存、增删与科目库管理留 M1b。
-            </p>
           </div>
         </aside>
       </div>
@@ -183,84 +443,208 @@ export function QuoteBoard({ data }: { data: QuoteBoardData }) {
   );
 }
 
-/** 科目分组：一行分组头（含组小计）+ 组内明细行。 */
-function CategoryBlock({
+/** 一个科目分组：分组头（含组小计）+ 组内可编辑明细行。 */
+function GroupRows({
   group,
-  onChangeQuantity,
+  drafts,
+  indexById,
+  expanded,
+  onPatch,
+  onMove,
+  onDelete,
+  onToggle,
 }: {
-  group: QuoteCategoryGroup;
-  onChangeQuantity: (id: string, raw: string) => void;
+  group: { categoryName: string; subtotal: number; items: QuoteItemRow[] };
+  drafts: DraftRow[];
+  indexById: Map<string, number>;
+  expanded: Set<string>;
+  onPatch: (id: string, changes: Partial<Omit<DraftRow, "id">>) => void;
+  onMove: (id: string, dir: -1 | 1) => void;
+  onDelete: (id: string) => void;
+  onToggle: (id: string) => void;
 }) {
   return (
     <>
       <tr>
-        <td
+        <Td
           colSpan={5}
-          className="border-b border-line bg-sunken px-3 py-1.5 text-xs font-medium uppercase tracking-[0.08em] text-secondary"
+          className="bg-sunken text-xs font-medium uppercase tracking-[0.08em] text-secondary"
         >
           {group.categoryName}
-        </td>
-        <td className="num border-b border-line bg-sunken px-3 py-1.5 text-right text-xs font-medium text-secondary">
+        </Td>
+        <Td
+          align="right"
+          className="num bg-sunken text-xs font-medium text-secondary"
+        >
           {formatCny(group.subtotal)}
-        </td>
+        </Td>
+        <Td className="bg-sunken" />
       </tr>
-      {group.items.map((item) => (
-        <ItemRow key={item.id} item={item} onChangeQuantity={onChangeQuantity} />
-      ))}
+      {group.items.map((item) => {
+        const index = indexById.get(item.id) ?? 0;
+        const row = drafts[index];
+        if (!row) return null;
+        return (
+          <EditableRow
+            key={row.id}
+            row={row}
+            first={index === 0}
+            last={index === drafts.length - 1}
+            open={expanded.has(row.id)}
+            onPatch={(changes) => onPatch(row.id, changes)}
+            onMove={(dir) => onMove(row.id, dir)}
+            onDelete={() => onDelete(row.id)}
+            onToggle={() => onToggle(row.id)}
+          />
+        );
+      })}
     </>
   );
 }
 
-function ItemRow({
-  item,
-  onChangeQuantity,
+/** 单条明细：编号 / 名称 / 单位 / 单价 / 数量 行内编辑，材料 / 施工要求展开编辑。 */
+function EditableRow({
+  row,
+  first,
+  last,
+  open,
+  onPatch,
+  onMove,
+  onDelete,
+  onToggle,
 }: {
-  item: QuoteItemRow;
-  onChangeQuantity: (id: string, raw: string) => void;
+  row: DraftRow;
+  first: boolean;
+  last: boolean;
+  open: boolean;
+  onPatch: (changes: Partial<Omit<DraftRow, "id">>) => void;
+  onMove: (dir: -1 | 1) => void;
+  onDelete: () => void;
+  onToggle: () => void;
 }) {
   return (
-    <tr>
-      <Td className="num text-xs text-secondary">{item.code}</Td>
-      <Td className="min-w-[220px]">
-        <span className="block font-medium leading-snug">{item.name}</span>
-        {item.materials && (
-          <span className="mt-0.5 block text-xs leading-relaxed text-secondary">
-            {item.materials}
+    <>
+      <tr className="hover:bg-canvas">
+        <Td className="w-28">
+          <span className="flex items-center gap-1">
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={first}
+              onClick={() => onMove(-1)}
+              aria-label="上移一行"
+            >
+              ↑
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={last}
+              onClick={() => onMove(1)}
+              aria-label="下移一行"
+            >
+              ↓
+            </Button>
           </span>
-        )}
-        {item.sop && (
-          <details className="mt-1">
-            <summary className="cursor-pointer list-none text-xs text-accent-ink underline-offset-4 hover:underline">
-              施工要求
-            </summary>
-            <ul className="mt-1 space-y-0.5 pl-1 text-xs leading-relaxed text-secondary">
-              {item.sop.split("\n").map((step, i) => (
-                <li key={i}>{step}</li>
-              ))}
-            </ul>
-          </details>
-        )}
-      </Td>
-      <Td className="text-xs text-secondary">{item.unit}</Td>
-      <Td align="right" className="num text-secondary">
-        {formatCny(item.unitPrice)}
-      </Td>
-      <Td align="right" className="w-24">
+        </Td>
+        <Td className="min-w-[260px]">
+          <div className="flex items-center gap-2">
+            <Input
+              compact
+              value={row.code}
+              onChange={(e) => onPatch({ code: e.target.value })}
+              placeholder="编号"
+              aria-label="编号"
+              className="num w-24 shrink-0"
+            />
+            <Input
+              compact
+              value={row.name}
+              onChange={(e) => onPatch({ name: e.target.value })}
+              placeholder="项目名称"
+              aria-label="项目名称"
+              className="min-w-[120px] flex-1"
+            />
+          </div>
+        </Td>
+        <Td>
           <Input
+            compact
+            value={row.unit}
+            onChange={(e) => onPatch({ unit: e.target.value })}
+            placeholder="项"
+            aria-label="单位"
+            className="w-16"
+          />
+        </Td>
+        <Td align="right">
+          <Input
+            compact
             type="number"
             min="0"
-            step="0.1"
+            step="0.01"
+            value={row.unitPrice}
+            onChange={(e) => onPatch({ unitPrice: e.target.value })}
+            aria-label="单价"
+            className="num w-24 text-right"
+          />
+        </Td>
+        <Td align="right">
+          <Input
             compact
-            value={item.quantity}
-            onChange={(e) => onChangeQuantity(item.id, e.target.value)}
-            aria-label={`${item.name} 数量`}
+            type="number"
+            min="0"
+            step="0.01"
+            value={row.quantity}
+            onChange={(e) => onPatch({ quantity: e.target.value })}
+            aria-label="数量"
             className="num w-20 text-right"
           />
-      </Td>
-      <Td align="right" className="num font-medium">
-        {formatCny(lineTotal(item.unitPrice, item.quantity))}
-      </Td>
-    </tr>
+        </Td>
+        <Td align="right" className="num">
+          {formatCny(lineTotal(toNumber(row.unitPrice), toNumber(row.quantity)))}
+        </Td>
+        <Td align="right">
+          <span className="flex items-center justify-end gap-1">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={onToggle}
+              aria-expanded={open}
+            >
+              {open ? "收起" : "材料"}
+            </Button>
+            <Button size="sm" variant="danger" onClick={onDelete}>
+              删除
+            </Button>
+          </span>
+        </Td>
+      </tr>
+      {open && (
+        <tr>
+          <Td colSpan={7} className="bg-sunken">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="材料说明">
+                <Textarea
+                  rows={2}
+                  value={row.materials}
+                  onChange={(e) => onPatch({ materials: e.target.value })}
+                  placeholder="如：16A 开关 × 2，国标 BVR 2.5㎡ 线"
+                />
+              </Field>
+              <Field label="施工要求" hint="多行按换行分隔">
+                <Textarea
+                  rows={3}
+                  value={row.sop}
+                  onChange={(e) => onPatch({ sop: e.target.value })}
+                  placeholder={"按图定位并标记\n开槽深度 ≤ 线管外径 1.5 倍\n隐蔽前拍照留档"}
+                />
+              </Field>
+            </div>
+          </Td>
+        </tr>
+      )}
+    </>
   );
 }
 
@@ -268,7 +652,7 @@ function TotalRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline justify-between gap-3">
       <dt className="text-xs text-secondary">{label}</dt>
-      <dd className="num text-sm">{value}</dd>
+      <dd className="num text-[13px]">{value}</dd>
     </div>
   );
 }

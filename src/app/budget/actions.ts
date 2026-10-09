@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import type { QuoteItemRow } from "@/modules/budget/types";
 import { createProject, ValidationError } from "@/modules/budget/server/projects";
+import { saveQuoteItems, type QuoteItemPayload } from "@/modules/budget/server/quote";
 import {
   createCategory,
   createItem,
@@ -169,4 +171,46 @@ export async function setItemOrderAction(
     ? (formData.getAll("ids") as string[]).filter((v) => typeof v === "string" && v !== "")
     : [];
   return runCatalogWrite(() => setItemOrder(categoryId, ids));
+}
+
+/* ── 报价明细（quote）──────────────────────────────────────────
+   整表替换：界面提交当前全部行，服务端单事务删插并按顺序重编号。
+   返回落库后的行给界面直接替换本地草稿 —— id 与 order 都会重分配，
+   旧 id 不能留在客户端 state 里（React key 也要跟着换）。
+   ── */
+
+export interface QuoteSaveState {
+  ok: boolean;
+  error?: string;
+  items?: QuoteItemRow[];
+}
+
+export async function saveQuoteItemsAction(
+  projectId: string,
+  rows: QuoteItemPayload[]
+): Promise<QuoteSaveState> {
+  try {
+    const saved = await saveQuoteItems(projectId, rows);
+    revalidatePath("/budget");
+    revalidatePath(`/budget/${projectId}`);
+    return {
+      ok: true,
+      items: saved.map((r) => ({
+        id: r.id,
+        categoryName: r.categoryName,
+        code: r.code,
+        name: r.name,
+        unit: r.unit,
+        unitPrice: r.unitPrice,
+        quantity: r.quantity,
+        materials: r.materials,
+        sop: r.sop,
+        order: r.order,
+      })),
+    };
+  } catch (e) {
+    if (e instanceof ValidationError) return { ok: false, error: e.message };
+    console.error("[saveQuoteItemsAction]", e);
+    return { ok: false, error: "保存失败，请稍后重试" };
+  }
 }

@@ -1,8 +1,9 @@
 import { notFound } from "next/navigation";
 import { PROJECT_STATUS_LABEL, QUOTE_STATUS_LABEL } from "@/core/domain/types";
 import type { ProjectStatus, QuoteStatus } from "@/core/domain/types";
+import { listCatalogForPicker } from "@/modules/budget/server/catalog";
 import { getProjectDetail } from "@/modules/budget/server/projects";
-import { QuoteBoard } from "./QuoteBoard";
+import { QuoteBoard, type QuoteBoardData } from "./QuoteBoard";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "报价明细" };
@@ -12,14 +13,17 @@ interface PageProps {
 }
 
 /**
- * 项目报价明细页（M1a：只读为主，数量可临时改并即时重算）。
- * 服务端取数并序列化为可传给客户端组件的纯数据。
+ * 项目报价明细页（M1b：完整编辑器）。
+ * 服务端并行取项目详情与科目库选入清单，序列化为可传给客户端组件的纯数据。
  */
 export default async function BudgetDetailPage({ params }: PageProps) {
-  const detail = await getProjectDetail(params.projectId);
+  const [detail, picker] = await Promise.all([
+    getProjectDetail(params.projectId),
+    listCatalogForPicker(),
+  ]);
   if (!detail) notFound();
 
-  const data = {
+  const data: QuoteBoardData = {
     project: {
       id: detail.id,
       code: detail.code,
@@ -40,6 +44,7 @@ export default async function BudgetDetailPage({ params }: PageProps) {
     quoteStatusLabel:
       QUOTE_STATUS_LABEL[detail.quoteStatus as QuoteStatus] ?? detail.quoteStatus,
     items: detail.items,
+    picker,
   };
 
   return <QuoteBoard data={data} />;
