@@ -53,3 +53,6 @@ _qa*/
 _view.log
 *.log
 .wtest
+
+# 本地产物统一收纳（见 AGENTS §9 工作区目录约定）
+_scratch/
