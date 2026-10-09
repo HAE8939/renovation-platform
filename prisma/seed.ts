@@ -1,5 +1,6 @@
 /* eslint-disable no-console */
 import { PrismaClient } from "@prisma/client";
+import { USER_ROLE, DEPARTMENT } from "../src/core/domain/types";
 
 const prisma = new PrismaClient();
 
@@ -237,10 +238,17 @@ const DEMO_QUOTE: { code: string; quantity: number }[] = [
 async function main() {
   const existing = await prisma.organization.findUnique({ where: { slug: "default" } });
   if (existing) {
-    console.log("已存在默认组织，seed 跳过（如需重置请删除 prisma/dev.db 后重跑）。");
-    return;
+    console.log("已存在默认组织，基础数据 seed 跳过（如需重置请删除 prisma/dev.db 后重跑）。");
+  } else {
+    await seedBaseData();
   }
 
+  // M5-a：设计任务 seed（幂等，独立于基础数据块 —— 老库也能补灌）。
+  await seedDesignTasks();
+}
+
+/** M1a/M2-A 基础数据：组织 + 用户 + 客户 + 项目 + 报价 + 科目模板 + 线索。 */
+async function seedBaseData() {
   const org = await prisma.organization.create({
     data: { name: "默认工作室", slug: "default" },
   });
@@ -421,6 +429,174 @@ async function main() {
   }
   if (followUpCount < 3) {
     throw new Error(`seed 自检失败：FollowUp 实际写入不足 3 条（实际 ${followUpCount} 条）`);
+  }
+}
+
+// ── M5-a 设计任务 seed ─────────────────────────────────────────
+// 幂等：已有 DesignTask 则只报数不重灌。
+// 用户按 email upsert（复用已 seed 的 User），任务挂在库里已有项目上。
+// 刻意不建 TaskSubmission：M5-b 才用，留表不留假数据。
+async function seedDesignTasks() {
+  const org = await prisma.organization.findUnique({ where: { slug: "default" } });
+  if (!org) {
+    throw new Error("design seed 自检失败：默认组织不存在，请先运行基础 seed");
+  }
+
+  // 2-3 个设计侧用户：designer / design_asst；「审核人」语义复用 designer 角色
+  //（USER_ROLE 无独立 reviewer 值，v5.1 11 角色里审核即由设计师承担）。
+  const designer = await prisma.user.upsert({
+    where: { email: "linlan@renovation.local" },
+    update: {},
+    create: {
+      orgId: org.id,
+      name: "林岚",
+      email: "linlan@renovation.local",
+      role: USER_ROLE.designer,
+      department: DEPARTMENT.design,
+    },
+  });
+  const designAsst = await prisma.user.upsert({
+    where: { email: "suxiao@renovation.local" },
+    update: {},
+    create: {
+      orgId: org.id,
+      name: "苏晓",
+      email: "suxiao@renovation.local",
+      role: USER_ROLE.design_asst,
+      department: DEPARTMENT.design,
+    },
+  });
+  const reviewer = await prisma.user.upsert({
+    where: { email: "hemin@renovation.local" },
+    update: {},
+    create: {
+      orgId: org.id,
+      name: "何铭",
+      email: "hemin@renovation.local",
+      role: USER_ROLE.designer, // 审核人语义：资深设计师复核
+      department: DEPARTMENT.design,
+    },
+  });
+
+  const existingCount = await prisma.designTask.count();
+  if (existingCount > 0) {
+    console.log(`已存在 ${existingCount} 条设计任务，M5-a 任务 seed 跳过。`);
+    return;
+  }
+
+  const projects = await prisma.project.findMany({ orderBy: { code: "asc" } });
+  if (projects.length === 0) {
+    throw new Error("design seed 自检失败：库里没有任何项目，设计任务无主脊可挂");
+  }
+
+  const year = new Date().getFullYear();
+  const day = 24 * 60 * 60 * 1000;
+  // 5 条任务：覆盖全部 5 种 status 与 5 种 type；1 条 deadline 已逾期、
+  // 1 条待分配（assigneeId=null）、其余指向上面的 seed 用户。
+  const TASKS = [
+    {
+      code: `DES-${year}-001`,
+      title: "全案概念方案",
+      type: "scheme",
+      status: "approved",
+      assigneeId: designer.id,
+      reviewerId: reviewer.id,
+      requirement: "三版概念方向供业主比选，需含风格意向与动线示意。",
+      deadline: new Date(Date.now() - 20 * day),
+      priority: "medium",
+    },
+    {
+      code: `DES-${year}-002`,
+      title: "平面布置深化",
+      type: "floorplan",
+      status: "submitted",
+      assigneeId: designAsst.id,
+      reviewerId: designer.id,
+      requirement: "按确认概念深化平面，复核家具尺度与过道宽度。",
+      deadline: new Date(Date.now() + 10 * day),
+      priority: "high",
+    },
+    {
+      code: `DES-${year}-003`,
+      title: "客餐厅效果图",
+      type: "rendering",
+      status: "assigned",
+      assigneeId: designer.id,
+      reviewerId: reviewer.id,
+      requirement: "主视角 + 两个辅助视角，材质贴图需与选型单一致。",
+      deadline: new Date(Date.now() - 3 * day), // 刻意已逾期：看板/统计要能标红
+      priority: "high",
+    },
+    {
+      code: `DES-${year}-004`,
+      title: "全屋施工图深化",
+      type: "construction_drawing",
+      status: "revisions",
+      assigneeId: designAsst.id,
+      reviewerId: reviewer.id,
+      requirement: "水电点位图与大样节点图待按审核意见返修。",
+      deadline: new Date(Date.now() + 5 * day),
+      priority: "medium",
+    },
+    {
+      code: `DES-${year}-005`,
+      title: "现场复核量房",
+      type: "measurement",
+      status: "pending",
+      assigneeId: null, // 刻意待分配：看板「待分配」列要有真数据
+      reviewerId: null,
+      requirement: "开工前复核实际尺寸与图纸偏差，出水点位逐一定位。",
+      deadline: new Date(Date.now() + 14 * day),
+      priority: "low",
+    },
+  ];
+
+  await prisma.$transaction(
+    TASKS.map((t, i) =>
+      prisma.designTask.create({
+        data: {
+          projectId: projects[i % projects.length].id,
+          code: t.code,
+          title: t.title,
+          type: t.type,
+          status: t.status,
+          assigneeId: t.assigneeId,
+          reviewerId: t.reviewerId,
+          requirement: t.requirement,
+          deadline: t.deadline,
+          priority: t.priority,
+        },
+      })
+    )
+  );
+
+  // 报数一律取数据库真实行数 + 自检断言（勿抄源数组常量 —— M1a 踩过坑）。
+  const [taskCount, userCount, statuses, overdue, unassigned] = await Promise.all([
+    prisma.designTask.count(),
+    prisma.user.count(),
+    prisma.designTask.findMany({ select: { status: true } }),
+    prisma.designTask.count({
+      where: { deadline: { lt: new Date() }, NOT: { status: "approved" } },
+    }),
+    prisma.designTask.count({ where: { assigneeId: null } }),
+  ]);
+  const distinctStatuses = new Set(statuses.map((s) => s.status)).size;
+
+  console.log(
+    `M5-a seed 完成：设计用户 ${userCount} · 设计任务 ${taskCount} 条（状态 ${distinctStatuses} 种 · 逾期 ${overdue} · 待分配 ${unassigned}）`
+  );
+
+  if (taskCount < 3) {
+    throw new Error(`design seed 自检失败：DesignTask 实际写入不足 3 条（实际 ${taskCount} 条）`);
+  }
+  if (distinctStatuses < 3) {
+    throw new Error(`design seed 自检失败：任务状态应至少覆盖 3 种（实际 ${distinctStatuses} 种）`);
+  }
+  if (overdue < 1) {
+    throw new Error(`design seed 自检失败：应至少 1 条已逾期任务（实际 ${overdue} 条）`);
+  }
+  if (unassigned < 1) {
+    throw new Error(`design seed 自检失败：应至少 1 条待分配任务（实际 ${unassigned} 条）`);
   }
 }
 

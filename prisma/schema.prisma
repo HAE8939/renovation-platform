@@ -82,9 +82,10 @@ model Project {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  client Client       @relation(fields: [clientId], references: [id])
-  quotes BudgetQuote[]
-  lead    Lead?                        // 反向：签约线索（真源在 Lead.projectId @unique）
+  client    Client       @relation(fields: [clientId], references: [id])
+  quotes    BudgetQuote[]
+  lead      Lead?                        // 反向：签约线索（真源在 Lead.projectId @unique）
+  designTasks DesignTask[]               // 反向：设计任务（M5-a，真源在 DesignTask.projectId）
 
   @@map("projects")
 }
@@ -203,4 +204,54 @@ model FollowUp {
   lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
 
   @@map("follow_ups")
+}
+
+// ─────────────────────────────────────────────────────────────
+// 设计管理模块自有实体 (modules/design) — M5-a
+// DesignTask 通过 projectId 外键引用共享 core/domain 的 Project（AGENTS §2/§4）。
+// assigneeId / reviewerId 语义上是 User.id（存 userId，非自由文本），
+// 但本期不建到 User 的 @relation（User 侧不加反向字段），仅逻辑引用 + @@index
+// —— P4 接登录后再决定是否建外键关系，避免现在牵动 User 表。
+// ─────────────────────────────────────────────────────────────
+model DesignTask {
+  id          String   @id @default(cuid())
+  projectId   String                     // ★ 引用共享 core/domain Project，不得自造
+  code        String   @unique           // DES-YYYY-NNN
+  title       String
+  type        String                     // scheme|floorplan|rendering|construction_drawing|measurement（见 design/types.ts 常量）
+  status      String   @default("pending") // pending|assigned|submitted|revisions|approved（见 design/status.ts）
+  assigneeId  String?                    // ★ userId，非自由文本；null=待分配
+  reviewerId  String?                    // ★ userId，审核人
+  requirement String   @default("")      // 需求说明，多行
+  deadline    DateTime?
+  priority    String   @default("medium") // high|medium|low
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project     Project        @relation(fields: [projectId], references: [id])
+  submissions TaskSubmission[]
+
+  @@index([projectId])
+  @@index([assigneeId])
+  @@map("design_tasks")
+}
+
+// 任务提交记录（版本化）。M5-a 只建表不落数据；提交/审核逻辑 M5-b/M5-c。
+model TaskSubmission {
+  id           String    @id @default(cuid())
+  taskId       String
+  version      Int                       // 同 task 自增（服务层算 max+1）
+  note         String    @default("")     // 提交说明
+  assetRef     String?                    // 交付物链接占位（本期无上传，可空）
+  submittedBy  String                     // ★ userId
+  result       String    @default("pending") // pending|approved|rejected（本次提交审核结果）
+  rejectReason String?                     // 退回时必填（M5-c 服务层校验）
+  reviewedBy   String?                     // ★ userId
+  reviewedAt   DateTime?
+  createdAt    DateTime  @default(now())
+
+  task DesignTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, version])
+  @@map("task_submissions")
 }

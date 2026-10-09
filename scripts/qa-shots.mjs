@@ -132,6 +132,7 @@ console.log("✓ 服务就绪且身份核对通过\n");
 const { PrismaClient } = await import("@prisma/client");
 const prisma = new PrismaClient();
 const project = await prisma.project.findFirst({ orderBy: { createdAt: "asc" } });
+const designTask = await prisma.designTask?.findFirst({ orderBy: { createdAt: "asc" } }) ?? null;
 await prisma.$disconnect();
 
 const targets = [
@@ -150,6 +151,11 @@ const targets = [
   project
     ? { name: "09-project-budget", path: `/projects/${project.id}?tab=budget` }
     : { name: "09-project-budget", path: "/projects/__none__" },
+  { name: "10-design-board", path: "/design" },
+  { name: "11-design-mine", path: "/design?scope=mine" },
+  designTask
+    ? { name: "12-design-detail", path: `/design/${designTask.id}` }
+    : { name: "12-design-detail", path: "/design/__none__" },
 ];
 
 const shot = (url, file) =>
