@@ -62,6 +62,7 @@ export default async function BudgetListPage() {
                   <Th>状态</Th>
                   <Th align="right">报价条目</Th>
                   <Th align="right">最近更新</Th>
+                  <Th>项目详情</Th>
                 </tr>
               </thead>
               <tbody>
@@ -90,6 +91,14 @@ export default async function BudgetListPage() {
                     </Td>
                     <Td align="right" className="text-xs text-secondary">
                       {formatDate(p.updatedAt)}
+                    </Td>
+                    <Td>
+                      <Link
+                        href={`/projects/${p.id}`}
+                        className="text-xs text-accent-ink whitespace-nowrap hover:underline underline-offset-4"
+                      >
+                        查看 →
+                      </Link>
                     </Td>
                   </tr>
                 ))}

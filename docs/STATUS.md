@@ -27,6 +27,7 @@
 | **M3-d2** | 签约 UI 接 `signLead`：新 `core/ui/Modal.tsx`（V0.3 L1 遮罩+L3 浮层）、`SignLeadModal.tsx`、`signLeadAction`；`/crm` 加「签约/项目」列（quoted 及之后显签约、已签约显「查看项目」链接）。**集成测试抓出并修复真 bug**：`signLead` 与 `createProject` 各开独立事务、SQLite 下后者看不见前者未提交的 Client → 改为 `createProject(input, tx?)` 事务传播 | build 绿 + verify-quote 17 + verify-crm 11 + verify-health 20 + **新 `verify-sign.mts` 集成 12/12** + `/crm` 截图签约按钮按阶段门控正确 |
 | **M3-c** | 线索详情抽屉 + 跟进：新 `core/ui/Drawer.tsx`（右侧滑出，复用 Modal 遮罩/浮层令牌）、`LeadDrawer.tsx`；抽纯 `crm/stages.ts`（无 prisma，供客户端安全引用）；`getLeadDetail`/`addFollowUp` 服务 + `getLeadDetailAction`/`addFollowUpAction`；`/crm` 行可点开抽屉（基础信息+跟进时间线倒序+添加跟进表单），未签约且超 3 天未跟进的「最后跟进」标 danger 红 | build 绿 + verify-quote 17 + verify-crm 11 + verify-health 20 + **隔离库 addFollowUp 集成 6/6** + `/crm` 截图确认超 3 天标红、d2 签约列未破 |
 | **M3-b** | 线索 5 阶段看板：`/crm` 加「看板/列表」切换（默认看板、`?view=` 深链）；`LeadBoard.tsx`（5 列、列头计数、卡片含意向/预算/超3天标红、拖拽仅向前推进 + 「→ 下一阶段」按钮兜底、点卡片开抽屉）；`ViewToggle.tsx`；`LeadDrawer` 抽成表格/看板共用、抽屉内报价及之后显签约（复用 SignLeadModal） | build 绿 + verify-quote 17 + verify-crm 11 + verify-health 20 + `/crm?view=board`/`list` 双视图截图确认（看板标红、列表签约列未破） |
+| **M4-a** | 新建 `projects` 模块（manifest + registry 接线 + 从 deferred 移除）；`/projects` 管理列表（卡片/表格双视图 + 按 status 筛选，经 prisma 读 Project+报价总额）；`/projects/[id]` 最小占位页防死链；`/budget` 行加「项目详情」互链。**诚实占位**：进度/合同额无源时显「未接入」灰态、不造假绿 | build 绿 + verify-quote 17 + verify-crm 11 + verify-health 20 + `/projects` 截图（报价总价 ¥61,990.76 与基线一致、进度显未接入） |
 
 **路由 7 条**（M2-A 无新增路由，纯数据层）：`/`、`/budget`、`/budget/[projectId]`、`/budget/[projectId]/print`、`/budget/[projectId]/stats`、`/budget/[projectId]/settings`、`/budget/catalog`。
 
@@ -77,6 +78,7 @@
 | 5 | ~~M1.5 schema 批次~~ → **M2-A 主脊 schema 已合入**；`PlatformSetting`（主题键名+Logo）与 EAV 自定义字段按路线 B **降级到 M9**（EAV 仅作用 Project+Client，服务看板筛选） | M2-A ✅；PlatformSetting/Logo/EAV 未开始 |
 | 6 | AGENTS 契约未更新：R1/R2 落地条款、§9 工作区约定、两处规范冲突（AGENTS「无阴影」过度简化 vs V0.3 浮层 L1–L3；accent 族"4 值"说法与实际浅色 3 值不符） | 补丁文本已在 `docs/PROPOSAL_M1.5.md` §4 与 §9，**待应用** |
 | 7 | 交互写回路径尚未经人手验证（科目库增删改排序、报价选入保存、项目设置保存、Ctrl+P 打印） | 服务已起 `http://127.0.0.1:3000`，待用户亲手点 |
+| 8 | **技术债 · 跨模块计算耦合**：`projects/server` import 了 `budget/lib/quote` 的 `computeTotals`（复用单一口径，金额正确），但按 AGENTS §2「模块不互 import 内部」属越界 | 取舍：优先保「不另抄算法」。**待办**：把 `quote.ts` 的纯计算口径上收 `core/domain/pricing.ts`，budget 与 projects 都从 core 引（`budget/lib/quote.ts` 留 re-export 保 `verify-quote` 不破）。M4-b 或独立小重构时做 |
 
 ## 5. 踩过的坑（每条都有代价，防返工）
 

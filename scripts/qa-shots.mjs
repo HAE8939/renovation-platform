@@ -143,6 +143,7 @@ const targets = [
   { name: "04-catalog", path: "/budget/catalog" },
   { name: "05-crm", path: "/crm" },
   { name: "06-crm-list", path: "/crm?view=list" },
+  { name: "07-projects", path: "/projects" },
 ];
 
 const shot = (url, file) =>
