@@ -334,6 +334,21 @@ export function QuoteBoard({ data }: { data: QuoteBoardData }) {
               <Button variant="secondary" disabled={saving} onClick={addBlankRow}>
                 新增空行
               </Button>
+              {/* 项目级页面的入口只能放在这里 —— 全局导航是静态清单，拿不到 projectId。 */}
+              <Link
+                href={`/budget/${project.id}/stats`}
+                className="text-xs text-accent-ink underline-offset-4 hover:underline"
+              >
+                科目分布
+              </Link>
+              <Link
+                href={`/budget/${project.id}/print`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-accent-ink underline-offset-4 hover:underline"
+              >
+                打印视图
+              </Link>
             </div>
           </div>
           <div className="flex flex-wrap items-center justify-between gap-3 px-1">
