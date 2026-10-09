@@ -286,7 +286,7 @@ export function QuoteBoard({ data }: { data: QuoteBoardData }) {
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
           <h1 className="text-xl font-semibold leading-tight">{project.name}</h1>
           <span className="num text-xs text-secondary">{project.code}</span>
-          <Badge variant="accent">{project.statusLabel}</Badge>
+          <Badge variant="outline">{project.statusLabel}</Badge>
           <Badge variant="outline">{quoteStatusLabel}</Badge>
         </div>
         {project.address && (
@@ -294,151 +294,131 @@ export function QuoteBoard({ data }: { data: QuoteBoardData }) {
         )}
       </header>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-        {/* 明细编辑器 */}
-        <section className="min-w-0">
-          <div className="flex flex-col gap-3">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-[15px] font-semibold">报价明细</h2>
-                <span className="text-xs text-secondary">
-                  {totals.categoryCount} 个科目 · {totals.itemCount} 条
-                </span>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  variant="secondary"
-                  disabled={saving || picker.length === 0}
-                  onClick={() => setPickerOpen((v) => !v)}
-                  aria-expanded={pickerOpen}
-                >
-                  {pickerOpen ? "收起选入面板" : "从科目库选入"}
-                </Button>
-                <Button variant="secondary" disabled={saving} onClick={addBlankRow}>
-                  新增空行
-                </Button>
-              </div>
+      {/* 实时预算看板：表格上方一条紧凑汇总条，整体右对齐，窄屏折行 */}
+      <div className="flex flex-wrap items-end justify-end gap-x-8 gap-y-3 rounded-inner border border-line bg-surface px-4 py-3">
+        <SummaryItem label="直接费" value={formatCny(totals.directSubtotal)} />
+        <SummaryItem
+          label={`税金（${formatPercent(taxRate)}）`}
+          value={formatCny(totals.tax)}
+        />
+        <SummaryItem label="总价" value={formatCny(totals.grand)} accent />
+        <SummaryItem
+          label="单方造价"
+          value={
+            totals.unitCost === null
+              ? "面积缺失"
+              : `${formatCny(totals.unitCost)} /㎡`
+          }
+        />
+      </div>
+
+      {/* 明细编辑器：占满内容区宽度，不再与侧栏并排 */}
+      <section className="min-w-0">
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-[15px] font-semibold">报价明细</h2>
+              <span className="text-xs text-secondary">
+                {totals.categoryCount} 个科目 · {totals.itemCount} 条
+              </span>
             </div>
-            <div className="flex flex-wrap items-center justify-between gap-3 px-1">
-              <span className="text-xs text-secondary">{statusText}</span>
-              <Button disabled={saving || !dirty} onClick={save}>
-                {saving ? "保存中…" : "保存"}
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="secondary"
+                disabled={saving || picker.length === 0}
+                onClick={() => setPickerOpen((v) => !v)}
+                aria-expanded={pickerOpen}
+              >
+                {pickerOpen ? "收起选入面板" : "从科目库选入"}
+              </Button>
+              <Button variant="secondary" disabled={saving} onClick={addBlankRow}>
+                新增空行
               </Button>
             </div>
           </div>
-
-          {error && (
-            <p
-              role="alert"
-              className="mt-3 rounded-inner border border-danger bg-surface px-3 py-2 text-[13px] text-danger"
-            >
-              {error}
-            </p>
-          )}
-
-          {pickerOpen && picker.length > 0 && (
-            <CatalogPicker catalog={picker} onPick={pick} />
-          )}
-
-          {items.length === 0 ? (
-            <Card className="mt-3 py-6 text-center text-[13px] leading-relaxed text-secondary">
-              该项目还没有报价明细。从科目库选入，或新增空行后填编号与项目名称。
-            </Card>
-          ) : (
-            <Card padded={false} className="mt-3">
-              <Table>
-                <thead>
-                  <tr>
-                    <Th>顺序</Th>
-                    <Th>编号 / 项目名称</Th>
-                    <Th>单位</Th>
-                    <Th align="right">单价</Th>
-                    <Th align="right">数量</Th>
-                    <Th align="right">小计</Th>
-                    <Th align="right">操作</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {groups.map((group) => (
-                    <GroupRows
-                      key={group.categoryName}
-                      group={group}
-                      drafts={drafts}
-                      indexById={indexById}
-                      expanded={expanded}
-                      onPatch={patch}
-                      onMove={moveRow}
-                      onDelete={deleteRow}
-                      onToggle={toggleDetail}
-                    />
-                  ))}
-                </tbody>
-              </Table>
-            </Card>
-          )}
-        </section>
-
-        {/* 实时看板 */}
-        <aside className="min-w-0">
-          <div className="space-y-4 xl:sticky xl:top-6">
-            <Card>
-              <SectionTitle>预算汇总</SectionTitle>
-              <dl className="mt-4 space-y-3">
-                <TotalRow label="直接费" value={formatCny(totals.directSubtotal)} />
-                <TotalRow
-                  label={`税金（${formatPercent(taxRate)}）`}
-                  value={formatCny(totals.tax)}
-                />
-              </dl>
-              <div className="mt-4 border-t border-line pt-4">
-                <div className="flex items-baseline justify-between gap-3">
-                  <span className="text-[15px] font-medium">总价</span>
-                  <span className="num text-xl font-semibold text-accent-ink">
-                    {formatCny(totals.grand)}
-                  </span>
-                </div>
-              </div>
-              <div className="mt-4 flex items-baseline justify-between gap-3 border-t border-line pt-4">
-                <span className="text-xs text-secondary">单方造价</span>
-                <span className="num text-[13px] text-secondary">
-                  {totals.unitCost === null ? (
-                    "面积缺失"
-                  ) : (
-                    <>
-                      {formatCny(totals.unitCost)}
-                      <span className="text-xs"> /㎡</span>
-                    </>
-                  )}
-                </span>
-              </div>
-            </Card>
-
-            <Card>
-              <SectionTitle>项目信息</SectionTitle>
-              <dl className="mt-4 space-y-2 text-[13px]">
-                <Meta
-                  label="客户"
-                  value={`${project.clientName}${project.clientPhone ? ` · ${project.clientPhone}` : ""}`}
-                />
-                <Meta
-                  label="面积"
-                  value={project.area > 0 ? `${formatQty(project.area)} ㎡` : "未填"}
-                />
-                <Meta
-                  label="工期"
-                  value={
-                    project.startDate && project.endDate
-                      ? `${project.startDate} — ${project.endDate}`
-                      : "未排期"
-                  }
-                />
-                <Meta label="设计" value={project.designer ?? "—"} />
-                <Meta label="项目经理" value={project.pm ?? "—"} />
-              </dl>
-            </Card>
+          <div className="flex flex-wrap items-center justify-between gap-3 px-1">
+            <span className="text-xs text-secondary">{statusText}</span>
+            <Button disabled={saving || !dirty} onClick={save}>
+              {saving ? "保存中…" : "保存"}
+            </Button>
           </div>
-        </aside>
-      </div>
+        </div>
+
+        {error && (
+          <p
+            role="alert"
+            className="mt-3 rounded-inner border border-danger bg-surface px-3 py-2 text-[13px] text-danger"
+          >
+            {error}
+          </p>
+        )}
+
+        {pickerOpen && picker.length > 0 && (
+          <CatalogPicker catalog={picker} onPick={pick} />
+        )}
+
+        {items.length === 0 ? (
+          <Card className="mt-3 py-6 text-center text-[13px] leading-relaxed text-secondary">
+            该项目还没有报价明细。从科目库选入，或新增空行后填编号与项目名称。
+          </Card>
+        ) : (
+          <Card padded={false} className="mt-3">
+            <Table>
+              <thead>
+                <tr>
+                  <Th>顺序</Th>
+                  <Th>编号 / 项目名称</Th>
+                  <Th>单位</Th>
+                  <Th align="right">单价</Th>
+                  <Th align="right">数量</Th>
+                  <Th align="right">小计</Th>
+                  <Th align="right">操作</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {groups.map((group) => (
+                  <GroupRows
+                    key={group.categoryName}
+                    group={group}
+                    drafts={drafts}
+                    indexById={indexById}
+                    expanded={expanded}
+                    onPatch={patch}
+                    onMove={moveRow}
+                    onDelete={deleteRow}
+                    onToggle={toggleDetail}
+                  />
+                ))}
+              </tbody>
+            </Table>
+          </Card>
+        )}
+      </section>
+
+      {/* 项目信息：明细表下方紧凑定义列表，不抢表格横向空间 */}
+      <section className="mt-8">
+        <SectionTitle>项目信息</SectionTitle>
+        <dl className="mt-4 grid grid-cols-2 gap-x-8 gap-y-3 text-[13px] sm:grid-cols-3">
+          <Meta
+            label="客户"
+            value={`${project.clientName}${project.clientPhone ? ` · ${project.clientPhone}` : ""}`}
+          />
+          <Meta
+            label="面积"
+            value={project.area > 0 ? `${formatQty(project.area)} ㎡` : "未填"}
+          />
+          <Meta
+            label="工期"
+            value={
+              project.startDate && project.endDate
+                ? `${project.startDate} — ${project.endDate}`
+                : "未排期"
+            }
+          />
+          <Meta label="设计" value={project.designer ?? "—"} />
+          <Meta label="项目经理" value={project.pm ?? "—"} />
+        </dl>
+      </section>
     </div>
   );
 }
@@ -547,37 +527,41 @@ function EditableRow({
             </Button>
           </span>
         </Td>
-        <Td className="min-w-[260px]">
+        <Td className="min-w-[220px]">
           <div className="flex items-center gap-2">
-            <Input
-              compact
-              value={row.code}
-              onChange={(e) => onPatch({ code: e.target.value })}
-              placeholder="编号"
-              aria-label="编号"
-              className="num w-24 shrink-0"
-            />
+            {/* Input 基类硬写 w-full，单实例传 w-24 会被它静默压掉（Tailwind 里 full 排在数字档之后）。
+                所以定宽交给外层容器，Input 只负责填满容器 —— 别改 Input，那会波及全站。 */}
+            <span className="w-24 shrink-0">
+              <Input
+                compact
+                value={row.code}
+                onChange={(e) => onPatch({ code: e.target.value })}
+                placeholder="编号"
+                aria-label="编号"
+                className="num"
+              />
+            </span>
             <Input
               compact
               value={row.name}
               onChange={(e) => onPatch({ name: e.target.value })}
               placeholder="项目名称"
               aria-label="项目名称"
-              className="min-w-[120px] flex-1"
+              className="min-w-[100px] flex-1"
             />
           </div>
         </Td>
-        <Td>
+        <Td className="w-20">
           <Input
             compact
             value={row.unit}
             onChange={(e) => onPatch({ unit: e.target.value })}
             placeholder="项"
             aria-label="单位"
-            className="w-16"
+            className="w-20"
           />
         </Td>
-        <Td align="right">
+        <Td align="right" className="w-28">
           <Input
             compact
             type="number"
@@ -586,10 +570,10 @@ function EditableRow({
             value={row.unitPrice}
             onChange={(e) => onPatch({ unitPrice: e.target.value })}
             aria-label="单价"
-            className="num w-24 text-right"
+            className="num w-28 text-right"
           />
         </Td>
-        <Td align="right">
+        <Td align="right" className="w-24">
           <Input
             compact
             type="number"
@@ -598,13 +582,13 @@ function EditableRow({
             value={row.quantity}
             onChange={(e) => onPatch({ quantity: e.target.value })}
             aria-label="数量"
-            className="num w-20 text-right"
+            className="num w-24 text-right"
           />
         </Td>
         <Td align="right" className="num">
           {formatCny(lineTotal(toNumber(row.unitPrice), toNumber(row.quantity)))}
         </Td>
-        <Td align="right">
+        <Td align="right" className="w-32">
           <span className="flex items-center justify-end gap-1">
             <Button
               size="sm"
@@ -648,11 +632,24 @@ function EditableRow({
   );
 }
 
-function TotalRow({ label, value }: { label: string; value: string }) {
+/** 汇总条单项：标签在上、数值在下，整体右对齐；总价用 accent 做全画面唯一强调点。 */
+function SummaryItem({
+  label,
+  value,
+  accent = false,
+}: {
+  label: string;
+  value: string;
+  accent?: boolean;
+}) {
   return (
-    <div className="flex items-baseline justify-between gap-3">
-      <dt className="text-xs text-secondary">{label}</dt>
-      <dd className="num text-[13px]">{value}</dd>
+    <div className="flex flex-col items-end gap-1 text-right">
+      <dt className="text-xs text-secondary whitespace-nowrap">{label}</dt>
+      <dd
+        className={`num ${accent ? "text-[20px] font-semibold text-accent-ink" : "text-[15px]"}`}
+      >
+        {value}
+      </dd>
     </div>
   );
 }

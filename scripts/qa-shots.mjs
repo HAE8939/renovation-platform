@@ -12,7 +12,7 @@
  * 注意：必须先 pnpm build。dev 模式的编译遮罩会被截进图里，白截。
  */
 
-import { spawn } from "node:child_process";
+import { spawn, execFileSync } from "node:child_process";
 import { mkdirSync, existsSync, statSync, readFileSync } from "node:fs";
 import { join, resolve, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -71,15 +71,21 @@ const server = spawn("npx", ["next", "start", "-p", String(PORT)], {
   detached: false,
 });
 const stopServer = () => {
+  if (!server.pid) return;
   try {
-    server.kill("SIGTERM");
     if (process.platform === "win32") {
-      spawn("taskkill", ["/F", "/T", "/PID", String(server.pid)], { stdio: "ignore" });
+      // 必须同步阻塞杀：shell:true 下 server.pid 是 cmd.exe，其下还挂着 node（next start）。
+      // 早先用异步 spawn 发 taskkill 后立刻 process.exit()，taskkill 还没来得及执行就被带走，
+      // 于是每次跑完都留一个占着端口的孤儿服务 —— 下次探活由它应答，截图就是假绿。
+      execFileSync("taskkill", ["/F", "/T", "/PID", String(server.pid)], { stdio: "ignore" });
+    } else {
+      server.kill("SIGTERM");
     }
   } catch {
     /* 已退出 */
   }
 };
+process.on("exit", stopServer);
 process.on("SIGINT", () => {
   stopServer();
   process.exit(130);
