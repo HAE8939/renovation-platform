@@ -1,44 +1,46 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import prisma from "@/core/db";
-import { Badge, Card } from "@/core/ui";
-import { PROJECT_STATUS_LABEL } from "@/core/domain/types";
-import type { ProjectStatus } from "@/core/domain/types";
+import { Badge } from "@/core/ui";
+import { getProjectHub } from "@/modules/projects/server/projectDetail";
+import { ProjectTabs } from "./ProjectTabs";
 
 export const dynamic = "force-dynamic";
+export const metadata = { title: "项目详情" };
 
-/** M4-a 占位详情页：仅显项目名 + 开发中提示，避免 /projects/[id] 死链。
- *  六合一详情由 M4-b 实现。 */
-export default async function ProjectDetailPlaceholder({
+/** 项目中心六合一详情（M4-b）。 */
+export default async function ProjectDetailPage({
   params,
+  searchParams,
 }: {
   params: { id: string };
+  searchParams: { tab?: string };
 }) {
-  const project = await prisma.project.findUnique({
-    where: { id: params.id },
-    select: { name: true, code: true, status: true },
-  });
-  if (!project) notFound();
+  const hub = await getProjectHub(params.id);
+  if (!hub) notFound();
 
   return (
-    <div className="space-y-8">
-      <header>
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-[28px] font-semibold">{project.name}</h1>
-          <Badge variant="neutral">{PROJECT_STATUS_LABEL[project.status as ProjectStatus] ?? project.status}</Badge>
-        </div>
-        <p className="mt-2 text-[13px] text-secondary">{project.code}</p>
-      </header>
-
-      <Card>
-        <p className="text-[15px] text-secondary">详情页开发中（M4-b）。</p>
+    <div>
+      <div className="mb-6">
         <Link
           href="/projects"
-          className="mt-3 inline-block text-[13px] text-accent-ink whitespace-nowrap hover:underline underline-offset-4"
+          className="whitespace-nowrap text-[13px] text-secondary transition-colors duration-150 hover:text-accent-ink"
         >
           ← 返回项目列表
         </Link>
-      </Card>
+      </div>
+
+      <header className="border-b border-line pb-6">
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="text-[28px] font-semibold leading-tight">{hub.name}</h1>
+          <Badge variant="outline">{hub.statusLabel}</Badge>
+        </div>
+        <p className="mt-2 text-[13px] text-secondary">
+          {hub.code}
+          {hub.client ? ` · ${hub.client.name}` : ""}
+        </p>
+      </header>
+
+      <ProjectTabs hub={hub} initialTab={searchParams.tab} />
     </div>
   );
 }

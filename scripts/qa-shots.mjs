@@ -144,6 +144,12 @@ const targets = [
   { name: "05-crm", path: "/crm" },
   { name: "06-crm-list", path: "/crm?view=list" },
   { name: "07-projects", path: "/projects" },
+  project
+    ? { name: "08-project-detail", path: `/projects/${project.id}` }
+    : { name: "08-project-detail", path: "/projects/__none__" },
+  project
+    ? { name: "09-project-budget", path: `/projects/${project.id}?tab=budget` }
+    : { name: "09-project-budget", path: "/projects/__none__" },
 ];
 
 const shot = (url, file) =>

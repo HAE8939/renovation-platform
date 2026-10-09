@@ -8,7 +8,7 @@
 
 ## 0. 一句话
 
-**M1a 平台壳 + M1b 预算模块已全部落在 master 并通过门禁；M2-A「全案主脊 schema」已合入（Project 扩列、Lead/FollowUp 建表、User 11 角色常量、health.ts 派生层），schema 自 M1a 起从 1 条迁移增至 2 条、旧预算数据零破坏。全案按 `PLAN_FULL_SERVICE_V1.md` v1.2 路线 B（执行链优先）推进；**M3-a1（`createProject` 上收 + crm 模块骨架 + 线索列表/新建）已合入，M3 余下看板/抽屉/签约/漏斗待续。**
+**M1a 平台壳 + M1b 预算模块 + M2-A 主脊 schema + M3 商务线索（a1/b/c/d，最小可用完整）+ M4 项目中心（a 列表 / b 六合一详情）均已合入 master 并通过门禁；schema 2 条迁移、旧预算数据零破坏。全案按 `PLAN_FULL_SERVICE_V1.md` v1.2 路线 B 推进；余 M3-e 漏斗（延至 M9 驾驶舱），下一步 M5 设计任务。**
 
 ## 1. 已完成（M1b 最后一个代码提交 `6f4246a`；其后均为文档提交，`git log --oneline \| wc -l` 可自查）
 
@@ -28,6 +28,7 @@
 | **M3-c** | 线索详情抽屉 + 跟进：新 `core/ui/Drawer.tsx`（右侧滑出，复用 Modal 遮罩/浮层令牌）、`LeadDrawer.tsx`；抽纯 `crm/stages.ts`（无 prisma，供客户端安全引用）；`getLeadDetail`/`addFollowUp` 服务 + `getLeadDetailAction`/`addFollowUpAction`；`/crm` 行可点开抽屉（基础信息+跟进时间线倒序+添加跟进表单），未签约且超 3 天未跟进的「最后跟进」标 danger 红 | build 绿 + verify-quote 17 + verify-crm 11 + verify-health 20 + **隔离库 addFollowUp 集成 6/6** + `/crm` 截图确认超 3 天标红、d2 签约列未破 |
 | **M3-b** | 线索 5 阶段看板：`/crm` 加「看板/列表」切换（默认看板、`?view=` 深链）；`LeadBoard.tsx`（5 列、列头计数、卡片含意向/预算/超3天标红、拖拽仅向前推进 + 「→ 下一阶段」按钮兜底、点卡片开抽屉）；`ViewToggle.tsx`；`LeadDrawer` 抽成表格/看板共用、抽屉内报价及之后显签约（复用 SignLeadModal） | build 绿 + verify-quote 17 + verify-crm 11 + verify-health 20 + `/crm?view=board`/`list` 双视图截图确认（看板标红、列表签约列未破） |
 | **M4-a** | 新建 `projects` 模块（manifest + registry 接线 + 从 deferred 移除）；`/projects` 管理列表（卡片/表格双视图 + 按 status 筛选，经 prisma 读 Project+报价总额）；`/projects/[id]` 最小占位页防死链；`/budget` 行加「项目详情」互链。**诚实占位**：进度/合同额无源时显「未接入」灰态、不造假绿 | build 绿 + verify-quote 17 + verify-crm 11 + verify-health 20 + `/projects` 截图（报价总价 ¥61,990.76 与基线一致、进度显未接入） |
+| **M4-b** | 项目中心六合一详情 `/projects/[id]`：`projectDetail.ts` 经 prisma 直读 + 复用 core `computeTotals`/`groupByCategory`（不 import budget 内部）；`ProjectTabs.tsx` 六 Tab——基础信息(真) / 预算收支(真：直接费·税·总价·单方 + 分科目占比条 + 打开报价单链接) / 人员分配(真) / 设计·工期·质量(诚实空状态 M5/M6/M7)；`?tab=` 深链可分享 | build 绿 + verify-quote 17 + verify-crm 11 + verify-health 20 + 截图：预算 Tab 金额与 `/budget` 一致（¥61,990.76）、基础信息合同额显「未录入」不造假 |
 
 **路由 7 条**（M2-A 无新增路由，纯数据层）：`/`、`/budget`、`/budget/[projectId]`、`/budget/[projectId]/print`、`/budget/[projectId]/stats`、`/budget/[projectId]/settings`、`/budget/catalog`。
 
