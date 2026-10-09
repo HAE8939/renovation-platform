@@ -70,13 +70,17 @@ export function ProjectSettingsForm({ values }: { values: ProjectSettingsValues 
         <Field label="项目名称" required>
           <Input name="name" defaultValue={values.name} required />
         </Field>
-        <Field label="客户名称" required>
+        <Field
+          label="客户名称"
+          required
+          hint="客户是共享主数据：此处修改会同步到该客户名下所有项目"
+        >
           <Input name="clientName" defaultValue={values.clientName} required />
         </Field>
         <Field label="项目编号" required>
           <Input name="code" defaultValue={values.code} required />
         </Field>
-        <Field label="客户电话">
+        <Field label="客户电话" hint="同样写入共享的客户记录">
           <Input name="clientPhone" defaultValue={values.clientPhone ?? ""} placeholder="选填" />
         </Field>
         <Field label="建筑面积（㎡）" required>
