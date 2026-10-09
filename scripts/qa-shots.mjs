@@ -132,7 +132,13 @@ console.log("✓ 服务就绪且身份核对通过\n");
 const { PrismaClient } = await import("@prisma/client");
 const prisma = new PrismaClient();
 const project = await prisma.project.findFirst({ orderBy: { createdAt: "asc" } });
-const designTask = await prisma.designTask?.findFirst({ orderBy: { createdAt: "asc" } }) ?? null;
+const designTask =
+  (await prisma.designTask?.findFirst({
+    where: { submissions: { some: { result: "rejected" } } },
+    orderBy: { createdAt: "asc" },
+  })) ??
+  (await prisma.designTask?.findFirst({ orderBy: { createdAt: "asc" } })) ??
+  null;
 await prisma.$disconnect();
 
 const targets = [

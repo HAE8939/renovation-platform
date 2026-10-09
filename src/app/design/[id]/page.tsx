@@ -1,14 +1,21 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import prisma from "@/core/db";
 import { Badge } from "@/core/ui";
+import { getPlaceholderUser } from "@/modules/design/currentUser";
 import {
+  canSubmit,
   DESIGN_TASK_STATUS_LABEL,
-  isOverdue,
   statusBadgeTone,
+  SUBMISSION_RESULT_LABEL,
+  submissionResultTone,
   type DesignTaskStatus,
 } from "@/modules/design/status";
 import { DESIGN_TASK_TYPE_LABEL, type DesignTaskType } from "@/modules/design/types";
+import {
+  getTaskDetail,
+  type TaskSubmissionItem,
+} from "@/modules/design/server/submissions";
+import { SubmitTaskForm } from "./SubmitTaskForm";
 
 export const dynamic = "force-dynamic";
 
@@ -21,43 +28,91 @@ function formatDate(d: Date | null): string {
   });
 }
 
+/** 提交/审核时间精确到分钟（同一天的多轮提交靠时间区分）。 */
+function formatDateTime(d: Date | null): string {
+  if (!d) return "—";
+  return new Date(d).toLocaleString("zh-CN", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 const PRIORITY_LABEL: Record<string, string> = { high: "高", medium: "中", low: "低" };
 
+/** 版本历史单条：版本号、提交人/时间、说明、交付物链接、结果徽章；退回显示原因。 */
+function SubmissionEntry({ s }: { s: TaskSubmissionItem }) {
+  return (
+    <li className="border-l border-line pl-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="text-[13px] font-medium num text-primary whitespace-nowrap">
+          v{s.version}
+        </span>
+        <Badge variant={submissionResultTone(s.result)}>
+          {SUBMISSION_RESULT_LABEL[s.result] ?? s.result}
+        </Badge>
+      </div>
+      <p className="mt-1 text-[13px] text-secondary">
+        {s.submittedByName ?? "未知用户"} 提交于 {formatDateTime(s.createdAt)}
+        {s.reviewedByName && (
+          <>
+            {" · "}
+            {s.reviewedByName} 审核{formatDateTime(s.reviewedAt) !== "—" ? `于 ${formatDateTime(s.reviewedAt)}` : ""}
+          </>
+        )}
+      </p>
+      <p className="mt-2 text-[15px] leading-relaxed break-words text-primary">{s.note}</p>
+      <p className="mt-1 text-[13px] text-secondary">
+        交付物：
+        {s.assetRef ? (
+          <a
+            href={s.assetRef}
+            target="_blank"
+            rel="noreferrer"
+            className="font-medium break-all text-accent-ink hover:underline"
+          >
+            {s.assetRef}
+          </a>
+        ) : (
+          "—"
+        )}
+      </p>
+      {s.result === "rejected" && s.rejectReason && (
+        <p className="mt-2 text-[13px] leading-relaxed text-danger">
+          退回原因：{s.rejectReason}
+        </p>
+      )}
+    </li>
+  );
+}
+
 /**
- * 设计任务详情 —— M5-a 最小占位页（防死链）。
- * 提交成果 / 版本历史 / 审核退回在 M5-b、M5-c 实现，本页不做任何写操作。
+ * 设计任务详情（M5-b）：基本信息 + 需求说明 + 提交成果表单 + 版本历史（倒序）。
+ * 审核通过/退回（M5-c）不在本页实现；表单门控走 status.ts 的 canSubmit 纯函数。
  */
 export default async function DesignTaskDetailPage({
   params,
 }: {
   params: { id: string };
 }) {
-  const task = await prisma.designTask.findUnique({
-    where: { id: params.id },
-    include: { project: { select: { code: true, name: true } } },
-  });
+  const [task, placeholder] = await Promise.all([
+    getTaskDetail(params.id),
+    getPlaceholderUser(),
+  ]);
   if (!task) notFound();
 
-  // assignee/reviewer 仅逻辑引用 User.id（无 @relation），按需查名。
-  const [assignee, reviewer] = await Promise.all([
-    task.assigneeId
-      ? prisma.user.findUnique({ where: { id: task.assigneeId }, select: { name: true } })
-      : null,
-    task.reviewerId
-      ? prisma.user.findUnique({ where: { id: task.reviewerId }, select: { name: true } })
-      : null,
-  ]);
-
-  const overdue = isOverdue(task.deadline, task.status);
+  const overdue = task.overdue;
   const typeLabel = DESIGN_TASK_TYPE_LABEL[task.type as DesignTaskType] ?? task.type;
   const statusLabel =
     DESIGN_TASK_STATUS_LABEL[task.status as DesignTaskStatus] ?? task.status;
 
   const rows: { label: string; value: React.ReactNode }[] = [
     { label: "类型", value: typeLabel },
-    { label: "项目", value: `${task.project.code} · ${task.project.name}` },
-    { label: "负责人", value: assignee?.name ?? "待分配" },
-    { label: "审核人", value: reviewer?.name ?? "—" },
+    { label: "项目", value: `${task.projectCode} · ${task.projectName}` },
+    { label: "负责人", value: task.assigneeName ?? "待分配" },
+    { label: "审核人", value: task.reviewerName ?? "—" },
     {
       label: "截止",
       value: (
@@ -115,12 +170,36 @@ export default async function DesignTaskDetailPage({
         )}
       </section>
 
-      {/* 诚实引导：提交与审核属后续单元，不放假按钮、不造数据 */}
-      <section className="rounded-card border border-line bg-surface px-8 py-12 text-center">
-        <p className="text-[15px] font-medium text-primary">提交与审核功能开发中（M5-b / M5-c）</p>
-        <p className="mt-2 text-[13px] leading-relaxed text-secondary">
-          执行者提交成果、版本化历史与设计师审核（通过 / 退回需填原因）将在后续版本上线。
+      {/* 提交成果：仅可提交状态显示（canSubmit 谓词门控，不在页面硬编码状态） */}
+      {canSubmit(task.status) ? (
+        <section className="rounded-card border border-line bg-surface p-6">
+          <h2 className="text-[15px] font-semibold">提交成果</h2>
+          <SubmitTaskForm taskId={task.id} placeholderUserName={placeholder?.name ?? null} />
+        </section>
+      ) : (
+        <p className="text-[13px] text-secondary">
+          当前任务状态为「{statusLabel}
+          」，暂不可提交{task.status === "submitted" ? "，请等待审核" : ""}。
         </p>
+      )}
+
+      {/* 版本历史：倒序，最新在上 */}
+      <section className="rounded-card border border-line bg-surface p-6">
+        <div className="flex items-baseline justify-between gap-4">
+          <h2 className="text-[15px] font-semibold">版本历史</h2>
+          <span className="text-[13px] text-secondary whitespace-nowrap">
+            共 <span className="num text-primary">{task.submissions.length}</span> 次提交
+          </span>
+        </div>
+        {task.submissions.length === 0 ? (
+          <p className="mt-4 text-[13px] leading-relaxed text-secondary">尚无提交记录。</p>
+        ) : (
+          <ol className="mt-6 space-y-6">
+            {task.submissions.map((s) => (
+              <SubmissionEntry key={s.id} s={s} />
+            ))}
+          </ol>
+        )}
       </section>
     </div>
   );

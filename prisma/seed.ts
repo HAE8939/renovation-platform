@@ -245,6 +245,8 @@ async function main() {
 
   // M5-a：设计任务 seed（幂等，独立于基础数据块 —— 老库也能补灌）。
   await seedDesignTasks();
+  // M5-b：提交记录 seed（幂等，给 revisions/submitted/approved 任务补版本历史）。
+  await seedTaskSubmissions();
 }
 
 /** M1a/M2-A 基础数据：组织 + 用户 + 客户 + 项目 + 报价 + 科目模板 + 线索。 */
@@ -435,7 +437,7 @@ async function seedBaseData() {
 // ── M5-a 设计任务 seed ─────────────────────────────────────────
 // 幂等：已有 DesignTask 则只报数不重灌。
 // 用户按 email upsert（复用已 seed 的 User），任务挂在库里已有项目上。
-// 刻意不建 TaskSubmission：M5-b 才用，留表不留假数据。
+// TaskSubmission 不在本函数创建，由下方 seedTaskSubmissions（M5-b）补。
 async function seedDesignTasks() {
   const org = await prisma.organization.findUnique({ where: { slug: "default" } });
   if (!org) {
@@ -598,6 +600,148 @@ async function seedDesignTasks() {
   if (unassigned < 1) {
     throw new Error(`design seed 自检失败：应至少 1 条待分配任务（实际 ${unassigned} 条）`);
   }
+}
+
+// ── M5-b：设计任务提交记录（TaskSubmission）seed ──────────────────
+// 给 revisions / submitted / approved 三种状态的任务各补版本历史；
+// 刻意不给 pending / assigned 任务造提交（它们还没派工/没提交，不造假数据）。
+async function seedTaskSubmissions() {
+  const existing = await prisma.taskSubmission.count();
+  if (existing > 0) {
+    console.log(`已存在 ${existing} 条提交记录，M5-b 提交 seed 跳过。`);
+    return;
+  }
+
+  // 三种状态各取最早一条任务（M5-a seed 按时间升序建，第一条即演示任务）
+  const [revisionsTask, submittedTask, approvedTask] = await Promise.all([
+    prisma.designTask.findFirst({ where: { status: "revisions" }, orderBy: { createdAt: "asc" } }),
+    prisma.designTask.findFirst({ where: { status: "submitted" }, orderBy: { createdAt: "asc" } }),
+    prisma.designTask.findFirst({ where: { status: "approved" }, orderBy: { createdAt: "asc" } }),
+  ]);
+  if (!revisionsTask || !submittedTask || !approvedTask) {
+    console.log("库中缺 revisions/submitted/approved 任务，M5-b 提交 seed 跳过（请先跑 M5-a seed）。");
+    return;
+  }
+
+  const submissionsData = [
+    // revisions 任务：v1 被退回（带原因）→ v2 待审核（返修后再提交）
+    {
+      taskId: revisionsTask.id,
+      version: 1,
+      note: "全屋施工图初版：水电点位图与卫生间大样节点图，请审核。",
+      assetRef: "https://example.com/files/cd-v1",
+      submittedBy: revisionsTask.assigneeId,
+      result: "rejected",
+      rejectReason: "水电点位图与现场管线走向冲突；卫生间大样节点标注深度不足，请按批注返修。",
+      reviewedBy: revisionsTask.reviewerId,
+      reviewedAt: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000),
+      createdAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000),
+    },
+    {
+      taskId: revisionsTask.id,
+      version: 2,
+      note: "按批注返修：调整水电点位走向、补齐卫生间大样节点标注。",
+      assetRef: "https://example.com/files/cd-v2",
+      submittedBy: revisionsTask.assigneeId,
+      result: "pending",
+      rejectReason: null,
+      reviewedBy: null,
+      reviewedAt: null,
+      createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+    },
+    // submitted 任务：v1 待审核
+    {
+      taskId: submittedTask.id,
+      version: 1,
+      note: "平面布置深化完成：双卫干湿分区、主卧衣柜与飘窗关系已复核。",
+      assetRef: "https://example.com/files/floorplan-v1",
+      submittedBy: submittedTask.assigneeId,
+      result: "pending",
+      rejectReason: null,
+      reviewedBy: null,
+      reviewedAt: null,
+      createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
+    },
+    // approved 任务：v1 已通过（审核人与审核时间指向演示 reviewer）
+    {
+      taskId: approvedTask.id,
+      version: 1,
+      note: "全案概念方案三版：现代简约、温暖木质、静谧东方，含风格意向与动线示意。",
+      assetRef: null,
+      submittedBy: approvedTask.assigneeId,
+      result: "approved",
+      rejectReason: null,
+      reviewedBy: approvedTask.reviewerId,
+      reviewedAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000),
+      createdAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000),
+    },
+  ];
+
+  // assigneeId 为 null 的任务不应出现在这三种状态里，但防御性过滤一下
+  type SubmissionSeed = (typeof submissionsData)[number] & { submittedBy: string };
+  const creatable = submissionsData.filter(
+    (s): s is SubmissionSeed => s.submittedBy !== null
+  );
+  if (creatable.length !== submissionsData.length) {
+    throw new Error("M5-b 提交 seed 失败：演示任务的负责人为空，无法确定提交人");
+  }
+
+  await prisma.$transaction(
+    creatable.map((s) =>
+      prisma.taskSubmission.create({
+        data: {
+          taskId: s.taskId,
+          version: s.version,
+          note: s.note,
+          assetRef: s.assetRef,
+          submittedBy: s.submittedBy,
+          result: s.result,
+          rejectReason: s.rejectReason,
+          reviewedBy: s.reviewedBy,
+          reviewedAt: s.reviewedAt,
+          createdAt: s.createdAt,
+        },
+      })
+    )
+  );
+
+  // ── 自检断言（报数一律取 DB 真值，勿抄源数组常量） ──
+  const total = await prisma.taskSubmission.count();
+  if (total !== 4) {
+    throw new Error(`M5-b 提交 seed 自检失败：提交记录应为 4 条，实际 ${total} 条`);
+  }
+
+  // revisions 任务版本应连续 [1, 2]
+  const revisionsVersions = await prisma.taskSubmission.findMany({
+    where: { taskId: revisionsTask.id },
+    orderBy: { version: "asc" },
+    select: { version: true },
+  });
+  if (
+    revisionsVersions.length !== 2 ||
+    revisionsVersions[0].version !== 1 ||
+    revisionsVersions[1].version !== 2
+  ) {
+    throw new Error("M5-b 提交 seed 自检失败：revisions 任务版本应连续为 [1, 2]");
+  }
+
+  // pending / assigned 任务不应有任何提交（不造假数据）
+  const forbidden = await prisma.designTask.count({
+    where: { status: { in: ["pending", "assigned"] }, submissions: { some: {} } },
+  });
+  if (forbidden > 0) {
+    throw new Error(`M5-b 提交 seed 自检失败：pending/assigned 任务不应有提交（实际 ${forbidden} 条）`);
+  }
+
+  // rejected 提交必须有退回原因
+  const rejectedWithoutReason = await prisma.taskSubmission.count({
+    where: { result: "rejected", OR: [{ rejectReason: null }, { rejectReason: "" }] },
+  });
+  if (rejectedWithoutReason > 0) {
+    throw new Error(`M5-b 提交 seed 自检失败：rejected 提交缺少退回原因（实际 ${rejectedWithoutReason} 条）`);
+  }
+
+  console.log(`M5-b 提交 seed 完成：TaskSubmission 共 ${total} 条（revisions 任务 v1 已退回 + v2 待审核、submitted 任务 v1 待审核、approved 任务 v1 已通过）。`);
 }
 
 main()
