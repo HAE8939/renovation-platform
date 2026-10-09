@@ -23,6 +23,7 @@
 | M1b-B3 | 项目设置 `/budget/[projectId]/settings`：`updateProject` + 表单，编号唯一性排除自身 | build + 17 项断言 |
 | **M2-A** | **全案主脊 schema**：`Project` +7 可空列（合同额/户型/风格/渠道/巡检/预算员/实际完工）+ status 纯新增 design/acceptance 两态（零行迁移）；`Lead`/`FollowUp` 建表；`User.department` + `USER_ROLE` 11 角色常量；`BudgetQuote.lockedAt`；`core/domain/health.ts` 派生层（进度+三色灯，无 prisma、非 emoji） | build 绿 + verify-quote 17 + **新 verify-health 20** + 活库截图详情页 ¥61,990.76 一致 |
 | **M3-a1** | `createProject`/`updateProject`/`listProjects`/`suggestProjectCode` 从 budget 上收 `core/domain/projects.ts`（budget 留 re-export 兼容层，`QuoteItemRow` 在 core 内本地定义避免反向依赖）；新建 `crm` 模块（manifest+registry 接线、`rbac.ts` 骨架、`Lead` list/create/advanceStage、`/crm` 列表页+新建表单）。**M3 余 b-e（看板/抽屉/签约 Modal/漏斗）待续** | build 绿 + verify-quote 17（上收未破预算）+ verify-health 20 + `/crm` 活库截图列出 2 条 seed 线索 |
+| **M3-d1** | `createProject` 加可选 `clientId`/`clientPhone`/`style`/`source`/`contractAmount`（向后兼容，预算零改动）；`signLead` 事务内按手机号归并 Client（命中不覆盖 name）、幂等、建项目回写 `Lead.projectId`+stage=signed；抽 `leadMatch.ts` 纯函数 + 新 `verify-crm.mjs`。运行期 DB 归并行为待 d2 集成验 | build 绿 + verify-quote 17（扩展未破预算）+ verify-crm 11 + verify-health 20 |
 
 **路由 7 条**（M2-A 无新增路由，纯数据层）：`/`、`/budget`、`/budget/[projectId]`、`/budget/[projectId]/print`、`/budget/[projectId]/stats`、`/budget/[projectId]/settings`、`/budget/catalog`。
 

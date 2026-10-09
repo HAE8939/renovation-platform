@@ -155,13 +155,19 @@ export async function getProjectDetail(projectId: string): Promise<ProjectDetail
 
 export interface CreateProjectInput {
   name: string;
-  code: string;
+  code?: string;
   clientName: string;
   area: number;
   address?: string;
   designer?: string;
   pm?: string;
   status?: string;
+  // M3-d1 扩展（向后兼容预算）：签约按手机号归并后传入现成 Client，或补手机号
+  clientId?: string;
+  clientPhone?: string;
+  style?: string;
+  source?: string;
+  contractAmount?: number;
 }
 
 export interface CreateProjectResult {
@@ -208,17 +214,33 @@ export async function createProject(
   const area = Number(input.area);
   if (!Number.isFinite(area) || area < 0) throw new ValidationError("建筑面积需为非负数字");
 
-  const code = input.code.trim() || (await suggestProjectCode());
+  const code = input.code?.trim() || (await suggestProjectCode());
   const exists = await prisma.project.findUnique({ where: { code } });
   if (exists) throw new ValidationError(`项目编号 ${code} 已存在，请更换`);
 
   const orgId = await getDefaultOrgId();
 
   return prisma.$transaction(async (tx) => {
-    // Client 表无 (orgId, name) 复合唯一约束，用 findFirst/create 代替 upsert
-    const client = (await tx.client.findFirst({ where: { orgId, name: clientName } })) ?? (
-      await tx.client.create({ data: { orgId, name: clientName } })
-    );
+    // Client 解析：若显式传入 clientId → 直接复用（先校验存在），跳过按名 findFirst；
+    // 否则保持原「按客户名 findFirst/create」路径（预算调用方零改动）。
+    let client: { id: string; phone: string | null };
+    if (input.clientId) {
+      const existing = await tx.client.findUnique({ where: { id: input.clientId } });
+      if (!existing) throw new ValidationError(`指定的客户(${input.clientId})不存在`);
+      client = existing;
+    } else {
+      client =
+        (await tx.client.findFirst({ where: { orgId, name: clientName } })) ??
+        (await tx.client.create({ data: { orgId, name: clientName } }));
+    }
+
+    // 若传入手机号，写进命中/新建的 Client（命中时仅补 phone，不覆盖其 name）。
+    if (input.clientPhone) {
+      const phone = input.clientPhone.trim() || null;
+      if (phone !== client.phone) {
+        client = await tx.client.update({ where: { id: client.id }, data: { phone } });
+      }
+    }
 
     const project = await tx.project.create({
       data: {
@@ -230,6 +252,11 @@ export async function createProject(
         designer: input.designer?.trim() || null,
         pm: input.pm?.trim() || null,
         status: input.status ?? PROJECT_STATUS.draft,
+        style: input.style?.trim() || null,
+        source: input.source?.trim() || null,
+        contractAmount: Number.isFinite(Number(input.contractAmount))
+          ? Number(input.contractAmount)
+          : 0,
       },
     });
 
