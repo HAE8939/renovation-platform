@@ -25,6 +25,7 @@ model Organization {
 
   clients Client[]
   users   User[]
+  leads   Lead[]
 
   @@map("organizations")
 }
@@ -35,7 +36,8 @@ model User {
   orgId     String
   name      String
   email     String   @unique
-  role      String   @default("viewer") // owner / designer / pm / viewer（字符串常量，见 core/domain/types.ts）
+  role       String   @default("viewer") // owner / designer / pm / viewer…（字符串常量，见 core/domain/types.ts）
+  department String?                      // management | business | design | engineering
   createdAt DateTime @default(now())
 
   org Organization @relation(fields: [orgId], references: [id])
@@ -67,14 +69,22 @@ model Project {
   clientId   String
   designer   String?
   pm         String?
-  status     String   @default("draft") // draft / in_progress / completed / archived
+  status     String   @default("draft") // draft / design / in_progress / acceptance / completed / archived
   startDate  DateTime?
-  endDate    DateTime?
+  endDate    DateTime?                  // 计划/预计完工（B3「工期止」即此）
+  contractAmount Float  @default(0)     // 合同额；0=未录入（哨兵，budgetLight/毛利遇 0 走中性）
+  houseType  String?                    // 户型
+  style      String?                    // 风格偏好
+  source     String?                    // 获客渠道（签约时从 Lead.source 带入，供驾驶舱归因）
+  inspector  String?                    // 工程巡检（本期文本，P4 再改 userId）
+  budgetAnalyst String?                 // 预算员（同上）
+  actualEndDate DateTime?               // 实际完工
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
   client Client       @relation(fields: [clientId], references: [id])
   quotes BudgetQuote[]
+  lead    Lead?                        // 反向：签约线索（真源在 Lead.projectId @unique）
 
   @@map("projects")
 }
@@ -117,8 +127,9 @@ model BudgetQuote {
   id        String   @id @default(cuid())
   projectId String   @unique // M1a：一项目一报价；多版本留 M1b
   taxRate   Float    @default(0.03)
-  status    String   @default("draft") // draft / confirmed
+  status    String   @default("draft") // draft / confirmed / locked
   note      String?
+  lockedAt  DateTime?                  // 签约锁单时刻；null=未锁
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -146,4 +157,50 @@ model QuoteItem {
   quote BudgetQuote @relation(fields: [quoteId], references: [id])
 
   @@map("quote_items")
+}
+
+// ─────────────────────────────────────────────────────────────
+// M2-A 全案主脊：线索与跟进（core/domain 主数据）
+// Lead = 签约前线索；FollowUp = 1-N 跟进记录（非长文本）。
+// 本期只落表，不接页面；M3 才从 Lead 签约回写 Project.projectId。
+// ─────────────────────────────────────────────────────────────
+
+model Lead {
+  id           String    @id @default(cuid())
+  orgId        String
+  code         String    @unique // LEAD-YYYY-NNN
+  name         String
+  phone        String?   // 归并键（M3 签约按此并 Client）
+  estate       String?   // 楼盘
+  area         Float     @default(0)
+  style        String?
+  budgetRange  String?   // 意向预算区间（文本，非精确）
+  source       String?   // 获客渠道
+  stage        String    @default("leads") // leads | contacted | confirmed | quoted | signed
+  intentLevel  String    @default("medium") // high | medium | low
+  assignee     String?   // 负责人（本期文本）
+  lastFollowAt DateTime?
+  nextFollowAt DateTime?
+  projectId    String?   @unique // 签约回写，1-1；未签为 null
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  org       Organization @relation(fields: [orgId], references: [id])
+  project   Project?     @relation(fields: [projectId], references: [id])
+  followUps FollowUp[]
+
+  @@map("leads")
+}
+
+model FollowUp {
+  id           String    @id @default(cuid())
+  leadId       String
+  date         DateTime  @default(now())
+  content      String
+  nextFollowAt DateTime?
+  createdAt    DateTime  @default(now())
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@map("follow_ups")
 }

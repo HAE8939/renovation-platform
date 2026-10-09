@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useFormState } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Button, Card, Field, Input, Select } from "@/core/ui";
-import { PROJECT_STATUS, PROJECT_STATUS_LABEL } from "@/core/domain/types";
+import { PROJECT_STATUS_LABEL, PROJECT_STATUS_ORDER } from "@/core/domain/types";
 import type { ProjectStatus } from "@/core/domain/types";
 import { updateProjectAction, type ProjectFormState } from "../actions";
 
@@ -25,9 +25,11 @@ export interface ProjectSettingsValues {
 
 const initialState: ProjectFormState = {};
 
-const STATUS_OPTIONS = Object.values(PROJECT_STATUS).map((s) => ({
+// 顺序严格按 PROJECT_STATUS_ORDER（TS 不会强制数组穷举，故以 ORDER 派生，
+// 避免漏加 design / acceptance 两态或顺序错位）。
+const STATUS_OPTIONS = (PROJECT_STATUS_ORDER as readonly ProjectStatus[]).map((s) => ({
   value: s,
-  label: PROJECT_STATUS_LABEL[s as ProjectStatus] ?? s,
+  label: PROJECT_STATUS_LABEL[s] ?? s,
 }));
 
 function fmtDate(d: Date | string | null): string {

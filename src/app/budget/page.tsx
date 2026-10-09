@@ -14,7 +14,9 @@ export const metadata = { title: "装修预算报价" };
 
 const STATUS_BADGE: Record<ProjectStatus, "neutral" | "accent" | "success" | "outline"> = {
   draft: "outline",
+  design: "accent",
   in_progress: "accent",
+  acceptance: "neutral",
   completed: "success",
   archived: "neutral",
 };

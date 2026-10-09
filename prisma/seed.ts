@@ -289,6 +289,66 @@ async function main() {
     },
   });
 
+  // ── M2-A 演示线索（2 条不同 stage）+ 跟进，不建 project（那是 M3）──
+  // Lead.projectId 留 null（未签约）。本期只落表，供后续线索管理模块消费。
+  await prisma.lead.create({
+    data: {
+      orgId: org.id,
+      code: "LEAD-2026-001",
+      name: "王先生",
+      phone: "139-0000-0001",
+      estate: "锦绣花园 5 栋 901",
+      area: 89.5,
+      style: "现代简约",
+      budgetRange: "15-20 万",
+      source: "老客户转介绍",
+      stage: "contacted",
+      intentLevel: "high",
+      assignee: "林岚",
+      lastFollowAt: new Date("2026-10-05T00:00:00.000Z"),
+      nextFollowAt: new Date("2026-10-12T00:00:00.000Z"),
+      followUps: {
+        create: [
+          {
+            content: "首次电话沟通，了解户型与装修意向，约定周末上门量房。",
+            date: new Date("2026-10-05T00:00:00.000Z"),
+          },
+        ],
+      },
+    },
+  });
+
+  await prisma.lead.create({
+    data: {
+      orgId: org.id,
+      code: "LEAD-2026-002",
+      name: "李女士",
+      phone: "139-0000-0002",
+      estate: "滨江公馆 2 栋 1802",
+      area: 142.0,
+      style: "新中式",
+      budgetRange: "30-40 万",
+      source: "小红书",
+      stage: "quoted",
+      intentLevel: "medium",
+      assignee: "周工",
+      lastFollowAt: new Date("2026-10-08T00:00:00.000Z"),
+      nextFollowAt: new Date("2026-10-15T00:00:00.000Z"),
+      followUps: {
+        create: [
+          {
+            content: "完成量房，已出初步方案，电子报价单已发送客户。",
+            date: new Date("2026-10-08T00:00:00.000Z"),
+          },
+          {
+            content: "客户反馈希望调整主卧布局，待二次沟通确认。",
+            date: new Date("2026-10-10T00:00:00.000Z"),
+          },
+        ],
+      },
+    },
+  });
+
   // 先灌科目模板（科目与其下的科目项一起写），再按 code 快照成报价明细。
   // 教训：M1a 曾在此只创建了 catalogCategory，CatalogItem 一条没写，
   // 而完成日志按源数组常量算数，把漏项盖住了 —— 故下面改为按真实入库行数报数并加断言。
@@ -336,13 +396,15 @@ async function main() {
   });
 
   // 报数一律取数据库真实行数，不取源数组长度 —— 否则漏写会被日志掩盖。
-  const [catCount, itemCount] = await Promise.all([
+  const [catCount, itemCount, leadCount, followUpCount] = await Promise.all([
     prisma.catalogCategory.count(),
     prisma.catalogItem.count(),
+    prisma.lead.count(),
+    prisma.followUp.count(),
   ]);
 
   console.log(
-    `seed 完成：组织 1 · 用户 1 · 客户 1 · 项目 1 · 科目 ${catCount} · 模板 ${itemCount} 项 · 报价明细 ${quoteItems.count} 条`
+    `seed 完成：组织 1 · 用户 1 · 客户 1 · 项目 1 · 科目 ${catCount} · 模板 ${itemCount} 项 · 报价明细 ${quoteItems.count} 条 · 线索 ${leadCount} · 跟进 ${followUpCount}`
   );
 
   if (itemCount === 0) {
@@ -352,6 +414,13 @@ async function main() {
     throw new Error(
       `seed 自检失败：模板应 ${CATALOG.reduce((n, c) => n + c.items.length, 0)} 项，实际入库 ${itemCount} 项`
     );
+  }
+  // 线索 / 跟进同样按真实入库行数自检（曾经的"日志抄常量掩盖空入库"教训）。
+  if (leadCount < 2) {
+    throw new Error(`seed 自检失败：Lead 实际写入不足 2 条（实际 ${leadCount} 条）`);
+  }
+  if (followUpCount < 3) {
+    throw new Error(`seed 自检失败：FollowUp 实际写入不足 3 条（实际 ${followUpCount} 条）`);
   }
 }
 
