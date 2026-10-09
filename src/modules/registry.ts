@@ -1,4 +1,5 @@
 import { budgetManifest } from "./budget/manifest";
+import { crmManifest } from "./crm/manifest";
 import type { DeferredModule, ModuleManifest } from "./types";
 
 /**
@@ -7,7 +8,7 @@ import type { DeferredModule, ModuleManifest } from "./types";
  * 新增模块：在 src/modules/<id>/manifest.ts 定义，然后在此数组加一行，
  * 导航与首页自动出现，无需改外壳代码。
  */
-export const modules: ModuleManifest[] = [budgetManifest].sort(
+export const modules: ModuleManifest[] = [budgetManifest, crmManifest].sort(
   (a, b) => a.order - b.order
 );
 

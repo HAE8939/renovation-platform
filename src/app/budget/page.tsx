@@ -5,7 +5,7 @@ import type { ProjectStatus } from "@/core/domain/types";
 import {
   listProjects,
   suggestProjectCode,
-} from "@/modules/budget/server/projects";
+} from "@/core/domain/projects";
 import { formatQty } from "@/modules/budget/lib/quote";
 import { CreateProjectForm } from "./CreateProjectForm";
 

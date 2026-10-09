@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import type { QuoteItemRow } from "@/modules/budget/types";
-import { createProject, updateProject, ValidationError } from "@/modules/budget/server/projects";
+import { createProject, updateProject, ValidationError } from "@/core/domain/projects";
 import { saveQuoteItems, type QuoteItemPayload } from "@/modules/budget/server/quote";
 import {
   createCategory,
