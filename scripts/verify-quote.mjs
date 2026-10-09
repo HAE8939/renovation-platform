@@ -19,7 +19,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 const { PrismaClient } = await import("@prisma/client");
 const quote = await import(
-  pathToFileURL(join(ROOT, "src/modules/budget/lib/quote.ts")).href
+  pathToFileURL(join(ROOT, "src/core/domain/pricing.ts")).href
 );
 
 const prisma = new PrismaClient();
@@ -50,7 +50,7 @@ function walk(dir, out = []) {
   return out;
 }
 
-const ORACLE = join(ROOT, "src", "modules", "budget", "lib", "quote.ts");
+const ORACLE = join(ROOT, "src", "core", "domain", "pricing.ts");
 const strays = [];
 for (const f of walk(join(ROOT, "src"))) {
   if (resolve(f) === resolve(ORACLE)) continue;
@@ -61,9 +61,9 @@ for (const f of walk(join(ROOT, "src"))) {
 }
 check(
   "hard",
-  "单一口径：lib/quote.ts 之外不得出现 unitPrice×quantity",
+  "单一口径：core/domain/pricing.ts 之外不得出现 unitPrice×quantity",
   strays.length === 0,
-  strays.length ? `发现第二处算法：${strays.join(", ")}` : "仅 lib/quote.ts 一处"
+  strays.length ? `发现第二处算法：${strays.join(", ")}` : "仅 core/domain/pricing.ts 一处"
 );
 
 /* ── 主校验：逐报价单 ────────────────────────────────────────────── */

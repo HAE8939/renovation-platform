@@ -1,6 +1,6 @@
 import prisma from "@/core/db";
-import { computeTotals } from "@/modules/budget/lib/quote";
-import type { QuoteItemRow } from "@/modules/budget/types";
+import { computeTotals } from "@/core/domain/pricing";
+import type { QuoteItemRow } from "@/core/domain/pricing";
 
 /**
  * 项目管理服务（projects 模块 M4-a）。
@@ -8,8 +8,8 @@ import type { QuoteItemRow } from "@/modules/budget/types";
  * 只读聚合：经共享 core/db 的 prisma 直读 Project / Client / BudgetQuote / QuoteItem
  * （AGENTS §2：不 import budget/crm 的 server 内部函数，只直读共享表）。
  *
- * 金额口径单一真源 = src/modules/budget/lib/quote.ts：本文件只调 computeTotals，
- * 不自己写 unitPrice×quantity（verify-quote.mjs 静态断言全仓仅 lib/quote.ts 一处算法）。
+ * 金额口径单一真源 = src/core/domain/pricing.ts：本文件只调 computeTotals，
+ * 不自己写 unitPrice×quantity（verify-quote.mjs 静态断言全仓仅 pricing.ts 一处算法）。
  */
 
 export interface ProjectManagementItem {
