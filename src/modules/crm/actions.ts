@@ -3,13 +3,20 @@
 import { revalidatePath } from "next/cache";
 import {
   advanceStage,
+  addFollowUp,
   createLead,
+  getLeadDetail,
   signLead,
   LeadValidationError,
   type LeadStage,
 } from "./server/leads";
 
 export interface LeadFormState {
+  error?: string;
+  ok?: boolean;
+}
+
+export interface FollowUpFormState {
   error?: string;
   ok?: boolean;
 }
@@ -94,5 +101,42 @@ export async function signLeadAction(
     if (e instanceof LeadValidationError) return { error: e.message };
     console.error("[signLeadAction]", e);
     return { error: "签约失败，请稍后重试" };
+  }
+}
+
+/** 取线索详情（供客户端抽屉打开时拉取跟进时间线）。返回数据为可序列化结构。 */
+export async function getLeadDetailAction(leadId: string) {
+  try {
+    return await getLeadDetail(leadId);
+  } catch (e) {
+    console.error("[getLeadDetailAction]", e);
+    return null;
+  }
+}
+
+/**
+ * 添加跟进（沿用 useFormState 模式；leadId 经 bind 传入）。
+ * 成功后 revalidate /crm，中文错误回显；content 为空服务端兜底回文案。
+ */
+export async function addFollowUpAction(
+  leadId: string,
+  _prev: FollowUpFormState,
+  formData: FormData
+): Promise<FollowUpFormState> {
+  try {
+    const content = String(formData.get("content") ?? "").trim();
+    const nextRaw = String(formData.get("nextFollowAt") ?? "").trim();
+    const nextFollowAt = nextRaw ? new Date(nextRaw) : null;
+    if (nextFollowAt && Number.isNaN(nextFollowAt.getTime())) {
+      return { error: "下次跟进日期格式不正确" };
+    }
+
+    await addFollowUp(leadId, { content, nextFollowAt });
+    revalidatePath("/crm");
+    return { ok: true };
+  } catch (e) {
+    if (e instanceof LeadValidationError) return { error: e.message };
+    console.error("[addFollowUpAction]", e);
+    return { error: "保存失败，请稍后重试" };
   }
 }

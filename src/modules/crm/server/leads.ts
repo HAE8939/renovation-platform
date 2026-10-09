@@ -2,30 +2,27 @@ import prisma from "@/core/db";
 import { createProject } from "@/core/domain/projects";
 import { PROJECT_STATUS } from "@/core/domain/types";
 import { normalizePhone, pickClientByPhone } from "./leadMatch";
+import {
+  LEAD_STAGE_ORDER,
+  LEAD_STAGE_LABEL,
+  nextStage,
+} from "../stages";
+import type { LeadStage } from "../stages";
 
 /**
- * 商务线索服务（crm 模块 M3-a）。
+ * 商务线索服务（crm 模块 M3-a/M3-c）。
  * 读写 M2-A 已建的 Lead 表（core 主数据），本服务不建/不改 schema。
  * 阶段推进先做按钮（非拖拽看板），口径与 TASK_M3_CRM 一致。
  */
 
-/** Lead 阶段有序序列：推进按钮据此决定「下一阶段」。 */
-export const LEAD_STAGE_ORDER = [
-  "leads",
-  "contacted",
-  "confirmed",
-  "quoted",
-  "signed",
-] as const;
-export type LeadStage = (typeof LEAD_STAGE_ORDER)[number];
-
-export const LEAD_STAGE_LABEL: Record<LeadStage, string> = {
-  leads: "线索",
-  contacted: "已联系",
-  confirmed: "已确认",
-  quoted: "已报价",
-  signed: "已签约",
+// 阶段常量/标签/nextStage 抽到纯模块（stages.ts），客户端 UI 可安全引用；
+// 服务层与历史调用方仍从本文件 re-export，保持兼容。
+export {
+  LEAD_STAGE_ORDER,
+  LEAD_STAGE_LABEL,
+  nextStage,
 };
+export type { LeadStage };
 
 export interface LeadListItem {
   id: string;
@@ -107,13 +104,6 @@ export async function advanceStage(leadId: string, stage: LeadStage): Promise<vo
     where: { id: leadId },
     data: { stage, lastFollowAt: new Date() },
   });
-}
-
-/** 计算下一阶段；已是末态返回 null（按钮禁用）。 */
-export function nextStage(stage: LeadStage): LeadStage | null {
-  const idx = LEAD_STAGE_ORDER.indexOf(stage);
-  if (idx < 0 || idx >= LEAD_STAGE_ORDER.length - 1) return null;
-  return LEAD_STAGE_ORDER[idx + 1];
 }
 
 async function getDefaultOrgId(): Promise<string> {
@@ -200,5 +190,96 @@ export async function signLead(
     });
 
     return { projectId };
+  });
+}
+
+/** 单条跟进记录（快照自 FollowUp 表）。 */
+export interface FollowUpItem {
+  id: string;
+  date: Date;
+  content: string;
+  nextFollowAt: Date | null;
+}
+
+/** 线索详情：基础信息 + 其跟进时间线（按 date 倒序，最新在上）。 */
+export interface LeadDetail {
+  id: string;
+  code: string;
+  name: string;
+  phone: string | null;
+  estate: string | null;
+  area: number;
+  style: string | null;
+  budgetRange: string | null;
+  source: string | null;
+  stage: LeadStage;
+  assignee: string | null;
+  lastFollowAt: Date | null;
+  nextFollowAt: Date | null;
+  projectId: string | null;
+  followUps: FollowUpItem[];
+}
+
+/** 取线索详情（含倒序跟进）。线索不存在返回 null。 */
+export async function getLeadDetail(leadId: string): Promise<LeadDetail | null> {
+  const lead = await prisma.lead.findUnique({
+    where: { id: leadId },
+    include: { followUps: { orderBy: { date: "desc" } } },
+  });
+  if (!lead) return null;
+
+  return {
+    id: lead.id,
+    code: lead.code,
+    name: lead.name,
+    phone: lead.phone,
+    estate: lead.estate,
+    area: lead.area,
+    style: lead.style,
+    budgetRange: lead.budgetRange,
+    source: lead.source,
+    stage: lead.stage as LeadStage,
+    assignee: lead.assignee,
+    lastFollowAt: lead.lastFollowAt,
+    nextFollowAt: lead.nextFollowAt,
+    projectId: lead.projectId,
+    followUps: lead.followUps.map((f) => ({
+      id: f.id,
+      date: f.date,
+      content: f.content,
+      nextFollowAt: f.nextFollowAt,
+    })),
+  };
+}
+
+export interface AddFollowUpInput {
+  content: string;
+  nextFollowAt?: Date | null;
+}
+
+/**
+ * 新增一条跟进，并同步回写 Lead：lastFollowAt=当前时间、nextFollowAt=传入值（若有）。
+ * content 为空抛 LeadValidationError，由调用方（Server Action）捕获回中文文案。
+ */
+export async function addFollowUp(leadId: string, input: AddFollowUpInput): Promise<void> {
+  const content = (input.content ?? "").trim();
+  if (!content) throw new LeadValidationError("请填写跟进内容");
+
+  await prisma.$transaction(async (tx) => {
+    await tx.followUp.create({
+      data: {
+        leadId,
+        content,
+        nextFollowAt: input.nextFollowAt ?? null,
+        date: new Date(),
+      },
+    });
+    await tx.lead.update({
+      where: { id: leadId },
+      data: {
+        lastFollowAt: new Date(),
+        nextFollowAt: input.nextFollowAt ?? null,
+      },
+    });
   });
 }
