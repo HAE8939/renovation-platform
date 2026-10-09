@@ -184,7 +184,25 @@ const dupe = await prisma.$queryRawUnsafe(
 check("hard", "一项目一报价（BudgetQuote.projectId 唯一）", dupe.length === 0,
   dupe.length ? `重复：${dupe.map((d) => `${d.projectId}×${d.c}`).join(", ")}` : "无重复");
 
-/* 8. 昨日手算基线（信息项：编辑器动过演示数据后必然漂移，不作为门禁） */
+/* 8. 科目库非空（M1a 曾只建科目、模板 0 项，而 seed 日志按源数组算数把漏项盖掉；
+      报价明细是快照、看不出模板库空 —— 故必须在这里独立断言） */
+const cats = await prisma.catalogCategory.findMany({
+  include: { _count: { select: { items: true } } },
+  orderBy: { order: "asc" },
+});
+const emptyCats = cats.filter((c) => c._count.items === 0);
+const totalItems = cats.reduce((n, c) => n + c._count.items, 0);
+check("hard", "科目库非空且无空科目", cats.length > 0 && totalItems > 0 && emptyCats.length === 0,
+  `${cats.length} 科目 / ${totalItems} 模板项` +
+    (emptyCats.length ? `；空科目：${emptyCats.map((c) => c.name).join(", ")}` : ""));
+
+const dupCodes = await prisma.$queryRawUnsafe(
+  "SELECT code, COUNT(*) c FROM catalog_items GROUP BY code HAVING c > 1"
+);
+check("hard", "科目项 code 全局唯一（选入与搜索依赖它）", dupCodes.length === 0,
+  dupCodes.length ? `重复 code：${dupCodes.map((d) => `${d.code}×${d.c}`).join(", ")}` : "无重复");
+
+/* 9. 昨日手算基线（信息项：编辑器动过演示数据后必然漂移，不作为门禁） */
 const BASELINE = { direct: 60185.2, tax: 1805.56, grand: 61990.76, unitCost: 482.04 };
 const seedQuote = quotes[0];
 if (seedQuote) {
