@@ -139,6 +139,8 @@ const designTask =
   })) ??
   (await prisma.designTask?.findFirst({ orderBy: { createdAt: "asc" } })) ??
   null;
+const submittedTask =
+  (await prisma.designTask?.findFirst({ where: { status: "submitted" } })) ?? null;
 await prisma.$disconnect();
 
 const targets = [
@@ -162,6 +164,9 @@ const targets = [
   designTask
     ? { name: "12-design-detail", path: `/design/${designTask.id}` }
     : { name: "12-design-detail", path: "/design/__none__" },
+  submittedTask
+    ? { name: "13-design-review", path: `/design/${submittedTask.id}` }
+    : { name: "13-design-review", path: "/design/__none__" },
 ];
 
 const shot = (url, file) =>

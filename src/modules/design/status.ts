@@ -81,3 +81,30 @@ export function submissionResultTone(result: string): StatusBadgeTone {
       return "neutral";
   }
 }
+
+/**
+ * 审核谓词（M5-c）：仅「待审核（submitted）」态可执行审核。
+ * approved 是收尾态、revisions 需重新提交后才能再审、pending/assigned 尚未提交。
+ */
+export function canReview(status: string): boolean {
+  return status === "submitted";
+}
+
+/**
+ * 审核后下一状态：通过 → approved；退回 → revisions。
+ * 与 canReview 配合：仅 submitted 态会走到审核，故输出必是这两个之一。
+ */
+export function nextStatusAfterReview(approve: boolean): DesignTaskStatus {
+  return approve ? "approved" : "revisions";
+}
+
+/**
+ * 校验状态转移合法性（M5-c）：仅 submitted → approved / submitted → revisions 合法，
+ * 其余转移非法并抛错（防御性，供服务层在事务内兜底，避免状态机漂移）。
+ */
+export function assertReviewTransition(from: string, to: string): void {
+  const legal = from === "submitted" && (to === "approved" || to === "revisions");
+  if (!legal) {
+    throw new Error(`非法状态转移：${from} → ${to}（审核只发生在 submitted 态）`);
+  }
+}

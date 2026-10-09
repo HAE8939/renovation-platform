@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Badge } from "@/core/ui";
 import { getPlaceholderUser } from "@/modules/design/currentUser";
 import {
+  canReview,
   canSubmit,
   DESIGN_TASK_STATUS_LABEL,
   statusBadgeTone,
@@ -16,6 +17,7 @@ import {
   type TaskSubmissionItem,
 } from "@/modules/design/server/submissions";
 import { SubmitTaskForm } from "./SubmitTaskForm";
+import { ReviewForm } from "./ReviewForm";
 
 export const dynamic = "force-dynamic";
 
@@ -43,7 +45,13 @@ function formatDateTime(d: Date | null): string {
 const PRIORITY_LABEL: Record<string, string> = { high: "高", medium: "中", low: "低" };
 
 /** 版本历史单条：版本号、提交人/时间、说明、交付物链接、结果徽章；退回显示原因。 */
-function SubmissionEntry({ s }: { s: TaskSubmissionItem }) {
+function SubmissionEntry({
+  s,
+  reviewForm,
+}: {
+  s: TaskSubmissionItem;
+  reviewForm?: React.ReactNode;
+}) {
   return (
     <li className="border-l border-line pl-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -84,13 +92,15 @@ function SubmissionEntry({ s }: { s: TaskSubmissionItem }) {
           退回原因：{s.rejectReason}
         </p>
       )}
+      {reviewForm && <div className="mt-4">{reviewForm}</div>}
     </li>
   );
 }
 
 /**
- * 设计任务详情（M5-b）：基本信息 + 需求说明 + 提交成果表单 + 版本历史（倒序）。
- * 审核通过/退回（M5-c）不在本页实现；表单门控走 status.ts 的 canSubmit 纯函数。
+ * 设计任务详情（M5-b + M5-c）：基本信息 + 需求说明 + 提交成果表单 + 版本历史（倒序）。
+ * 审核通过/退回操作区（M5-c）渲染在最新一条 pending 提交旁；门控走 status.ts 的
+ * canSubmit / canReview 纯函数，不在页面硬编码状态。
  */
 export default async function DesignTaskDetailPage({
   params,
@@ -107,6 +117,12 @@ export default async function DesignTaskDetailPage({
   const typeLabel = DESIGN_TASK_TYPE_LABEL[task.type as DesignTaskType] ?? task.type;
   const statusLabel =
     DESIGN_TASK_STATUS_LABEL[task.status as DesignTaskStatus] ?? task.status;
+
+  // 审核操作区（M5-c）：仅 canReview 态（submitted）在最新一条 pending 提交旁渲染。
+  // 历史已倒序，find 返回的即最新待审版本；无 pending 则不渲染（防御性）。
+  const reviewTarget = canReview(task.status)
+    ? task.submissions.find((s) => s.result === "pending") ?? null
+    : null;
 
   const rows: { label: string; value: React.ReactNode }[] = [
     { label: "类型", value: typeLabel },
@@ -196,7 +212,19 @@ export default async function DesignTaskDetailPage({
         ) : (
           <ol className="mt-6 space-y-6">
             {task.submissions.map((s) => (
-              <SubmissionEntry key={s.id} s={s} />
+              <SubmissionEntry
+                key={s.id}
+                s={s}
+                reviewForm={
+                  reviewTarget && reviewTarget.id === s.id ? (
+                    <ReviewForm
+                      taskId={task.id}
+                      submissionId={s.id}
+                      placeholderUserName={placeholder?.name ?? null}
+                    />
+                  ) : undefined
+                }
+              />
             ))}
           </ol>
         )}
