@@ -1,7 +1,7 @@
 # 项目状态 — renovation-platform
 
-> 更新：**2026-10-09 22:40** · 维护：QwenWork（集成者）
-> 本轮：M5 设计管理模块四单元（a/b/c/d）全部合入 master 并通过门禁；codebuddy 驱动模型改用 **glm-5.2**（省积分）。
+> 更新：**2026-10-10 16:30** · 维护：QwenWork（集成者）
+> 本轮：M6 时间管控模块五单元（a/b/c/d/e）全部合入 master 并通过门禁；codebuddy 驱动通道更正为 **Provider 渠道 `custom-local:glm-5.2`**（走 8787 三号池，见 §3 执行通道）。
 > 本文件是**唯一**状态真源。`docs/SURVEY_2026-10-09.md`（16:48 快照）已并入此处并删除；
 > 10-08 深夜版 STATUS 中「M1b 暂停、两条 wip 分支待续」已作废——那两条废弃分支弃用未参考，M1b 由新轨道重做完成。
 > **2026-10-09 下午**：吸收 `Full-Service Project Management/` 三份妙搭资料，全案重排为 `docs/PLAN_FULL_SERVICE_V1.md` v1.2（路线 B）；M2-A 主脊 schema 已合入。
@@ -9,9 +9,9 @@
 
 ## 0. 一句话
 
-**M1a 平台壳 + M1b 预算模块 + M2-A 主脊 schema + M3 商务线索（a1/b/c/d，最小可用完整）+ M4 项目中心（a 列表 / b 六合一详情）+ M5 设计管理（a 模块+看板双视角 / b 提交版本历史 / c 审核状态机+返修率 / d 日历+跳预算）均已合入 master 并通过门禁；schema 3 条迁移、旧预算数据零破坏。全案按 `PLAN_FULL_SERVICE_V1.md` v1.2 路线 B 推进；余 M3-e 漏斗（延至 M9 驾驶舱），下一步 M6 工程排程。**
+**M1a 平台壳 + M1b 预算模块 + M2-A 主脊 schema + M3 商务线索 + M4 项目中心 + M5 设计管理 + M6 时间管控（a 模块+预警看板 / b 甘特主体 / c 抽屉编辑·进度联动·拖拽调期 / d 工序模板库 / e 项目中心接线）均已合入 master 并通过门禁；schema 4 条迁移、旧数据零破坏。全案按 `PLAN_FULL_SERVICE_V1.md` v1.2 路线 B 推进；余 M3-e 漏斗（延至 M9 驾驶舱），下一步 **M7 质量管控**。**
 
-## 1. 已完成（M1b 最后一个代码提交 `6f4246a`；其后均为文档提交，`git log --oneline \| wc -l` 可自查）
+## 1. 已完成（截至 M6；清单外的演化用 `git log --oneline` 自查）
 
 | 里程碑 | 内容 | 验证 |
 |---|---|---|
@@ -34,12 +34,17 @@
 | **M5-b** | 执行者提交：`submissions.ts` `getTaskDetail` + `createSubmission`（**单 `$transaction`** 原子做 version=max+1→建提交→推进 status=submitted，避开 M3-d2 嵌套事务坑）；`actions.ts` Server Action；`/design/[id]` 提交表单（`canSubmit` 门控）+ 版本历史倒序（result 语义色徽章、rejected 显退回原因、空态诚实）；seed 幂等补 4 条演示提交 | build 绿 + 三门禁零回退 + 截图版本历史（v1 已退回含原因 + v2 待审核）；375 DOM 实测 scrollWidth=360 无溢出 |
 | **M5-c** | 审核状态机：`review.ts` `reviewSubmission`（canReview 门控、只审 pending 版防重复、**退回必填原因**、写 reviewedBy/reviewedAt + 推进 approved/revisions，单事务）；`status.ts` 追加 canReview/nextStatusAfterReview/assertReviewTransition；`metrics.ts` `reworkRate`（主口径=有退回任务数/有提交任务数）+ avgReworkRounds；`ReviewForm.tsx` 通过/退回内联展开必填；**新 `scripts/verify-design.mjs` 28 断言**（状态机 + 返修率独立整数预言机 + 禁 emoji） | build 绿 + verify-design 28 + 三门禁零回退；返修率真值 1/3；截图审核区（通过/退回按钮在 pending 版旁） |
 | **M5-d** | 设计日历：`calendar.ts` 纯函数（monthDays 6×7 周一起始/groupByDay/parseMonthParam）；`DesignCalendar.tsx` 月导航深链 + 色片(status/逾期语义色点) + 今日单点描边 + 未排期诚实提示；`/design?view=board\|calendar` 切换；详情页加「打开该项目报价单 →」跳 `/budget/[projectId]`（不进 manifest.nav） | build 绿 + tsc 0 + verify-design28/quote17/crm11/health20 全过；**375 DOM 实测 scrollWidth=375 无溢出**（640px 网格在 overflow-x-auto 容器内横滚）；截图日历月视图 |
+| **M6-a** | 新建 `schedule` 模块（manifest + registry 接线 + 从 `deferredModules` 移除）；`ProcessTemplate`/`ScheduleTask`/`ScheduleTaskDependency`（自引用依赖中间表）三表迁移；纯函数 `status.ts`/`plan.ts`（面积定档/链式排期/拓扑无环/进度联动）+ **新 `scripts/verify-schedule.mjs` 50 断言**；seed 33 行模板（11 工序 × 3 档，照 v5.1 §6.5.2）+ 演示项目 002/003/004；`/schedule` **预警看板**（红/黄/绿/灰四区，复用 `health.scheduleLight`/`overallProgress`）+ 两占位页防死链 | build 绿 + verify-schedule 50 + 四门禁零回退 + 截图四区全演示（003 超期 7 天 / 002 剩余 6 天 / 001 46% / 004 未排程）+ 375 探针无溢出 |
+| **M6-b** | `/schedule/[projectId]` 甘特主体：SVG 双轨（计划条 + 进度条按状态着色）+ 依赖肘线（`--text-disabled`）+ 今日竖线 + 周/日缩放 + 悬停浮层 + 图例；`server/tasks.ts`（ISO 序列化 + 空态预览）+ `server/generate.ts`（生成五守卫/单事务/依赖 createMany；清空级联）+ actions；**新 `scripts/verify-schedule-gen.mts` 集成门禁**（隔离库真跑） | build 绿 + 集成 13/13 + 截图四项目（中段/落后/全完成/空态预览 107 天链）+ 375 探针无溢出 |
+| **M6-c** | 任务抽屉（计划起止 date↔ISO、负责人下拉、进度更新走 `applyProgressUpdate` 唯口径、实际/前置只读）+ 计划条**拖拽调期**（按天吸附、±N 天标签、Esc 取消、错误条）；`server/updates.ts`（updateTaskInfo/updateTaskProgress/shiftTaskDates）；`plan.ts` 增 `shiftDates`；verify-schedule 55、集成门禁扩 23 | build 绿 + 55 + 集成 23/23 + 375 探针 |
+| **M6-d** | `/schedule/templates` 工序模板库：11 工序 × 3 档行级编辑保存（先全量预校验再写、缺档如实「—」；`w-24` 外层定宽规避 Input `w-full` 吞宽度）；集成门禁扩 27 | build 绿 + 截图全值核对（54/76/107 三档）+ 375 探针 |
+| **M6-e** | 项目中心接线：详情「工期进度」Tab（进度/灯/工序清单/跳甘特）+「设计进度」Tab 补课（M5 欠账：五态徽章）+ 基础信息灯与整体进度接真值 + `/projects` 列表进度列；口径经 prisma 直读 + 仅 core health、不跨模块 import；顺修两处 `bg-surface-sunken` 笔误 | build 绿 + 截图四页面目检全对（46%/五态各 1/工期正常/列表 46%·58%·100%·未排程）+ 375 探针 |
 
-**路由（M5 后共 12 条动态页）**：`/`、`/budget`、`/budget/[projectId]`、`/budget/[projectId]/{print,stats,settings}`、`/budget/catalog`、`/crm`、`/projects`、`/projects/[id]`、**`/design`、`/design/[id]`**（`?scope=` 双视角 / `?view=` 看板·日历 / `?month=` 月导航）。
+**路由（M6 后共 15 条动态页）**：`/`、`/budget`、`/budget/[projectId]`、`/budget/[projectId]/{print,stats,settings}`、`/budget/catalog`、`/crm`、`/projects`、`/projects/[id]`、`/design`、`/design/[id]`、**`/schedule`、`/schedule/[projectId]`、`/schedule/templates`**（深链：`?scope=`、`?view=`、`?month=`、`?tab=` 见各模块）。
 
-**数据基线**：4 科目 / 16 模板项 / 16 报价明细；直接费 ¥60,185.20 · 税 ¥1,805.56 · 总价 ¥61,990.76 · 单方 ¥482.04/㎡（128.6㎡）。
+**数据基线**：4 科目 / 16 模板项 / 16 报价明细；直接费 ¥60,185.20 · 税 ¥1,805.56 · 总价 ¥61,990.76 · 单方 ¥482.04/㎡（128.6㎡）。**排程**：33 行工序模板（11 工序 × 3 档 = 54/76/107 天）+ 演示 4 项目（001 中段 46% / 002 落后剩 6 天 / 003 超期竣工 7 天 / 004 未排程=生成流程手测位）。
 
-## 2. 门禁与工具链（五个脚本，均可重跑）
+## 2. 门禁与工具链（九个脚本，均可重跑）
 
 | 脚本 | 拦什么 | 备注 |
 |---|---|---|
@@ -47,6 +52,9 @@
 | `scripts/qa-shots.mjs` | 起生产构建逐页无头截图，支持 `--viewport` | 已修两处：自动挑空闲端口 + 比对 `BUILD_ID` 防残留服务假绿；`execFileSync` 阻塞杀进程树防泄漏孤儿服务 |
 | `scripts/print-pdf.mjs` | 把打印视图导成真 A4 PDF | 屏幕截图看不出分页与打印媒体样式，打印类改动必须走这个 |
 | `scripts/verify-health.mjs` | **20 项断言**：`health.ts` 四纯函数（进度均值/工期灯/质量灯/预算灯）边界 + 输出不含 emoji | M2-A 新增；仿 verify-quote，Node 24 原生 import 生产 health.ts + 独立枚举预言机 |
+| `scripts/verify-crm.mjs` | **11 项断言**：签约归并纯函数（normalizePhone / pickClientByPhone）边界 + lead 阶段常量 | M3 新增 |
+| `scripts/verify-schedule.mjs` | **55 项断言**：面积定档边界、三档总工期独立复算（54/76/107）、链式无缝无叠 + 跨月终点、边数 10、拓扑 5 例、进度联动 7 例、逾期边界、`shiftDates` 5 例、输出禁 emoji | M6-a 新增 50；M6-c 扩到 55 |
+| `scripts/verify-schedule-gen.mts` | **排程端到端集成门禁（27 项）**：隔离库真跑生成（链与 `buildSchedule` 预言机逐条一致 / 守卫拒重）、清空（Cascade 双向无孤儿）、更新类（进度三态+钳制 / 信息编辑+两类拒绝 / 平移+超界）、模板写入+拒绝 | M6-b~d 新增；运行配方见脚本头（同 verify-sign 的临时库三步）。**改排程写库逻辑时必跑** |
 | `scripts/verify-design.mjs` | **28 项断言**：`design/status.ts` 状态机谓词（canReview/canSubmit/nextStatusAfterReview/assertReviewTransition 合法+非法）+ `design/metrics.ts` reworkRate/avgReworkRounds 边界与**独立整数预言机**复算 + 输出禁 emoji | M5-c 新增；仿 verify-crm，Node 直跑 .ts（带扩展名，勿穿无扩展名 re-export 链） |
 | `scripts/verify-sign.mts` | **签约端到端集成门禁**：真跑生产 `signLead`，断言幂等（签两次同项目不覆盖）+ 手机号归并（同 phone 只 1 Client、第二条 lead 复用同 Client 另建项目）+ lead 回写 | 需 tsx 解析 `@/` 别名 + 临时库；运行配方见脚本头。M3-d2 靠它抓出事务传播 bug。**纯函数断言覆盖不到这层** |
 
@@ -65,6 +73,7 @@
 - **M3 两处架构决定（已定）**：`createProject` 从 budget 模块上收 `core/domain`（crm 签约也要建项目，模块不互 import 内部）；签约按**手机号归并** Client，有意取代既有「按客户名 upsert」。
 - **M2-A 角色偏差纠正**：codebuddy 曾把 `USER_ROLE` 编成通用公司角色（foreman/engineer/accountant…），集成者已改回 v5.1 §4.1 装修 11 角色（boss/ops/biz_mgr/designer/design_asst/floor_plan/construction/rendering/budget_mgr/pm/inspector + viewer 占位）；`USER_ROLE` 现无消费者，M3 建 `rbac.ts` 时接。
 - 执行通道（2026-10-10 更正）：默认 **`--model custom-local:glm-5.2`**——provider 前缀命中 models.json 自定义条目，**走本地代理 `127.0.0.1:8787`（buddy2api）三号池**（M6-b 起启用；日志验证 `Using custom URL … 8787` + HTTP 200）。裸 `--model glm-5.2` 会被账号内置目录抢先命中、直打 `copilot.tencent.com`（单账号、绕开池子；M5-c/d 与 M6-a 的旧配方，仅作后备）。sensenova 降为备份。
+- **M6 三项架构决策（已定）**：① 工序依赖＝**自引用中间表** `ScheduleTaskDependency`（生成落线性链 i→i−1，结构支持非线性；拓扑无环由纯函数校验）；② 进度/状态联动**唯** `applyProgressUpdate`（0=重置清实际起止 / 1–99=进行中 / 100=完成且补写不覆盖已有完成日）；③ 排程快照语义（改模板不回溯已生成排程）+ 排程 100%→验收节点的副作用**留 M7**。`categoryId` 科目关联**未做**（模块边界 + 无消费方，M8/M9 财务核算时再定）。
 - Logo 上传从 B3 拆出，归 M1.5 与 `PlatformSetting` 一起做（无表可存文件路径，硬做只能靠约定猜文件名）。
 - 工作区约定：非交付物一律进 `_scratch/`（日志/截图/试验分子目录）、**禁止在仓库根新建 `.log` 或下划线目录**、决策类产物归 `docs/`、一次性脚手架禁止与项目平级建目录。
 
@@ -86,6 +95,8 @@
 | 6 | AGENTS 契约未更新：R1/R2 落地条款、§9 工作区约定、两处规范冲突（AGENTS「无阴影」过度简化 vs V0.3 浮层 L1–L3；accent 族"4 值"说法与实际浅色 3 值不符） | 补丁文本已在 `docs/PROPOSAL_M1.5.md` §4 与 §9，**待应用** |
 | 7 | 交互写回路径尚未经人手验证（科目库增删改排序、报价选入保存、项目设置保存、Ctrl+P 打印） | 服务已起 `http://127.0.0.1:3000`，待用户亲手点 |
 | 8 | ~~技术债 · 跨模块计算耦合~~ **已清（2026-10-09）**：报价计算口径上收 `core/domain/pricing.ts`，budget 与 projects 都从 core 引；`budget/lib/quote.ts` + `budget/types.ts` 退化为 re-export shim | §2 越界已消除；build + verify-quote 17 + verify-sign 12 全绿 |
+| 9 | M6 小瑕：连续链上依赖肘线退化为隐式短接（非线性依赖时才有视觉意义）；003 短链甘特右侧留白（svg 宽不足容器） | 记录未修（低优先） |
+| 10 | 模板库改动对「未排程项目生成预览」的刷新为下次请求生效（force-dynamic + ≤30s 客户端路由缓存） | 可接受，未修 |
 
 ## 5. 踩过的坑（每条都有代价，防返工）
 
@@ -100,6 +111,8 @@
 - **新建 git worktree 后 `pnpm install` 不会自动 `prisma generate`**：直接跑 seed 报 `@prisma/client did not initialize yet`。准备序列是 `install → prisma generate → migrate deploy → db seed`。
 - **linked worktree 不能放进主仓工作树内部**（git 视其为未跟踪目录，且与 `src/**` 构建 glob 冲突），必须同级；并行轨失效后及时 `git worktree remove` + 删目录，只留分支承载历史。
 - **V0.3 淡边框会让 375 截图"看着像溢出"，实则未必**（M5-b 踩过：把极淡 `border-line` + 右对齐值贴边误判成整页横向溢出，差点瞎补 `min-w-0`）。判 375 是否真溢出**别只信肉眼**——用无头 Edge 同源 iframe 探针量 `documentElement.scrollWidth ≤ innerWidth`（`public/__probe.html` + `--dump-dom`，用完 `host_safe_delete`）。M5 三页实测 scrollWidth 均 ≤ 视口，横向滚动都在 `overflow-x-auto` 容器内、不破 body。这也顺带给了 §4-1 那个"成因未定位"的 budget 详情 375 溢出一个可复用的排查工具。
+- **`--headless=new` 的「缺口」截图多半是渲染裁剪，不是溢出**（2026-10-10 实测）：新版无头窗口有 ~500px 最小宽度限制，`--window-size=375` 实际是「按宽版渲染后裁到 375」，所以内容"看着被切"——真值一律以上一条的 iframe 探针为准（M6 五轮复核：甘特/模板/空态/项目 Tab 全部 scrollWidth ≤ 375）。截图只作设计目检。
+- **后台跑批完成通知不可靠**（2026-10-10 实测：M6-b 那轮 codebuddy 跑完，系统完成通知未弹，靠人工发现）→ 集成者对后台任务采取**主动守候轮询**（每 45–55s 查输出日志非空即知完成），不静等通知；等待期间可并行备下一单元提示词。
 
 ## 6. 并行执行规约（当前生效）
 
@@ -115,17 +128,18 @@
 - 设计真源：`E:\19 Python File\MT-Visual-Language\HAE Creator Design System V0.3.md`（一行指针，不在本仓复制）。
 - 决策与审计：`docs/PROPOSAL_M1.5.md`、`docs/REQUIREMENTS.md`、`docs/DESIGN_AUDIT_M1A.md`、`docs/BUILD_SPEC_M1.md`。
 - 全案计划真源：`docs/PLAN_FULL_SERVICE_V1.md`（v1.2，路线 B；整合 `Full-Service Project Management/` 三份妙搭资料）。
-- 任务卡：`docs/TASK_M1A.md`、`TASK_M1B_A.md`、`_A2`、`_A3`、`_A4_FIX`、`_B1`、`_B1_FIX`、`_B2`、`_B3`、**`TASK_M2A.md`、`TASK_M3_CRM.md`、`TASK_M4.md`、`TASK_M5.md`（均已执行合入）**。
+- 任务卡：`docs/TASK_M1A.md`、`TASK_M1B_A.md`、`_A2`、`_A3`、`_A4_FIX`、`_B1`、`_B1_FIX`、`_B2`、`_B3`、`TASK_M2A.md`、`TASK_M3_CRM.md`、`TASK_M4.md`、`TASK_M5.md`、**`TASK_M6.md`（均已执行合入；M6 卡含 §7 偏差记录）**。
 - 配色决策产物：`docs/preview/theme-picker.html`（四套 accent × 同一张报价单，含无障碍实测与撞色风险）。
 - 本地产物（不入库）：`_scratch/logs/`、`_scratch/qa/`（截图与 PDF）、`_scratch/backup/`（dev.db 备份）。
 - 废弃分支（仅存档，勿参考勿 checkout）：`wip/m1b-a`、`feat/presentation`、`pre-m1b-checkpoint`。
 
-## 8. 下次接续（2026-10-09 日终 handoff）
+## 8. 下次接续（2026-10-10 日终 handoff）
 
-- **进度**：M2-A → **M5 全部合入 master**（见 §1，M5 四单元 `21cafb2`/`6a429ac`/`0c20825`/`d5ca7f9`），工作树干净、门禁全绿。设计管理模块完整上线：看板双视角 + 提交版本历史 + 审核通过/退回(原因必填) + 返修率 + 日历 + 跳预算。
-- **下一个里程碑 = M6 工程排程**（明天开工）：工序排程、甘特图、按面积档模板与工期预警（见 `PLAN_FULL_SERVICE_V1.md` §M6）。开工前先起草 `docs/TASK_M6.md`（照 `TASK_M4.md`/`TASK_M5.md` 写法：范围 / 单元拆分 / 硬约束 / 门禁 / 诚实空状态）。M6 私有表随模块下沉、经 `projectId` 挂共享 Project；`health.ts` 的工期灯届时可接真排程数据源（现走降级）。⚠️ 排程 100% 完成→建验收节点的副作用属 M7，M6 只留位不提前实现（红线三）。
+- **进度**：M2-A → **M6 全部合入 master**（见 §1；五单元 `689a016`/`2d1eff8`/`0d14a67`/`e47b26c`/`15fbe09` + 路由更正 `614203e`），工作树干净、门禁全绿。时间管控模块完整上线：预警看板 + 甘特（双轨/依赖肘线/今日线/缩放/悬停）+ 任务抽屉编辑 + 进度联动 + 拖拽调期 + 模板库 + 项目中心接线。
+- **M6 验收记录**：build 绿 + 五门禁（quote17/crm11/health20/design28/schedule55）+ **集成门禁 verify-schedule-gen 27**（隔离库真跑生成/清空/更新/模板）+ qa-shots 全程截图目检 + 375 DOM 探针 5 页复核无溢出。**待用户手测**（浏览器点击链路）：004 空态一键生成 → 拖拽调期 → 抽屉进度改 100 → 看板/灯/Tab 联动 → 清空 → 重新生成。
+- **下一个里程碑 = M7 质量管控**（`quality`）：`AcceptanceNode`/`CheckItem`/`Issue` 三表、验收节点状态机（提交→退回→重提→通过）、问题台账、质量档案；**并接活 M6 留的「排程 100%→建验收节点」副作用**；`health.ts` 质量灯接真数据。开工前先起草 `docs/TASK_M7.md`（照 TASK_M4/M5/M6 写法）。素材：`_scratch/m6_ref/fullMasterData.json`（89 项现场提取，验收/检查类条目可直接灌 CheckItem）。
 - **驱动 codebuddy 的命令（2026-10-10 更正：默认走 Provider 池）**：
   `codebuddy -p --model custom-local:glm-5.2 --session-id <id> --permission-mode bypassPermissions --disallowedTools "Bash(git:*),Bash(pnpm dev:*),Bash(pnpm prisma migrate:*),Bash(pnpm db:*)" < _scratch/logs/cb_<单元>_prompt.md > _scratch/logs/cb_<单元>_out.log 2>&1`（后台跑）。纪律：一轮一个界面单元；429 冷却可续、失败原卡重跑；改动留工作区由集成者 commit；**codebuddy 自述不作数，集成者必独立复跑门禁**；schema/seed 的**执行**（migrate/db seed）归集成者，codebuddy 只写文件。跑完 grep `~/.codebuddy/logs/<date>/renovation-platform__*.log` 的 `Using custom URL`/`url=`，确认命中 `http://127.0.0.1:8787/…`（别落回 copilot.tencent.com 内置口）。
-- **门禁套件（合入前必跑）**：`pnpm build` + `node scripts/verify-quote.mjs`(17) + `verify-crm.mjs`(11) + `verify-health.mjs`(20) + `verify-design.mjs`(28) + `verify-sign.mts`(12，签约/事务改动时，跑法见脚本头) + `node scripts/qa-shots.mjs`（截图目检——真缺陷历史上全靠它抓，断言过≠对；375 溢出争议用 §5 的 DOM 探针量 scrollWidth，别只信肉眼）。
+- **门禁套件（合入前必跑）**：`pnpm build` + `node scripts/verify-quote.mjs`(17) + `verify-crm.mjs`(11) + `verify-health.mjs`(20) + `verify-design.mjs`(28) + **`verify-schedule.mjs`(55)** + **`verify-schedule-gen.mts`(27，隔离库三步见脚本头；改排程写库逻辑时必跑)** + `verify-sign.mts`(12，签约/事务改动时) + `node scripts/qa-shots.mjs`（截图目检——真缺陷历史上全靠它抓，断言过≠对；375 溢出争议用 §5 的 DOM 探针量 scrollWidth，别只信肉眼）。
 - **局域网预览（如需再开）**：`npx next start -H 0.0.0.0 -p 3000` + 防火墙入站规则；本机局域网 IP `192.168.3.29`（会变，用前 `Get-NetIPAddress` 复核）。
-- **遗留**：① 防火墙规则 `renovation-preview-3000` 仍在（服务已停、规则空转），要删下次一条命令 + UAC；② M3-e 商务漏斗延至 M9 驾驶舱；③ 单用户免登录，「角色切换模拟视角」尚未接（`rbac.ts` 有骨架）。
+- **遗留**：① 防火墙规则 `renovation-preview-3000` 仍在（服务已停、规则空转），要删下次一条命令 + UAC；② M3-e 商务漏斗延至 M9 驾驶舱；③ 单用户免登录，「角色切换模拟视角」尚未接（`rbac.ts` 有骨架）；④ M6 小瑕见 §4-9/10；⑤ 临时库 `_scratch/schedgen.db` 可留可删（不进库）。
