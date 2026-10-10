@@ -12,6 +12,11 @@ import {
   shiftTaskDates,
   ScheduleUpdateError,
 } from "./server/updates";
+import {
+  updateTemplateDays,
+  ScheduleTemplateError,
+} from "./server/templates";
+import { AREA_TIERS, AREA_TIER_LABEL } from "./plan";
 
 /**
  * 排程 Server Actions（M6-b）。
@@ -137,5 +142,38 @@ export async function shiftTaskDatesAction(
     if (e instanceof ScheduleUpdateError) return { error: e.message };
     console.error("[shiftTaskDatesAction]", e);
     return { error: "调期失败，请稍后重试" };
+  }
+}
+
+/**
+ * 更新工序模板天数（M6-d）：三档 id + 三档 days 走 FormData。
+ * 先逐档预校验（缺档跳过、天数须 1–999 整数），全过再逐条 updateTemplateDays，
+ * 防止前几档已写库、后一档校验失败导致部分更新。成功 revalidate 模板库页。
+ */
+export async function updateTemplateDaysAction(
+  _prev: ScheduleActionState,
+  formData: FormData
+): Promise<ScheduleActionState> {
+  const entries: { id: string; days: number }[] = [];
+  for (const tier of AREA_TIERS) {
+    const id = String(formData.get(`id_${tier}`) ?? "").trim();
+    const daysRaw = String(formData.get(`days_${tier}`) ?? "").trim();
+    if (!id) continue; // 该档模板行缺失，跳过不写
+    const days = Number(daysRaw);
+    if (!Number.isInteger(days) || days < 1 || days > 999) {
+      return { error: `${AREA_TIER_LABEL[tier]}：天数须为 1–999 的整数` };
+    }
+    entries.push({ id, days });
+  }
+  try {
+    for (const e of entries) {
+      await updateTemplateDays(e.id, e.days);
+    }
+    revalidatePath("/schedule/templates");
+    return { ok: true };
+  } catch (e) {
+    if (e instanceof ScheduleTemplateError) return { error: e.message };
+    console.error("[updateTemplateDaysAction]", e);
+    return { error: "保存失败，请稍后重试" };
   }
 }

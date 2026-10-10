@@ -22,6 +22,7 @@ import {
   updateTaskInfo,
   updateTaskProgress,
 } from "@/modules/schedule/server/updates";
+import { updateTemplateDays } from "@/modules/schedule/server/templates";
 import { buildSchedule } from "@/modules/schedule/plan";
 
 const results: { name: string; ok: boolean }[] = [];
@@ -215,6 +216,29 @@ async function main() {
     shiftErr = e instanceof Error ? e.message : String(e);
   }
   chk("拖拽平移：|delta|>365 被拒", shiftErr.includes("合理范围"), shiftErr);
+
+  // ── 6) M6-d：模板天数编辑（写入 + 两类拒绝）────────────────────
+  const tplRow = await prisma.processTemplate.findFirst({
+    where: { tier: "lt90", order: 1 },
+  });
+  chk("前置：lt90 第 1 行模板存在", !!tplRow, tplRow?.name ?? "无");
+  await updateTemplateDays(tplRow!.id, 5);
+  const tplAfter = await prisma.processTemplate.findUnique({ where: { id: tplRow!.id } });
+  chk("模板天数写入 = 5", !!tplAfter && tplAfter.days === 5, `实际 ${tplAfter?.days}`);
+  let tplErr = "";
+  try {
+    await updateTemplateDays(tplRow!.id, 0);
+  } catch (e) {
+    tplErr = e instanceof Error ? e.message : String(e);
+  }
+  chk("模板天数 0 被拒（1–999）", tplErr.includes("1–999"), tplErr);
+  let tplErr2 = "";
+  try {
+    await updateTemplateDays("no-such-id", 5);
+  } catch (e) {
+    tplErr2 = e instanceof Error ? e.message : String(e);
+  }
+  chk("模板行不存在被拒", tplErr2.includes("不存在"), tplErr2);
 
   const failed = results.filter((r) => !r.ok).length;
   console.log(`\n${failed === 0 ? "全部通过" : `失败 ${failed} 项`} · 共 ${results.length} 项检查\n`);
