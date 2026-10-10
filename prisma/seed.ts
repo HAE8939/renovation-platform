@@ -1365,6 +1365,7 @@ async function seedQuality() {
           reportedBy: reviewer.id,
           assigneeId: reviewer.id,
           dueDate: addDays(new Date(), 3),
+          createdAt: addDays(actualEnd, 1), // 演示回填：问题=退回时刻生成（与节点审核时间一致）
         },
       });
     }
@@ -1401,6 +1402,33 @@ async function seedQuality() {
         where: { nodeId },
         data: { result: "pass" },
       });
+    }
+  }
+
+  // ── 演示回填：所有由完工工序生成的节点，createdAt=工序实际完工日 ──
+  // 目的：档案时间轴顺序自洽（生成事件须早于其提交/审核事件）。
+  // 仅 seed 演示数据这么做；生产 syncAcceptanceNodes 用真实时刻，不对账回填。
+  {
+    const demoNodes = await prisma.acceptanceNode.findMany({
+      where: { taskId: { not: null } },
+      select: { id: true, taskId: true },
+    });
+    const demoTaskIds = demoNodes
+      .map((n) => n.taskId)
+      .filter((v): v is string => v !== null);
+    const demoTasks = await prisma.scheduleTask.findMany({
+      where: { id: { in: demoTaskIds } },
+      select: { id: true, actualEnd: true },
+    });
+    const demoEndById = new Map(demoTasks.map((t) => [t.id, t.actualEnd]));
+    for (const n of demoNodes) {
+      const end = n.taskId ? demoEndById.get(n.taskId) : null;
+      if (end) {
+        await prisma.acceptanceNode.update({
+          where: { id: n.id },
+          data: { createdAt: end },
+        });
+      }
     }
   }
 

@@ -1,0 +1,108 @@
+/* ────────────────────────────────────────────────────────────────
+   A4 打印视图样式（仅本路由 import，不改 globals.css / tokens.css）
+   设计语言守 MT V0.3：无 box-shadow、单点钴蓝、气声描边、层级靠字重。
+   结构平行复制自 budget print，按质量档案版式微调（明细表三列：日期/事件/说明）。
+   屏幕态：可读的一页（纸感卡片居中）；打印态：A4 纵向、隐藏外壳与按钮、省墨。
+   ──────────────────────────────────────────────────────────────── */
+
+/* 屏幕态下的纸感卡片；打印态会被 @media print 覆写为白纸铺满 */
+.print-sheet {
+  max-width: 794px; /* A4 @96dpi 宽 */
+  margin: 0 auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  padding: 32px 48px;
+  color: var(--text-primary);
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+/* 明细表：固定列宽，日期/事件列收到容得下内容，说明列吃剩余宽度 */
+.print-sheet .detail-table {
+  table-layout: fixed;
+}
+/* 复用组件自带的 py-2.5(10px) 不在间距阶梯内，归一为 3/6，给窄列腾出横向空间 */
+.print-sheet th,
+.print-sheet td {
+  padding: 3px 6px !important;
+}
+.print-sheet table {
+  font-size: 13px;
+  line-height: 1.3;
+}
+
+/* ── 打印态 ─────────────────────────────────────────────────────── */
+@media print {
+  /* 隐藏平台外壳：侧栏/顶栏/移动导航/页脚
+     本页不使用 aside/header/nav/footer 语义标签，故该选择器只命中外壳，安全 */
+  aside,
+  header,
+  nav,
+  footer {
+    display: none !important;
+  }
+  /* 整页底刷白省墨（去掉外壳的 canvas 底与内容列包裹） */
+  html,
+  body,
+  body > div {
+    background: #fff !important;
+  }
+  /* 内容列去掉限宽与内距，铺满 A4 内容区 */
+  main {
+    display: block !important;
+  }
+  main > div {
+    max-width: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* 隐藏打印按钮 */
+  .no-print {
+    display: none !important;
+  }
+
+  /* 纸感底：白纸省墨，层级靠细线与留白，无大块底色 */
+  .print-sheet {
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+
+  /* A4 纵向 + 页边距 */
+  @page {
+    size: A4 portrait;
+    margin: 16mm 14mm;
+  }
+
+  /* 标题不与后文分离：仅页面/节级标题，避免「时间轴明细」成孤行 */
+  .print-sheet h1,
+  .print-sheet h2 {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  /* 表格跨页不切断行；表头在每页重复（栏目位于 thead） */
+  .print-sheet thead {
+    display: table-header-group;
+  }
+  /* 仅单行 tr 级避免切断 */
+  .print-sheet tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .print-sheet table {
+    break-after: auto;
+  }
+
+  /* 页脚分页规避：尽量留在文末，避免与正文分离成孤行 */
+  .print-sheet footer {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}

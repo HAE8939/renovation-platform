@@ -10,6 +10,8 @@
  *
  * 跑法：node scripts/print-pdf.mjs            （默认取最早的项目）
  *      node scripts/print-pdf.mjs --project <id> --out _scratch/qa/print-a4.pdf
+ *      node scripts/print-pdf.mjs --path "/quality/archive/<id>/print"
+ *      （--path 优先：指定任意打印路由；与 --project 互斥，给 --path 时不查库）
  */
 
 import { spawn, execFileSync } from "node:child_process";
@@ -83,7 +85,7 @@ const waitReady = async (ms = 60_000) => {
 console.log(`起服务 ${base}（构建 ${BUILD_ID.slice(0, 10)}）…`);
 if (!(await waitReady())) { console.error("✗ 服务未就绪"); killTree(); process.exit(1); }
 
-const url = `${base}/budget/${project.id}/print`;
+const url = base + arg("path", `/budget/${project.id}/print`);
 const html = await (await fetch(url)).text();
 if (!html.includes(BUILD_ID)) {
   console.error("✗ 应答方不是本次构建（buildId 不符），中止，不出假 PDF");

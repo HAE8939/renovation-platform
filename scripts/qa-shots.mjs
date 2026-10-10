@@ -155,6 +155,12 @@ const returnedNode =
   (await prisma.acceptanceNode?.findFirst({
     where: { project: { code: "RP-2026-003" }, name: "泥工工程" },
   })) ?? null;
+// M7-d：质量档案时间轴页（取 RP-2026-003，演示流节点齐全）
+const archiveProject =
+  (await prisma.project.findFirst({
+    where: { code: "RP-2026-003" },
+    select: { id: true },
+  })) ?? null;
 await prisma.$disconnect();
 
 const targets = [
@@ -205,6 +211,10 @@ const targets = [
     ? { name: "19-quality-node-returned", path: `/quality/nodes/${returnedNode.id}` }
     : { name: "19-quality-node-returned", path: "/quality/__none__" },
   { name: "20-quality-issues", path: "/quality/issues" },
+  { name: "21-quality-archive", path: "/quality/archive" },
+  archiveProject
+    ? { name: "21b-quality-archive-project", path: `/quality/archive/${archiveProject.id}` }
+    : { name: "21b-quality-archive-project", path: "/quality/archive/__none__" },
 ];
 
 const shot = (url, file) =>
