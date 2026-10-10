@@ -136,7 +136,7 @@
 ## 8. 下次接续（2026-10-10 日终 handoff）
 
 - **进度**：M2-A → **M6 全部合入 master**（见 §1；五单元 `689a016`/`2d1eff8`/`0d14a67`/`e47b26c`/`15fbe09` + 路由更正 `614203e`），工作树干净、门禁全绿。时间管控模块完整上线：预警看板 + 甘特（双轨/依赖肘线/今日线/缩放/悬停）+ 任务抽屉编辑 + 进度联动 + 拖拽调期 + 模板库 + 项目中心接线。
-- **M6 验收记录**：build 绿 + 五门禁（quote17/crm11/health20/design28/schedule55）+ **集成门禁 verify-schedule-gen 27**（隔离库真跑生成/清空/更新/模板）+ qa-shots 全程截图目检 + 375 DOM 探针 5 页复核无溢出。**待用户手测**（浏览器点击链路）：004 空态一键生成 → 拖拽调期 → 抽屉进度改 100 → 看板/灯/Tab 联动 → 清空 → 重新生成。
+- **M6 验收记录**：build 绿 + 五门禁（quote17/crm11/health20/design28/schedule55）+ **集成门禁 verify-schedule-gen 27**（隔离库真跑生成/清空/更新/模板）+ qa-shots 全程截图目检 + 375 DOM 探针 5 页复核无溢出。**用户手测已结（2026-10-10）**：浏览器点击链路走通；期间发现并修复「甘特『今天』小标贴右缘裁切/重叠」（`bf47884`：越界翻转 + 相邻刻度文字避让 + 遮罩定宽）。手测服务已停（3000 端口已释放、无残留进程）。
 - **下一个里程碑 = M7 质量管控**（`quality`）：`AcceptanceNode`/`CheckItem`/`Issue` 三表、验收节点状态机（提交→退回→重提→通过）、问题台账、质量档案；**并接活 M6 留的「排程 100%→建验收节点」副作用**；`health.ts` 质量灯接真数据。开工前先起草 `docs/TASK_M7.md`（照 TASK_M4/M5/M6 写法）。素材：`_scratch/m6_ref/fullMasterData.json`（89 项现场提取，验收/检查类条目可直接灌 CheckItem）。
 - **驱动 codebuddy 的命令（2026-10-10 更正：默认走 Provider 池）**：
   `codebuddy -p --model custom-local:glm-5.2 --session-id <id> --permission-mode bypassPermissions --disallowedTools "Bash(git:*),Bash(pnpm dev:*),Bash(pnpm prisma migrate:*),Bash(pnpm db:*)" < _scratch/logs/cb_<单元>_prompt.md > _scratch/logs/cb_<单元>_out.log 2>&1`（后台跑）。纪律：一轮一个界面单元；429 冷却可续、失败原卡重跑；改动留工作区由集成者 commit；**codebuddy 自述不作数，集成者必独立复跑门禁**；schema/seed 的**执行**（migrate/db seed）归集成者，codebuddy 只写文件。跑完 grep `~/.codebuddy/logs/<date>/renovation-platform__*.log` 的 `Using custom URL`/`url=`，确认命中 `http://127.0.0.1:8787/…`（别落回 copilot.tencent.com 内置口）。
