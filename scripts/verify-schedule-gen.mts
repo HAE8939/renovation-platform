@@ -1,9 +1,9 @@
 /**
- * verify-schedule-gen.mts —— 排程生成/清空的【端到端集成门禁】（隔离库，不碰 dev.db）。
+ * verify-schedule-gen.mts —— 排程生成/清空/更新类服务的【端到端集成门禁】（隔离库，不碰 dev.db）。
  *
- * 为什么存在：verify-schedule.mjs 只断言纯函数；generateSchedule / clearSchedule 的
- * 事务路径（单 tx 逐条 create 收集 id → createMany 依赖边）必须真跑生产服务层才能覆盖——
- * 承 M3-d2 教训（跨函数事务不共享连接，只有端到端集成能抓）。
+ * 为什么存在：verify-schedule.mjs 只断言纯函数；generateSchedule / clearSchedule /
+ * updateTaskInfo / updateTaskProgress / shiftTaskDates 的事务与联动路径必须真跑生产
+ * 服务层才能覆盖——承 M3-d2 教训（跨函数事务不共享连接，只有端到端集成能抓）。
  *
  * 运行配方（三步，指向一个临时库；在仓库根跑）：
  *   DATABASE_URL="file:../_scratch/schedgen.db" npx prisma migrate deploy
@@ -17,6 +17,11 @@ import {
   generateSchedule,
   ScheduleGenerateError,
 } from "@/modules/schedule/server/generate";
+import {
+  shiftTaskDates,
+  updateTaskInfo,
+  updateTaskProgress,
+} from "@/modules/schedule/server/updates";
 import { buildSchedule } from "@/modules/schedule/plan";
 
 const results: { name: string; ok: boolean }[] = [];
@@ -118,6 +123,98 @@ async function main() {
   const p1 = await prisma.project.findUnique({ where: { code: "RP-2026-001" } });
   const p1Count = p1 ? await prisma.scheduleTask.count({ where: { projectId: p1.id } }) : 0;
   chk("001 排程不受波及（= 11）", p1Count === 11, `实际 ${p1Count}`);
+
+  // ── 5) M6-c：更新类服务（进度联动 / 信息编辑 / 拖拽平移）────────
+  if (!p1) throw new Error("RP-2026-001 不存在");
+  const t0 = (
+    await prisma.scheduleTask.findMany({
+      where: { projectId: p1.id },
+      orderBy: { order: "asc" },
+    })
+  )[0];
+  const pm = await prisma.user.findFirst({ where: { role: "pm" } });
+  chk("前置：pm 用户存在（seed 周工）", !!pm, pm?.name ?? "无");
+
+  // 进度联动三态（结果与任务起始态无关）：50 → 进行中；100 → 已完成；0 → 重置
+  await updateTaskProgress(t0.id, 50);
+  let cur = await prisma.scheduleTask.findUnique({ where: { id: t0.id } });
+  chk(
+    "进度 50 → in_progress + 实际开始已写 + 实际完成为空",
+    !!cur && cur.progress === 50 && cur.status === "in_progress" && !!cur.actualStart && !cur.actualEnd
+  );
+  await updateTaskProgress(t0.id, 100);
+  cur = await prisma.scheduleTask.findUnique({ where: { id: t0.id } });
+  chk(
+    "进度 100 → completed + 实际完成已写",
+    !!cur && cur.progress === 100 && cur.status === "completed" && !!cur.actualEnd
+  );
+  await updateTaskProgress(t0.id, 0);
+  cur = await prisma.scheduleTask.findUnique({ where: { id: t0.id } });
+  chk(
+    "进度 0 → 重置 pending + 实际起止清空",
+    !!cur && cur.progress === 0 && cur.status === "pending" && !cur.actualStart && !cur.actualEnd
+  );
+  await updateTaskProgress(t0.id, 150);
+  cur = await prisma.scheduleTask.findUnique({ where: { id: t0.id } });
+  chk("进度 150 → 钳为 100（completed）", !!cur && cur.progress === 100 && cur.status === "completed");
+
+  // 信息编辑：日期归一 + 负责人写入；非法序被拒；幽灵负责人被拒
+  await updateTaskInfo(t0.id, {
+    startDateIso: "2027-01-01T00:00:00.000Z",
+    endDateIso: "2027-01-10T00:00:00.000Z",
+    ownerId: pm!.id,
+  });
+  cur = await prisma.scheduleTask.findUnique({ where: { id: t0.id } });
+  chk(
+    "信息编辑：起止写入且 UTC 0 点归一 + 负责人已写",
+    !!cur &&
+      cur.startDate.toISOString() === "2027-01-01T00:00:00.000Z" &&
+      cur.endDate.toISOString() === "2027-01-10T00:00:00.000Z" &&
+      cur.ownerId === pm!.id
+  );
+  let infoErr = "";
+  try {
+    await updateTaskInfo(t0.id, {
+      startDateIso: "2027-02-01T00:00:00.000Z",
+      endDateIso: "2027-01-01T00:00:00.000Z",
+      ownerId: null,
+    });
+  } catch (e) {
+    infoErr = e instanceof Error ? e.message : String(e);
+  }
+  chk("信息编辑：结束早于开始被拒", infoErr.includes("不能早于"), infoErr);
+  let ownerErr = "";
+  try {
+    await updateTaskInfo(t0.id, {
+      startDateIso: "2027-01-01T00:00:00.000Z",
+      endDateIso: "2027-01-10T00:00:00.000Z",
+      ownerId: "no-such-user",
+    });
+  } catch (e) {
+    ownerErr = e instanceof Error ? e.message : String(e);
+  }
+  chk("信息编辑：幽灵负责人被拒", ownerErr.includes("负责人不存在"), ownerErr);
+
+  // 拖拽平移：+2 天（相对当前值断言，可重复跑）；超界被拒
+  const beforeShift = await prisma.scheduleTask.findUnique({ where: { id: t0.id } });
+  await shiftTaskDates(t0.id, 2);
+  const afterShift = await prisma.scheduleTask.findUnique({ where: { id: t0.id } });
+  chk(
+    "拖拽平移 +2 天：起止各 +2d，时长不变",
+    !!beforeShift &&
+      !!afterShift &&
+      afterShift.startDate.getTime() === beforeShift.startDate.getTime() + 2 * MS_PER_DAY &&
+      afterShift.endDate.getTime() === beforeShift.endDate.getTime() + 2 * MS_PER_DAY &&
+      afterShift.endDate.getTime() - afterShift.startDate.getTime() ===
+        beforeShift.endDate.getTime() - beforeShift.startDate.getTime()
+  );
+  let shiftErr = "";
+  try {
+    await shiftTaskDates(t0.id, 999);
+  } catch (e) {
+    shiftErr = e instanceof Error ? e.message : String(e);
+  }
+  chk("拖拽平移：|delta|>365 被拒", shiftErr.includes("合理范围"), shiftErr);
 
   const failed = results.filter((r) => !r.ok).length;
   console.log(`\n${failed === 0 ? "全部通过" : `失败 ${failed} 项`} · 共 ${results.length} 项检查\n`);

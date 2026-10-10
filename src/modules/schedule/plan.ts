@@ -72,6 +72,24 @@ export function chainEdges(n: number): [number, number][] {
 }
 
 /**
+ * 两日期同移 dayDelta 天（M6-c 拖拽调期专用）。
+ * 纯毫秒数学（start/end 各加 dayDelta×MS_PER_DAY），不改写时区。
+ * dayDelta 可负；dayDelta=0 返回与入参值相等的新对象（恒等但非同一引用）。
+ * 调用方应传归零到 0 点的日期；返回值保持入参时区偏移特征（仅毫秒增减）。
+ */
+export function shiftDates(
+  start: Date,
+  end: Date,
+  dayDelta: number
+): { start: Date; end: Date } {
+  const deltaMs = dayDelta * MS_PER_DAY;
+  return {
+    start: new Date(start.getTime() + deltaMs),
+    end: new Date(end.getTime() + deltaMs),
+  };
+}
+
+/**
  * 拓扑无环检测（含自环）：给定节点 id 列表与有向边 [from, to]（from 依赖 to），
  * 若存在环或自环返回 true，否则 false。节点不在 nodeIds 中的边被忽略。
  * 用 DFS 三色标记：白=未访问 / 灰=在栈中（遇灰即环）/ 黑=已完成。

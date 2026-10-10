@@ -351,6 +351,63 @@ const tierSum = (tier) =>
   );
 }
 
+// ── shiftDates：拖拽调期纯函数 5 例（M6-c）────────────────────────
+{
+  const { shiftDates } = plan;
+  const MS = 1000 * 60 * 60 * 24;
+
+  // 1. +0 恒等：值相等但非同一引用
+  const s0 = new Date("2026-10-10T00:00:00.000Z");
+  const e0 = new Date("2026-10-15T00:00:00.000Z");
+  const r0 = shiftDates(s0, e0, 0);
+  check(
+    "shiftDates: +0 恒等（值相等，非同一引用）",
+    r0.start.getTime() === s0.getTime() &&
+      r0.end.getTime() === e0.getTime() &&
+      r0.start !== s0 &&
+      r0.end !== e0,
+    JSON.stringify(r0)
+  );
+
+  // 2. +1 天
+  const r1 = shiftDates(s0, e0, 1);
+  check(
+    "shiftDates: +1 天（start/end 各 +1d）",
+    r1.start.getTime() === s0.getTime() + MS &&
+      r1.end.getTime() === e0.getTime() + MS,
+    JSON.stringify(r1)
+  );
+
+  // 3. -3 天
+  const r3 = shiftDates(s0, e0, -3);
+  check(
+    "shiftDates: -3 天（start/end 各 -3d）",
+    r3.start.getTime() === s0.getTime() - 3 * MS &&
+      r3.end.getTime() === e0.getTime() - 3 * MS,
+    JSON.stringify(r3)
+  );
+
+  // 4. 跨月：2026-09-30 +1 → 2026-10-01
+  const sCross = new Date("2026-09-30T00:00:00.000Z");
+  const eCross = new Date("2026-10-05T00:00:00.000Z");
+  const rCross = shiftDates(sCross, eCross, 1);
+  check(
+    "shiftDates: 跨月 2026-09-30 +1 → 2026-10-01",
+    rCross.start.toISOString().slice(0, 10) === "2026-10-01" &&
+      rCross.end.toISOString().slice(0, 10) === "2026-10-06",
+    JSON.stringify(rCross)
+  );
+
+  // 5. 移位后 (end-start) 差值不变
+  const durBefore = e0.getTime() - s0.getTime();
+  const durAfter = r1.end.getTime() - r1.start.getTime();
+  check(
+    "shiftDates: 移位后 (end-start) 差值不变",
+    durBefore === durAfter,
+    `前 ${durBefore / MS}d / 后 ${durAfter / MS}d`
+  );
+}
+
 // ── isTaskOverdue：逾期边界 3 例 ─────────────────────────────────
 {
   const now = new Date("2026-10-10T12:00:00.000Z");

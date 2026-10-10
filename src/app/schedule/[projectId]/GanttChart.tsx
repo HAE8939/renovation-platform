@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { Button } from "@/core/ui";
 import {
@@ -15,8 +15,10 @@ import type {
 } from "@/modules/schedule/server/tasks";
 import {
   generateScheduleAction,
+  shiftTaskDatesAction,
   type ScheduleActionState,
 } from "@/modules/schedule/actions";
+import { TaskDrawer } from "./TaskDrawer";
 
 /**
  * 工程甘特图主体（M6-b，客户端）。
@@ -254,6 +256,16 @@ function HoverCard({
 function GanttBody({ data }: { data: ProjectScheduleData }) {
   const [zoom, setZoom] = useState<"week" | "day">("week");
   const [hovered, setHovered] = useState<number | null>(null);
+  const [drawerIndex, setDrawerIndex] = useState<number | null>(null);
+  const [dragError, setDragError] = useState<string | null>(null);
+  const [dragPreview, setDragPreview] = useState<{
+    taskIndex: number;
+    dayDelta: number;
+  } | null>(null);
+  const dragStartRef = useRef<{
+    taskIndex: number;
+    startX: number;
+  } | null>(null);
   const dayW = zoom === "week" ? 12 : 28;
   const today = useMemo(() => new Date(data.todayIso), [data.todayIso]);
 
@@ -294,6 +306,76 @@ function GanttBody({ data }: { data: ProjectScheduleData }) {
 
   const rowIndexById = new Map(data.tasks.map((t, i) => [t.id, i]));
 
+  // Esc 取消拖动
+  useEffect(() => {
+    if (!dragPreview) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        dragStartRef.current = null;
+        setDragPreview(null);
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [dragPreview]);
+
+  // 拖拽指针处理器（仅计划条）
+  const onBarPointerDown = (
+    e: React.PointerEvent<SVGRectElement>,
+    taskIndex: number
+  ) => {
+    if (e.button !== 0) return;
+    dragStartRef.current = { taskIndex, startX: e.clientX };
+    setDragPreview({ taskIndex, dayDelta: 0 });
+    setDragError(null);
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      // ignore
+    }
+  };
+
+  const onBarPointerMove = (e: React.PointerEvent<SVGRectElement>) => {
+    const start = dragStartRef.current;
+    if (!start) return;
+    const dx = e.clientX - start.startX;
+    const dayDelta = Math.round(dx / dayW);
+    setDragPreview({ taskIndex: start.taskIndex, dayDelta });
+  };
+
+  const onBarPointerUp = async (
+    e: React.PointerEvent<SVGRectElement>,
+    taskIndex: number
+  ) => {
+    const start = dragStartRef.current;
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch {
+      // ignore
+    }
+    dragStartRef.current = null;
+    setDragPreview(null);
+    if (!start) return;
+    const dx = e.clientX - start.startX;
+    const moved = Math.abs(dx);
+    const dayDelta = Math.round(dx / dayW);
+    if (moved < 3) {
+      setDrawerIndex(taskIndex);
+    } else if (dayDelta !== 0) {
+      const task = data.tasks[taskIndex];
+      const formData = new FormData();
+      formData.set("taskId", task.id);
+      formData.set("projectId", data.project.id);
+      formData.set("dayDelta", String(dayDelta));
+      try {
+        const result = await shiftTaskDatesAction({}, formData);
+        if (result.error) setDragError(result.error);
+      } catch {
+        setDragError("调期失败，请稍后重试");
+      }
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* 工具区：缩放 + 图例 */}
@@ -325,6 +407,20 @@ function GanttBody({ data }: { data: ProjectScheduleData }) {
         <Legend />
       </div>
 
+      {/* 拖拽错误提示 */}
+      {dragError && (
+        <div className="flex items-center gap-3 rounded-inner border border-line bg-surface px-3 py-2">
+          <span className="text-[13px] text-danger">{dragError}</span>
+          <button
+            type="button"
+            onClick={() => setDragError(null)}
+            className="ml-auto text-[12px] text-secondary whitespace-nowrap transition-colors hover:text-primary"
+          >
+            关闭
+          </button>
+        </div>
+      )}
+
       {/* 图体：左固定列 + 右滚动时间轴 */}
       <div className="rounded-card border border-line bg-surface overflow-hidden">
         <div className="flex">
@@ -342,10 +438,11 @@ function GanttBody({ data }: { data: ProjectScheduleData }) {
               return (
                 <div
                   key={t.id}
-                  style={{ height: ROW_H }}
-                  className="border-b border-line px-3 flex items-center gap-2"
+                  style={{ height: ROW_H, cursor: "pointer" }}
+                  className="border-b border-line px-3 flex items-center gap-2 transition-colors hover:bg-canvas"
                   onMouseEnter={() => setHovered(i)}
                   onMouseLeave={() => setHovered(null)}
+                  onClick={() => setDrawerIndex(i)}
                 >
                   <span className="text-[13px] num text-secondary shrink-0">
                     {t.order}.
@@ -444,11 +541,16 @@ function GanttBody({ data }: { data: ProjectScheduleData }) {
                     />
                   );
                 })}
-                {/* 双轨条 */}
+                {/* 双轨条：先画行命中区（透明，承空白点击 + 悬停），后画条（条在上层接收指针事件） */}
                 {data.tasks.map((t, i) => {
                   const startDay = dayIndex(t.startDate);
                   const endDay = dayIndex(t.endDate);
-                  const x = startDay * dayW;
+                  const isDragging =
+                    dragPreview?.taskIndex === i && dragPreview.dayDelta !== 0;
+                  const dragOffset = isDragging
+                    ? dragPreview!.dayDelta * dayW
+                    : 0;
+                  const x = startDay * dayW + dragOffset;
                   const w = (endDay - startDay + 1) * dayW;
                   const rowTop = HEADER_H + i * ROW_H;
                   const planY = rowTop + 4;
@@ -470,7 +572,19 @@ function GanttBody({ data }: { data: ProjectScheduleData }) {
                           : null;
                   return (
                     <g key={t.id}>
-                      {/* 计划条：底 surface-sunken + 1px 描边 */}
+                      {/* 行命中区（透明，先画于条下层）：空白区悬停 + 点击开抽屉 */}
+                      <rect
+                        x={0}
+                        y={rowTop}
+                        width={svgWidth}
+                        height={ROW_H}
+                        fill="transparent"
+                        style={{ cursor: "pointer" }}
+                        onMouseEnter={() => setHovered(i)}
+                        onMouseLeave={() => setHovered(null)}
+                        onClick={() => setDrawerIndex(i)}
+                      />
+                      {/* 计划条：底 surface-sunken + 1px 描边；可拖拽调期 */}
                       <rect
                         x={x}
                         y={planY}
@@ -479,8 +593,20 @@ function GanttBody({ data }: { data: ProjectScheduleData }) {
                         fill="var(--surface-sunken)"
                         stroke="var(--border)"
                         strokeWidth={1}
+                        style={{
+                          cursor:
+                            dragPreview?.taskIndex === i
+                              ? "grabbing"
+                              : "grab",
+                          touchAction: "none",
+                        }}
+                        onMouseEnter={() => setHovered(i)}
+                        onMouseLeave={() => setHovered(null)}
+                        onPointerDown={(e) => onBarPointerDown(e, i)}
+                        onPointerMove={onBarPointerMove}
+                        onPointerUp={(e) => onBarPointerUp(e, i)}
                       />
-                      {/* 进度条：长度 = progress% × 计划条长；pending 不渲染 */}
+                      {/* 进度条：长度 = progress% × 计划条长；pending 不渲染；点击开抽屉 */}
                       {progColor && progW > 0 && (
                         <rect
                           x={x}
@@ -488,18 +614,26 @@ function GanttBody({ data }: { data: ProjectScheduleData }) {
                           width={progW}
                           height={PROGRESS_BAR_H}
                           fill={progColor}
+                          style={{ cursor: "pointer" }}
+                          onMouseEnter={() => setHovered(i)}
+                          onMouseLeave={() => setHovered(null)}
+                          onClick={() => setDrawerIndex(i)}
                         />
                       )}
-                      {/* 行命中区（悬停，透明） */}
-                      <rect
-                        x={0}
-                        y={rowTop}
-                        width={svgWidth}
-                        height={ROW_H}
-                        fill="transparent"
-                        onMouseEnter={() => setHovered(i)}
-                        onMouseLeave={() => setHovered(null)}
-                      />
+                      {/* 拖拽预览标签「±N 天」 */}
+                      {isDragging && (
+                        <text
+                          x={x + w + 8}
+                          y={planY + PLAN_BAR_H}
+                          fontSize={12}
+                          fill="var(--accent-ink)"
+                          className="font-medium"
+                        >
+                          {dragPreview!.dayDelta > 0
+                            ? `+${dragPreview!.dayDelta} 天`
+                            : `${dragPreview!.dayDelta} 天`}
+                        </text>
+                      )}
                     </g>
                   );
                 })}
@@ -541,6 +675,15 @@ function GanttBody({ data }: { data: ProjectScheduleData }) {
           </div>
         </div>
       </div>
+
+      {/* 任务抽屉 */}
+      <TaskDrawer
+        task={drawerIndex != null ? data.tasks[drawerIndex] : null}
+        projectId={data.project.id}
+        users={data.users}
+        open={drawerIndex !== null}
+        onClose={() => setDrawerIndex(null)}
+      />
     </div>
   );
 }

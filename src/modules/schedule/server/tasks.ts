@@ -1,4 +1,5 @@
 import prisma from "@/core/db";
+import { USER_ROLE_LABEL } from "@/core/domain/types";
 import { AREA_TIER_LABEL, areaTier, buildSchedule } from "../plan";
 import type { AreaTier } from "../types";
 
@@ -82,6 +83,8 @@ export interface ProjectScheduleData {
   previewPlannedEnd: string | null;
   /** 今日 UTC 0 点，供客户端今日线定位。 */
   todayIso: string;
+  /** 全部用户（按 createdAt asc），供负责人下拉展示。 */
+  users: { id: string; name: string; roleLabel: string }[];
 }
 
 /**
@@ -127,6 +130,17 @@ export async function getProjectSchedule(
     : [];
   const nameById = new Map(users.map((u) => [u.id, u.name]));
   const taskNameById = new Map(tasks.map((t) => [t.id, t.name]));
+
+  // 全部用户（按 createdAt asc），roleLabel 取 USER_ROLE_LABEL，未知角色回落原值。
+  const allUsers = await prisma.user.findMany({
+    orderBy: { createdAt: "asc" },
+    select: { id: true, name: true, role: true },
+  });
+  const userOptions = allUsers.map((u) => ({
+    id: u.id,
+    name: u.name,
+    roleLabel: USER_ROLE_LABEL[u.role as keyof typeof USER_ROLE_LABEL] ?? u.role,
+  }));
 
   const dependencies: ScheduleDependencyEdge[] = tasks.flatMap((t) =>
     t.deps.map((d) => ({ taskId: d.taskId, dependsOnId: d.dependsOnId }))
@@ -227,5 +241,6 @@ export async function getProjectSchedule(
     previewPlannedStart,
     previewPlannedEnd,
     todayIso,
+    users: userOptions,
   };
 }
