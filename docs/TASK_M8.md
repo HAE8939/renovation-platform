@@ -190,7 +190,7 @@ model PaymentNode {
 | 处置 | 路径 |
 |---|---|
 | **新建** | `src/modules/finance/**`（manifest / types / status / payment / currentUser / server/*）｜`src/core/domain/ledger.ts`｜`src/app/finance/**`（page / ViewToggle / NewRecordModal / RecordDrawer / payments/* / actions.ts）｜`scripts/verify-finance.mjs`｜`scripts/verify-finance-flow.mts` |
-| **允许加行**（仅下列，且只加不改语义） | `prisma/schema.prisma`（尾部两 model + `Project` 两行反向关系）｜`src/modules/registry.ts`（`modules` 加一行、`deferredModules` 删 finance）｜`prisma/seed.ts`（追加 `seedFinance()` + `main()` 一行调用）｜`scripts/qa-shots.mjs`（targets 加 2 项）｜`src/core/domain/projects.ts`（`UpdateProjectInput` 一个可选字段 + `updateProject` 对应写入）｜`src/modules/budget/server/projects.ts` 与 `src/app/budget/[projectId]/settings/*`（取数带一列 / 表单加一行）｜`src/modules/projects/server/projectDetail.ts` + `src/app/projects/[id]/ProjectTabs.tsx`（毛利卡 + 预算灯，M8-d）｜`src/app/quality/nodes/[id]/page.tsx` 的 passed 横幅文案与 `ReviewForm.tsx` 的审核确认提示（M8-d，各只改文案一行 + 一条链接） |
+| **允许加行**（仅下列，且只加不改语义） | `prisma/schema.prisma`（尾部两 model + `Project` 两行反向关系）｜`src/modules/registry.ts`（`modules` 加一行、`deferredModules` 删 finance）｜`prisma/seed.ts`（追加 `seedFinance()` + `main()` 一行调用）｜`scripts/qa-shots.mjs`（targets 加 2 项）｜`src/core/domain/projects.ts`（`UpdateProjectInput` 一个可选字段 + `updateProject` 对应写入）｜`src/modules/budget/server/projects.ts`（实为 core 的 re-export，取数自动穿透）、`src/app/budget/[projectId]/settings/page.tsx` + `ProjectSettingsForm.tsx` + `src/app/budget/actions.ts`（透传一列 / 表单加一行 / 提交 parse 透传——actions.ts 系 M8-a 执行记录 §8-1 补记）｜`src/modules/projects/server/projectDetail.ts` + `src/app/projects/[id]/ProjectTabs.tsx`（毛利卡 + 预算灯，M8-d）｜`src/app/quality/nodes/[id]/page.tsx` 的 passed 横幅文案与 `ReviewForm.tsx` 的审核确认提示（M8-d，各只改文案一行 + 一条链接） |
 | **禁区（碰即返工）** | `src/core/domain/health.ts`、`src/core/domain/pricing.ts`、`src/core/domain/acceptance.ts`、`src/core/ui/**`、`src/app/layout.tsx`、`src/styles/tokens.css`、`src/modules/budget/{lib,components}/**` 与报价保存路径、`src/modules/quality/{status,timeline}.ts` 与 quality 全部写库服务、`src/modules/schedule/**`、`src/modules/design/**`、`src/modules/crm/**`、既有 `scripts/verify-*.mjs|mts`（**只新增脚本，不改老脚本的断言与阈值**） |
 
 ## 6. 门禁与验收（每单元必跑；集成者独立复跑，codebuddy 自述不作数）
@@ -222,7 +222,22 @@ model PaymentNode {
 12. **待收款 = 合同额 − 已收（缺口口径），与"计划未付合计"分开显示**：两个数语义不同（缺口 vs 未到期计划），合并会造假一致。
 13. **补合同额录入入口**（M2-A 遗留缺口）：`updateProject` 与项目设置表单此前都不含 `contractAmount`，只有签约一条路——M8 若无入口，非签约项目永远算不了毛利、生不成计划、灯也接不上真值。属"下游第一次真正用到锚点时补齐写入侧"，不是新设计。
 
-## 8. 阻塞回报优先于瞎猜
+## 8. M8-a 执行记录与集成者裁定（2026-10-10 合入，commit `95f0bc6`）
+
+codebuddy 自报 5 处偏离，集成者逐条裁定；另自修 2 处。
+
+1. **`src/app/budget/actions.ts` +2 行（parse + 透传 contractAmount）**：**准**。表单提交经 `updateProjectAction → updateProject`，不接线则新加的输入框是空摆设；该文件不在禁区（禁区是 budget `lib/components` 与报价保存路径）。§5.1 所有权表补记此文件。
+2. **`ledger.ts` 内联 `round2` 而非 import pricing**：**准**。经 plain-node 直跑的纯函数须自包含（`pricing.ts`/`health.ts`/`design/metrics.ts`/`quality/timeline.ts` 皆如此；`tsconfig` 无 `allowImportingTsExtensions`，Next 侧不能带 `.ts` 后缀 import）。`pricing.round2` 仍是权威定义，两处公式一致由 `verify-finance` 的整数分预言机兜住。
+3. **`marginRate` 取 `Math.round(rate*10000)/10000`**：**准，且本卡 §3 原文有笔误**——原写 `round2(rate*10000)/10000`，`round2` 是两位舍入，会把 0.2265625 变成六位小数、与「四位小数」声明自相矛盾。实现按 §6 断言口径（标准四位舍入）落地并注释。
+4. **seed 收支记录 11 笔 ≠ 本卡写的 9**：**准，本卡计数笔误**。§3 同时要求 4 笔 income（两本账一致）+ 7 笔 expense（三项目毛利率 35%/37.5%/22.7% 由金额锁死）= 11。金额与毛利约束优先，自检断言取 `=== 11` 并报 DB 真值。
+5. **五段之和浮点累加有 1e-11 误差**：**准**。`verify-finance` 用 `round2(sum)===c` 容差比对，另设整数分（cent）硬精确比对，两者并存。
+
+集成者自修（合入前）：
+- **支出 7 笔的 `date` 原全取 seed 时刻** → 改为按各自开工日 +12~+55 天落在施工期内（越过今天则钳回昨天）。已竣工项目出现「完工后才买主材」正是 STATUS §5「演示数据时间自洽」那条教训的重演。
+- **合同额 hint 措辞** → 原写「0 或留空＝未录入」，实际行为是"留空=不改此列"（`undefined` 不落库），改为「0＝未录入；清空＝保存时不改动此列」。
+- **目检抓出的真缺陷**：`/finance` 毛利卡的 `marginText` 定义了却没渲染，页面上只有「毛利率」三个字不显数值——build 绿、tsc 0、115 断言全过都没拦住，靠截图发现（再次印证 STATUS §2「验收纪律」）。
+
+## 9. 阻塞回报优先于瞎猜
 
 遇到以下拿不准的，**先停下回报集成者，别自作主张扩范围、造数或提前实现 M9（变更单/驾驶舱/利润分析）**：
 
