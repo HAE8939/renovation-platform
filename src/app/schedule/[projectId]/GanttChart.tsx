@@ -306,6 +306,13 @@ function GanttBody({ data }: { data: ProjectScheduleData }) {
 
   const rowIndexById = new Map(data.tasks.map((t, i) => [t.id, i]));
 
+  // 「今天」小标布局：贴图右缘时向左翻转（防越界裁切）；并让相邻刻度标签避让。
+  const TODAY_LABEL_W = 28;
+  const todayLabelFlipped = todayX + 8 + TODAY_LABEL_W > svgWidth;
+  const todayLabelLeft = todayLabelFlipped
+    ? todayX - 8 - TODAY_LABEL_W
+    : todayX + 8;
+
   // Esc 取消拖动
   useEffect(() => {
     if (!dragPreview) return;
@@ -469,28 +476,36 @@ function GanttBody({ data }: { data: ProjectScheduleData }) {
           <div className="relative flex-1">
             <div className="overflow-x-auto">
               <svg width={svgWidth} height={svgHeight} className="block">
-                {/* 周刻度 + 竖网格线（每 7 天） */}
-                {scaleMarks.map((m, i) => (
-                  <g key={i}>
-                    <line
-                      x1={m.x}
-                      y1={0}
-                      x2={m.x}
-                      y2={svgHeight}
-                      stroke="var(--border)"
-                      strokeWidth={1}
-                    />
-                    <text
-                      x={m.x + 4}
-                      y={20}
-                      className="num"
-                      fontSize={12}
-                      fill="var(--text-secondary)"
-                    >
-                      {m.label}
-                    </text>
-                  </g>
-                ))}
+                {/* 周刻度 + 竖网格线（每 7 天）；与「今天」小标重叠的刻度文字不画（网格线保留） */}
+                {scaleMarks.map((m, i) => {
+                  const labelLeft = m.x + 4;
+                  const overlapsToday =
+                    labelLeft + 30 > todayLabelLeft - 4 &&
+                    labelLeft < todayLabelLeft + TODAY_LABEL_W + 4;
+                  return (
+                    <g key={i}>
+                      <line
+                        x1={m.x}
+                        y1={0}
+                        x2={m.x}
+                        y2={svgHeight}
+                        stroke="var(--border)"
+                        strokeWidth={1}
+                      />
+                      {!overlapsToday && (
+                        <text
+                          x={m.x + 4}
+                          y={20}
+                          className="num"
+                          fontSize={12}
+                          fill="var(--text-secondary)"
+                        >
+                          {m.label}
+                        </text>
+                      )}
+                    </g>
+                  );
+                })}
                 {/* 日视图：每天极淡竖网格线 */}
                 {zoom === "day" &&
                   Array.from({ length: Math.ceil(svgWidth / dayW) }, (_, i) => (
@@ -637,7 +652,7 @@ function GanttBody({ data }: { data: ProjectScheduleData }) {
                     </g>
                   );
                 })}
-                {/* 今日竖线（全页唯一强 accent）+ 「今天」小标 */}
+                {/* 今日竖线（全页唯一强 accent）+ 「今天」小标（贴右缘时向左翻转，防越界裁切） */}
                 <line
                   x1={todayX}
                   y1={0}
@@ -647,18 +662,19 @@ function GanttBody({ data }: { data: ProjectScheduleData }) {
                   strokeWidth={1.5}
                 />
                 <rect
-                  x={todayX}
+                  x={todayLabelLeft - 3}
                   y={2}
-                  width={40}
+                  width={TODAY_LABEL_W + 6}
                   height={16}
                   fill="var(--surface)"
                 />
                 <text
-                  x={todayX + 4}
+                  x={todayLabelFlipped ? todayX - 8 : todayX + 8}
                   y={14}
                   fontSize={12}
                   fill="var(--accent-ink)"
                   className="font-medium"
+                  textAnchor={todayLabelFlipped ? "end" : "start"}
                 >
                   今天
                 </text>
