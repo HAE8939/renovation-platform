@@ -86,6 +86,7 @@ model Project {
   quotes    BudgetQuote[]
   lead      Lead?                        // 反向：签约线索（真源在 Lead.projectId @unique）
   designTasks DesignTask[]               // 反向：设计任务（M5-a，真源在 DesignTask.projectId）
+  scheduleTasks ScheduleTask[]           // 反向：排程工序（M6-a，真源在 ScheduleTask.projectId）
 
   @@map("projects")
 }
@@ -254,4 +255,63 @@ model TaskSubmission {
 
   @@unique([taskId, version])
   @@map("task_submissions")
+}
+
+// ─────────────────────────────────────────────────────────────
+// 时间管控模块自有实体 (modules/schedule) — M6-a
+// ScheduleTask 通过 projectId 外键引用共享 core/domain 的 Project（AGENTS §2/§4）。
+// ownerId 语义上是 User.id（存 userId，非自由文本），与 DesignTask.assigneeId 同策略：
+// 本期不建到 User 的 @relation，仅逻辑引用 + @@index，P4 接登录后再定外键关系。
+// ─────────────────────────────────────────────────────────────
+
+// 工序模板：11 工序 × 3 档（lt90 / b90_130 / gt130），生成排程时按面积档套用。
+model ProcessTemplate {
+  id        String   @id @default(cuid())
+  name      String   // 工序名（11 项）
+  order     Int      // 1..11，生成顺序
+  tier      String   // lt90 | b90_130 | gt130（见 schedule/plan.ts）
+  days      Int      // 标准工期（天）
+  createdAt DateTime @default(now())
+
+  @@unique([tier, order])
+  @@map("process_templates")
+}
+
+// 排程工序：从模板快照生成，挂在 Project 下。改模板不回溯已生成排程。
+model ScheduleTask {
+  id          String    @id @default(cuid())
+  projectId   String                     // ★ 引用共享 core/domain Project，不得自造
+  name        String                     // 工序名（快照自模板；改模板不回溯已生成排程）
+  order       Int
+  startDate   DateTime                   // 计划开始
+  endDate     DateTime                   // 计划结束（含当天；=start+days-1）
+  actualStart DateTime?
+  actualEnd   DateTime?
+  progress    Int       @default(0)      // 0–100 整数
+  status      String    @default("pending") // pending|in_progress|completed（见 schedule/status.ts）
+  ownerId     String?                    // ★ userId，非自由文本；null=未指派
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  project    Project                   @relation(fields: [projectId], references: [id])
+  deps       ScheduleTaskDependency[]  @relation("sch_dep_task")
+  dependents ScheduleTaskDependency[]  @relation("sch_dep_dependson")
+
+  @@index([projectId])
+  @@index([ownerId])
+  @@map("schedule_tasks")
+}
+
+// 自引用依赖中间表：taskId 依赖 dependsOnId（task 的前置 = dependsOn）。
+model ScheduleTaskDependency {
+  id          String   @id @default(cuid())
+  taskId      String
+  dependsOnId String
+  createdAt   DateTime @default(now())
+
+  task      ScheduleTask @relation("sch_dep_task", fields: [taskId], references: [id], onDelete: Cascade)
+  dependsOn ScheduleTask @relation("sch_dep_dependson", fields: [dependsOnId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, dependsOnId])
+  @@map("schedule_task_deps")
 }

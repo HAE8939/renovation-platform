@@ -1,6 +1,7 @@
 /* eslint-disable no-console */
 import { PrismaClient } from "@prisma/client";
 import { USER_ROLE, DEPARTMENT } from "../src/core/domain/types";
+import { buildSchedule, chainEdges } from "../src/modules/schedule/plan";
 
 const prisma = new PrismaClient();
 
@@ -235,6 +236,29 @@ const DEMO_QUOTE: { code: string; quantity: number }[] = [
   { code: "04.04", quantity: 68 },
 ];
 
+// ── 11 工序 × 3 档模板（照抄 TASK_M6 §3 / v5.1 §6.5.2）──────────────
+// 三档实算：lt90=54 / b90_130=76 / gt130=107。
+// 说明：任务卡 §3 逐工序天数实算 b90_130=76，§6 多处写作「80 / 2026-11-19」，
+// 二者相差 4 天。本 seed 照抄逐工序天数（照抄 v5.1），实算 76；如 v5.1 原表确为 80，
+// 请集成者核 v5.1 §6.5.2 后修正逐工序天数，seed 与 verify 同步即可。
+const SCHEDULE_PROCESS: {
+  name: string;
+  order: number;
+  days: { lt90: number; b90_130: number; gt130: number };
+}[] = [
+  { name: "拆除工程", order: 1, days: { lt90: 3, b90_130: 5, gt130: 7 } },
+  { name: "水电工程", order: 2, days: { lt90: 7, b90_130: 10, gt130: 14 } },
+  { name: "泥工工程", order: 3, days: { lt90: 10, b90_130: 14, gt130: 18 } },
+  { name: "防水工程", order: 4, days: { lt90: 3, b90_130: 3, gt130: 5 } },
+  { name: "地面工程", order: 5, days: { lt90: 5, b90_130: 7, gt130: 10 } },
+  { name: "墙面工程", order: 6, days: { lt90: 7, b90_130: 10, gt130: 14 } },
+  { name: "天花工程", order: 7, days: { lt90: 7, b90_130: 10, gt130: 14 } },
+  { name: "乳胶漆工程", order: 8, days: { lt90: 5, b90_130: 7, gt130: 10 } },
+  { name: "定制工程", order: 9, days: { lt90: 3, b90_130: 5, gt130: 7 } },
+  { name: "水电安装", order: 10, days: { lt90: 3, b90_130: 3, gt130: 5 } },
+  { name: "竣工清洁", order: 11, days: { lt90: 1, b90_130: 2, gt130: 3 } },
+];
+
 async function main() {
   const existing = await prisma.organization.findUnique({ where: { slug: "default" } });
   if (existing) {
@@ -247,6 +271,8 @@ async function main() {
   await seedDesignTasks();
   // M5-b：提交记录 seed（幂等，给 revisions/submitted/approved 任务补版本历史）。
   await seedTaskSubmissions();
+  // M6-a：工程排程 seed（模板 33 行 + 演示项目排程，幂等）。
+  await seedSchedule();
 }
 
 /** M1a/M2-A 基础数据：组织 + 用户 + 客户 + 项目 + 报价 + 科目模板 + 线索。 */
@@ -742,6 +768,389 @@ async function seedTaskSubmissions() {
   }
 
   console.log(`M5-b 提交 seed 完成：TaskSubmission 共 ${total} 条（revisions 任务 v1 已退回 + v2 待审核、submitted 任务 v1 待审核、approved 任务 v1 已通过）。`);
+}
+
+// ── M6-a 工程排程 seed ─────────────────────────────────────────
+// 幂等：模板按 processTemplate.count()==0 独立幂等；任务按 scheduleTask.count()>0
+// 整体跳过。用户按 email upsert。演示项目 002/003/004 直接 create（新客户 + 新项目），
+// 001（既有项目）从 Project.startDate 起链 + 按日期推导完成态。T = seed 运行时刻。
+async function seedSchedule() {
+  const org = await prisma.organization.findUnique({ where: { slug: "default" } });
+  if (!org) {
+    throw new Error("schedule seed 自检失败：默认组织不存在，请先运行基础 seed");
+  }
+
+  // 工程侧用户：项目经理 + 巡检（role 来自 core/domain/types）
+  const pm = await prisma.user.upsert({
+    where: { email: "zhougong@renovation.local" },
+    update: {},
+    create: {
+      orgId: org.id,
+      name: "周工",
+      email: "zhougong@renovation.local",
+      role: USER_ROLE.pm,
+      department: DEPARTMENT.engineering,
+    },
+  });
+  await prisma.user.upsert({
+    where: { email: "laozheng@renovation.local" },
+    update: {},
+    create: {
+      orgId: org.id,
+      name: "老郑",
+      email: "laozheng@renovation.local",
+      role: USER_ROLE.inspector,
+      department: DEPARTMENT.engineering,
+    },
+  });
+
+  // 模板 33 行（幂等：count==0 才灌）
+  const tplCount = await prisma.processTemplate.count();
+  if (tplCount === 0) {
+    const rows: { name: string; order: number; tier: string; days: number }[] = [];
+    for (const p of SCHEDULE_PROCESS) {
+      for (const tier of ["lt90", "b90_130", "gt130"] as const) {
+        rows.push({ name: p.name, order: p.order, tier, days: p.days[tier] });
+      }
+    }
+    await prisma.$transaction(
+      rows.map((r) => prisma.processTemplate.create({ data: r }))
+    );
+  }
+  const realTpl = await prisma.processTemplate.count();
+  const tierCounts = await prisma.processTemplate.groupBy({
+    by: ["tier"],
+    _count: true,
+  });
+  const tierMap = Object.fromEntries(
+    tierCounts.map((t) => [t.tier, t._count])
+  );
+  if (
+    realTpl !== 33 ||
+    tierMap.lt90 !== 11 ||
+    tierMap.b90_130 !== 11 ||
+    tierMap.gt130 !== 11
+  ) {
+    throw new Error(
+      `schedule seed 自检失败：模板应 33 行三档各 11，实际 ${realTpl}（lt90=${tierMap.lt90} b90_130=${tierMap.b90_130} gt130=${tierMap.gt130}）`
+    );
+  }
+
+  // 任务级 seed：已有任务则整体跳过
+  const taskCount = await prisma.scheduleTask.count();
+  if (taskCount > 0) {
+    console.log(`已存在 ${taskCount} 条排程任务，M6-a 任务 seed 跳过。`);
+    return;
+  }
+
+  const T = new Date();
+  const DAY = 24 * 60 * 60 * 1000;
+  const addDays = (base: Date, n: number) => new Date(base.getTime() + n * DAY);
+  // today0 = 今日 UTC 0 点（与 chain 的 UTC 0 点日期同口径比较）
+  const today0 = new Date(
+    Date.UTC(T.getUTCFullYear(), T.getUTCMonth(), T.getUTCDate())
+  );
+
+  // 拉某档模板行 → {name, order, days}[]
+  const rowsForTier = async (tier: string) => {
+    const tpls = await prisma.processTemplate.findMany({
+      where: { tier },
+      orderBy: { order: "asc" },
+    });
+    return tpls.map((t) => ({ name: t.name, order: t.order, days: t.days }));
+  };
+
+  // ── 演示项目 002 / 003 / 004（新客户 + 新项目，覆盖看板全色区）──
+  const c2 = await prisma.client.create({
+    data: {
+      orgId: org.id,
+      name: "孙先生",
+      phone: "138-0000-0102",
+      notes: "金域蓝湾 2 栋 802 业主，三室两厅，施工中。",
+    },
+  });
+  const p2 = await prisma.project.create({
+    data: {
+      code: "RP-2026-002",
+      name: "金域蓝湾 2 栋 802",
+      address: "金域蓝湾 2 栋 802 室",
+      area: 110,
+      clientId: c2.id,
+      pm: "周工",
+      status: "in_progress",
+      startDate: addDays(today0, -69),
+      endDate: addDays(today0, 6),
+    },
+  });
+  const c3 = await prisma.client.create({
+    data: {
+      orgId: org.id,
+      name: "周女士",
+      phone: "138-0000-0103",
+      notes: "老街 21 号院业主，自住翻新，已竣工。",
+    },
+  });
+  const p3 = await prisma.project.create({
+    data: {
+      code: "RP-2026-003",
+      name: "老街 21 号院",
+      address: "老街 21 号院",
+      area: 85,
+      clientId: c3.id,
+      pm: "周工",
+      status: "completed",
+      startDate: addDays(today0, -65),
+      endDate: addDays(today0, -12),
+      actualEndDate: addDays(today0, -5),
+    },
+  });
+  const c4 = await prisma.client.create({
+    data: {
+      orgId: org.id,
+      name: "吴先生",
+      phone: "138-0000-0104",
+      notes: "湖畔名庭 8 栋 501 业主，待开工，灰区手测位。",
+    },
+  });
+  const p4 = await prisma.project.create({
+    data: {
+      code: "RP-2026-004",
+      name: "湖畔名庭 8 栋 501",
+      address: "湖畔名庭 8 栋 501 室",
+      area: 140,
+      clientId: c4.id,
+      pm: "周工",
+      status: "draft",
+      startDate: addDays(today0, 10),
+    },
+  });
+
+  // ── 001 既有项目排程：b90_130 从 Project.startDate(2026-09-01) ──
+  // 完成态按日期推导（与"今天"自洽）：plannedEnd < 今日0点 → completed（实际=计划）；
+  // 跨今天 → in_progress（progress=已过天数比例，钳 5–95）；未到 → pending。
+  const p1 = await prisma.project.findUnique({ where: { code: "RP-2026-001" } });
+  let expectedP1Completed = -1; // 哨兵：-1 = 001 未处理（缺项目/缺开工日）
+  if (p1 && p1.startDate) {
+    const rows = await rowsForTier("b90_130");
+    const chain = buildSchedule(rows, p1.startDate);
+    const deriveState = (plannedStart: Date, plannedEnd: Date) => {
+      if (plannedEnd.getTime() < today0.getTime()) {
+        return { status: "completed", progress: 100, actualStart: plannedStart, actualEnd: plannedEnd };
+      }
+      if (
+        plannedStart.getTime() <= today0.getTime() &&
+        plannedEnd.getTime() >= today0.getTime()
+      ) {
+        const total = Math.round((plannedEnd.getTime() - plannedStart.getTime()) / DAY) + 1;
+        const elapsed = Math.round((today0.getTime() - plannedStart.getTime()) / DAY) + 1;
+        let prog = Math.round((elapsed / total) * 100);
+        prog = Math.max(5, Math.min(95, prog));
+        return { status: "in_progress", progress: prog, actualStart: plannedStart, actualEnd: null };
+      }
+      return { status: "pending", progress: 0, actualStart: null, actualEnd: null };
+    };
+    const tasks = chain.map((c) => ({
+      ...c,
+      ...deriveState(c.start, c.end),
+      projectId: p1.id,
+      ownerId: pm.id,
+    }));
+    const created = await prisma.$transaction(
+      tasks.map((t) =>
+        prisma.scheduleTask.create({
+          data: {
+            projectId: t.projectId,
+            name: t.name,
+            order: t.order,
+            startDate: t.start,
+            endDate: t.end,
+            actualStart: t.actualStart,
+            actualEnd: t.actualEnd,
+            progress: t.progress,
+            status: t.status,
+            ownerId: t.ownerId,
+          },
+        })
+      )
+    );
+    expectedP1Completed = tasks.filter((t) => t.status === "completed").length;
+    await createScheduleDeps(created.map((t) => t.id));
+  }
+
+  // ── 002 排程：b90_130 从 T-69d（链尾=endDate=T+6d）；任务 1-6 completed（实际=计划）、
+  //   7（天花）in_progress=40%（逾期点）、8-11 pending ──
+  {
+    const rows = await rowsForTier("b90_130");
+    const chain = buildSchedule(rows, p2.startDate!);
+    const tasks = chain.map((c, i) => {
+      let status: string;
+      let progress: number;
+      let actualStart: Date | null;
+      let actualEnd: Date | null;
+      if (i < 6) {
+        status = "completed";
+        progress = 100;
+        actualStart = c.start;
+        actualEnd = c.end;
+      } else if (i === 6) {
+        status = "in_progress";
+        progress = 40;
+        actualStart = c.start;
+        actualEnd = null;
+      } else {
+        status = "pending";
+        progress = 0;
+        actualStart = null;
+        actualEnd = null;
+      }
+      return {
+        ...c,
+        status,
+        progress,
+        actualStart,
+        actualEnd,
+        projectId: p2.id,
+        ownerId: pm.id,
+      };
+    });
+    const created = await prisma.$transaction(
+      tasks.map((t) =>
+        prisma.scheduleTask.create({
+          data: {
+            projectId: t.projectId,
+            name: t.name,
+            order: t.order,
+            startDate: t.start,
+            endDate: t.end,
+            actualStart: t.actualStart,
+            actualEnd: t.actualEnd,
+            progress: t.progress,
+            status: t.status,
+            ownerId: t.ownerId,
+          },
+        })
+      )
+    );
+    await createScheduleDeps(created.map((t) => t.id));
+  }
+
+  // ── 003 排程：lt90 从 T-65d；全部 completed（实际=计划），
+  //   任务 11（竣工清洁）实际结束 = 计划 + 7d（项目超期 7 天）──
+  {
+    const rows = await rowsForTier("lt90");
+    const chain = buildSchedule(rows, p3.startDate!);
+    const tasks = chain.map((c, i) => {
+      const isLast = i === chain.length - 1;
+      const actualEnd = isLast ? addDays(c.end, 7) : c.end;
+      return {
+        ...c,
+        status: "completed",
+        progress: 100,
+        actualStart: c.start,
+        actualEnd,
+        projectId: p3.id,
+        ownerId: pm.id,
+      };
+    });
+    const created = await prisma.$transaction(
+      tasks.map((t) =>
+        prisma.scheduleTask.create({
+          data: {
+            projectId: t.projectId,
+            name: t.name,
+            order: t.order,
+            startDate: t.start,
+            endDate: t.end,
+            actualStart: t.actualStart,
+            actualEnd: t.actualEnd,
+            progress: t.progress,
+            status: t.status,
+            ownerId: t.ownerId,
+          },
+        })
+      )
+    );
+    await createScheduleDeps(created.map((t) => t.id));
+  }
+  // 004：draft + 无排程 → 灰区 + 生成流程手测位（不建任何 ScheduleTask）
+
+  // ── 自检断言（报数取 DB 真值）──
+  const [
+    total,
+    depTotal,
+    p2Statuses,
+    p3Tasks,
+    p4Count,
+    p1Completed,
+  ] = await Promise.all([
+    prisma.scheduleTask.count(),
+    prisma.scheduleTaskDependency.count(),
+    prisma.scheduleTask.findMany({
+      where: { projectId: p2.id },
+      select: { status: true },
+    }),
+    prisma.scheduleTask.findMany({
+      where: { projectId: p3.id },
+      orderBy: { order: "asc" },
+      select: { status: true, actualEnd: true, endDate: true },
+    }),
+    prisma.scheduleTask.count({ where: { projectId: p4.id } }),
+    prisma.scheduleTask.count({
+      where: { projectId: p1?.id ?? "__none__", status: "completed" },
+    }),
+  ]);
+
+  const p2By = { completed: 0, in_progress: 0, pending: 0 } as Record<string, number>;
+  for (const s of p2Statuses) p2By[s.status] = (p2By[s.status] ?? 0) + 1;
+  const p3AllCompleted = p3Tasks.length === 11 && p3Tasks.every((t) => t.status === "completed");
+  const p3LastOverdue =
+    p3Tasks.length === 11 &&
+    !!p3Tasks[10].actualEnd &&
+    !!p3Tasks[10].endDate &&
+    p3Tasks[10].actualEnd!.getTime() > p3Tasks[10].endDate!.getTime();
+
+  console.log(
+    `M6-a seed 完成：模板 ${realTpl} · 排程任务 ${total} · 依赖 ${depTotal}（001 完成 ${p1Completed}/11 · 002 ${p2By.completed}/${p2By.in_progress}/${p2By.pending} · 003 全完成${p3LastOverdue ? "且超期" : ""} · 004 任务 ${p4Count}）`
+  );
+
+  if (total !== 33) {
+    throw new Error(`schedule seed 自检失败：任务应 33 条，实际 ${total}`);
+  }
+  if (depTotal !== 30) {
+    throw new Error(`schedule seed 自检失败：依赖应 30 条，实际 ${depTotal}`);
+  }
+  if (p2By.completed !== 6 || p2By.in_progress !== 1 || p2By.pending !== 4) {
+    throw new Error(
+      `schedule seed 自检失败：002 应 6/1/4，实际 ${p2By.completed}/${p2By.in_progress}/${p2By.pending}`
+    );
+  }
+  if (!p3AllCompleted) {
+    throw new Error("schedule seed 自检失败：003 应全 completed");
+  }
+  if (!p3LastOverdue) {
+    throw new Error("schedule seed 自检失败：003 任务 11 实际结束应晚于计划");
+  }
+  if (p4Count !== 0) {
+    throw new Error(`schedule seed 自检失败：004 应无任务，实际 ${p4Count}`);
+  }
+  if (expectedP1Completed >= 0 && p1Completed !== expectedP1Completed) {
+    throw new Error(
+      `schedule seed 自检失败：001 完成数应 ${expectedP1Completed}（按日期推导），实际 ${p1Completed}`
+    );
+  }
+}
+
+/** 为一组已建好的排程工序落相邻依赖边（chainEdges → [i, i-1]）。 */
+async function createScheduleDeps(taskIds: string[]) {
+  const edges = chainEdges(taskIds.length);
+  if (edges.length === 0) return;
+  await prisma.$transaction(
+    edges.map(([i, j]) =>
+      prisma.scheduleTaskDependency.create({
+        data: { taskId: taskIds[i], dependsOnId: taskIds[j] },
+      })
+    )
+  );
 }
 
 main()

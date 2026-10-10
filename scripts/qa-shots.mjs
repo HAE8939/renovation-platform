@@ -168,6 +168,11 @@ const targets = [
     ? { name: "13-design-review", path: `/design/${submittedTask.id}` }
     : { name: "13-design-review", path: "/design/__none__" },
   { name: "14-design-calendar", path: "/design?view=calendar" },
+  { name: "15-schedule", path: "/schedule" },
+  project
+    ? { name: "16-schedule-project", path: `/schedule/${project.id}` }
+    : { name: "16-schedule-project", path: "/schedule/__none__" },
+  { name: "17-schedule-templates", path: "/schedule/templates" },
 ];
 
 const shot = (url, file) =>
