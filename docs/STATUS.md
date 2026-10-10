@@ -148,7 +148,7 @@
 ## 8. 下次接续（2026-10-10 晚 handoff）
 
 - **进度**：M2-A → **M7 全部合入 master**（五单元 `aeafcbe`/`3225d2c`/`25270b8`/`ca52391` + 本收尾提交），工作树干净、门禁全绿。质量管控模块完整上线：验收节点（工序完工自动生成 + 提交/审核/退回自动建问题/重提门控）+ 问题台账（整改/复验/关闭 + 手工新建）+ 质量档案（时间轴 + A4 打印）+ 项目中心接线（质量 Tab / 质量灯 / 甘特跳验收）。
-- **M7 验收记录**：build 绿 + tsc 0 + 七门禁（quote17/crm11/health20/design28/schedule55/**quality108**/**flow94 隔离库**）+ qa-shots 26 目标截图目检 + 375 DOM 探针（列表/节点双态/台账/档案双页/项目质量 Tab 全过）+ 真 A4 PDF 目检（1 页、时间轴顺序自洽）。**候用户手测。**
+- **M7 验收记录**：build 绿 + tsc 0 + 七门禁（quote17/crm11/health20/design28/schedule55/**quality108**/**flow94 隔离库**）+ qa-shots 29 目标截图目检 + 375 DOM 探针（列表/节点双态/台账/档案双页/项目质量 Tab 全过）+ 真 A4 PDF 目检（1 页、时间轴顺序自洽）。**候用户手测。**
 - **下一个里程碑 = M8 财务基础**（`finance`）：`FinanceRecord` 收支台账（收/支双 Tab）+ 毛利粗算（读 M2-A 合同额）+ `PaymentNode` 五段付款（**接 M7「验收通过→付款解锁」回环**：验收通过置待付）+ `health.ts` 预算灯接真数据。开工前先起草 `docs/TASK_M8.md`（照 TASK_M6/M7 写法）。
 - **驱动 codebuddy 的命令（默认走 Provider 池 `custom-local:glm-5.2`）**：
   `codebuddy -p --model custom-local:glm-5.2 --session-id <id> --permission-mode bypassPermissions --disallowedTools "Bash(git:*),Bash(pnpm dev:*),Bash(pnpm prisma migrate:*),Bash(pnpm db:*)" < _scratch/logs/cb_<单元>_prompt.md > _scratch/logs/cb_<单元>_out.log 2>&1`（后台跑）。纪律：一轮一个界面单元；429 冷却可续、失败原卡重跑；改动留工作区由集成者 commit；**codebuddy 自述不作数，集成者必独立复跑门禁**；schema/seed 的**执行**（migrate/db seed）归集成者，codebuddy 只写文件。跑完 grep `~/.codebuddy/logs/<date>/renovation-platform__*.log` 的 `resolved model=`/`url=`，确认命中 `http://127.0.0.1:8787/…`（别落回 copilot.tencent.com 内置口）。
