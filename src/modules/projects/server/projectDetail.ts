@@ -5,12 +5,19 @@ import {
   type QuoteItemRow,
 } from "@/core/domain/pricing";
 import { PROJECT_STATUS_LABEL, type ProjectStatus } from "@/core/domain/types";
+import {
+  overallProgress,
+  scheduleLight,
+  type Light,
+} from "@/core/domain/health";
 
 /**
  * 项目中心详情读模型（projects 模块 M4-b）。
  * 只读聚合：经共享 core/db 的 prisma 直读 Project/Client/BudgetQuote/QuoteItem，
  * 金额口径复用 core/domain/pricing（不 import budget server 内部，AGENTS §2）。
- * 设计/工期/质量数据源模块（M5/M6/M7）未建 → 本层不产出，UI 显诚实空状态。
+ * 排程聚合经 prisma 直读 ScheduleTask，工期口径复用 core/domain/health
+ * （overallProgress / scheduleLight）；不 import schedule 模块内部。
+ * 设计聚合经 prisma 直读 DesignTask 计数；不 import design 模块内部。
  */
 
 export interface HubCategory {
@@ -18,6 +25,34 @@ export interface HubCategory {
   subtotal: number;
   /** 占直接费比例 0–1 */
   pct: number;
+}
+
+export interface HubScheduleTask {
+  name: string;
+  order: number;
+  status: string;
+  progress: number;
+}
+
+export interface HubSchedule {
+  hasSchedule: boolean;
+  taskCount: number;
+  progress: number;
+  light: Light;
+  tasks: HubScheduleTask[];
+  /** 最后一条工序的计划完工（沿用本文件 fmtDate 风格）；无排程 → null。 */
+  plannedEnd: string | null;
+}
+
+export interface HubDesign {
+  total: number;
+  byStatus: {
+    pending: number;
+    assigned: number;
+    submitted: number;
+    revisions: number;
+    approved: number;
+  };
 }
 
 export interface ProjectHub {
@@ -53,6 +88,8 @@ export interface ProjectHub {
     itemCount: number;
     categories: HubCategory[];
   } | null;
+  schedule: HubSchedule;
+  design: HubDesign;
 }
 
 function fmtDate(d: Date | null): string | null {
@@ -74,6 +111,17 @@ export async function getProjectHub(projectId: string): Promise<ProjectHub | nul
         orderBy: { updatedAt: "desc" },
         take: 1,
       },
+      scheduleTasks: {
+        select: {
+          name: true,
+          order: true,
+          status: true,
+          progress: true,
+          endDate: true,
+        },
+        orderBy: { order: "asc" },
+      },
+      designTasks: { select: { status: true } },
     },
   });
   if (!project) return null;
@@ -113,6 +161,50 @@ export async function getProjectHub(projectId: string): Promise<ProjectHub | nul
     };
   }
 
+  // ── 排程聚合（prisma 直读 ScheduleTask，口径复用 core/domain/health）──
+  const scheduleTasks = project.scheduleTasks;
+  const progress = overallProgress(
+    scheduleTasks.map((t) => ({ progress: t.progress }))
+  );
+  const now = new Date();
+  const light = scheduleLight(
+    { endDate: project.endDate, actualEndDate: project.actualEndDate, progress },
+    now
+  );
+  const lastTask =
+    scheduleTasks.length > 0 ? scheduleTasks[scheduleTasks.length - 1] : null;
+  const schedule: HubSchedule = {
+    hasSchedule: scheduleTasks.length > 0,
+    taskCount: scheduleTasks.length,
+    progress,
+    light,
+    tasks: scheduleTasks.map((t) => ({
+      name: t.name,
+      order: t.order,
+      status: t.status,
+      progress: t.progress,
+    })),
+    plannedEnd: lastTask ? fmtDate(lastTask.endDate) : null,
+  };
+
+  // ── 设计聚合（prisma 直读 DesignTask 计数，不 import design 模块内部）──
+  const byStatus: HubDesign["byStatus"] = {
+    pending: 0,
+    assigned: 0,
+    submitted: 0,
+    revisions: 0,
+    approved: 0,
+  };
+  for (const t of project.designTasks) {
+    if (t.status in byStatus) {
+      byStatus[t.status as keyof typeof byStatus]++;
+    }
+  }
+  const design: HubDesign = {
+    total: project.designTasks.length,
+    byStatus,
+  };
+
   return {
     id: project.id,
     code: project.code,
@@ -136,5 +228,7 @@ export async function getProjectHub(projectId: string): Promise<ProjectHub | nul
       budgetAnalyst: project.budgetAnalyst,
     },
     quote,
+    schedule,
+    design,
   };
 }

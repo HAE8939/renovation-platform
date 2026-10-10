@@ -31,12 +31,20 @@ function formatDate(d: Date): string {
   return d.toLocaleDateString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit" });
 }
 
-/** 进度：M6 才有，本期恒「未接入」中性态。 */
-function ProgressCell() {
+/** 进度：有排程显 {n}%；无排程显灰色「未排程」（撤掉恒「未接入」文案）。 */
+function ProgressCell({ progress }: { progress: number | null }) {
+  if (progress == null) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-[13px] text-muted whitespace-nowrap">
+        <span className="h-1.5 w-1.5 rounded-full bg-sunken" />
+        未排程
+      </span>
+    );
+  }
   return (
-    <span className="inline-flex items-center gap-1.5 text-[13px] text-secondary whitespace-nowrap">
-      <span className="h-1.5 w-1.5 rounded-full bg-line" />
-      未接入
+    <span className="inline-flex items-center gap-1.5 text-[13px] text-primary whitespace-nowrap">
+      <span className="h-1.5 w-1.5 rounded-full bg-accent" />
+      <span className="num">{progress}%</span>
     </span>
   );
 }
@@ -89,7 +97,7 @@ function ProjectCard({ p }: { p: ProjectManagementItem }) {
         </div>
 
         <div className="mt-3 flex items-center justify-between border-t border-line pt-3">
-          <ProgressCell />
+          <ProgressCell progress={p.progress} />
           <span className="text-[13px] text-accent-ink whitespace-nowrap group-hover:underline underline-offset-4">
             项目详情 →
           </span>
@@ -193,7 +201,7 @@ export default async function ProjectsListPage({
                     <Td className="text-secondary">{p.designer ?? "—"}</Td>
                     <Td className="text-secondary">{p.pm ?? "—"}</Td>
                     <Td>
-                      <ProgressCell />
+                      <ProgressCell progress={p.progress} />
                     </Td>
                     <Td align="right" className="text-[13px] text-secondary">
                       {formatDate(p.updatedAt)}

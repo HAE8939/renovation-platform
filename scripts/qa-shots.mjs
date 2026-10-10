@@ -164,6 +164,12 @@ const targets = [
   project
     ? { name: "09-project-budget", path: `/projects/${project.id}?tab=budget` }
     : { name: "09-project-budget", path: "/projects/__none__" },
+  project
+    ? { name: "09b-project-schedule", path: `/projects/${project.id}?tab=schedule` }
+    : { name: "09b-project-schedule", path: "/projects/__none__" },
+  project
+    ? { name: "09c-project-design", path: `/projects/${project.id}?tab=design` }
+    : { name: "09c-project-design", path: "/projects/__none__" },
   { name: "10-design-board", path: "/design" },
   { name: "11-design-mine", path: "/design?scope=mine" },
   designTask

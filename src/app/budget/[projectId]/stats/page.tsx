@@ -83,7 +83,7 @@ export default async function BudgetStatsPage({ params }: PageProps) {
                     <Td>
                       <div className="text-[15px] text-primary">{g.categoryName}</div>
                       <div
-                        className="mt-2 h-2 w-full overflow-hidden rounded-inner bg-surface-sunken"
+                        className="mt-2 h-2 w-full overflow-hidden rounded-inner bg-sunken"
                         role="img"
                         aria-label={`${g.categoryName} 占比 ${formatPercent(pct)}`}
                       >

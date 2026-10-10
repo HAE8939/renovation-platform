@@ -1,6 +1,7 @@
 import prisma from "@/core/db";
 import { computeTotals } from "@/core/domain/pricing";
 import type { QuoteItemRow } from "@/core/domain/pricing";
+import { overallProgress } from "@/core/domain/health";
 
 /**
  * 项目管理服务（projects 模块 M4-a）。
@@ -24,8 +25,8 @@ export interface ProjectManagementItem {
   designer: string | null;
   pm: string | null;
   updatedAt: Date;
-  /** 进度：M6 才有，本期恒为 null，UI 显「未接入」。 */
-  progress: null;
+  /** 进度：来自排程工序的 overallProgress；无排程 → null（UI 显「未排程」）。 */
+  progress: number | null;
   /** 报价直接费（Σ 行小计）。 */
   quoteSubtotal: number;
   /** 报价税金（直接费 × taxRate）。 */
@@ -55,6 +56,7 @@ export async function listProjectsForManagement(
         orderBy: { updatedAt: "desc" },
         take: 1,
       },
+      scheduleTasks: { select: { progress: true } },
     },
     orderBy: { updatedAt: "desc" },
   });
@@ -95,7 +97,10 @@ export async function listProjectsForManagement(
       designer: p.designer,
       pm: p.pm,
       updatedAt: p.updatedAt,
-      progress: null,
+      progress:
+        p.scheduleTasks.length > 0
+          ? overallProgress(p.scheduleTasks.map((t) => ({ progress: t.progress })))
+          : null,
       quoteSubtotal,
       quoteTax,
       quoteGrand,

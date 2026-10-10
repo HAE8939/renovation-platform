@@ -131,9 +131,10 @@ model ScheduleTaskDependency {
   - 服务层校验：非法输入报错回显（不 silent fail）；全部走 Server Action + `revalidatePath`。
 - **M6-d 模板库**（`src/app/schedule/templates/page.tsx` + `TemplateEditor.tsx` + `server/templates.ts`）：表 = 11 行 × 3 档天数列（number 输入，行级 `[保存]`）；校验 1–999 整数；保存 action 后 revalidate；页内注明「新建排程按面积档自动套用；改天数不回溯已生成排程」。顶部回 `/schedule` 互链。
 - **M6-e 项目中心接线**：
-  - `projects/server/projectDetail.ts` 增排程聚合（任务数/进度/灯/当前工序/逾期数/计划完工）与设计聚合（任务数/各状态计数/逾期数）→ `ProjectTabs.tsx`：
+  - **口径与边界（先定）**：排程/设计聚合在 `projects/server` 里**经 prisma 直读**（同 M4-b 读预算的做法），只用 `core/domain/health`（`overallProgress` / `scheduleLight`）；**不 import schedule/design 模块内部**——故不展示工序级/任务级逾期数（`isTaskOverdue`、design `isOverdue` 均系模块内部谓词；日后若需要，先上收 core 再到 Tab）。
+  - `projects/server/projectDetail.ts` 增排程聚合（任务数/进度/灯/≤11 工序清单）与设计聚合（任务数/各状态计数）→ `ProjectTabs.tsx`：
     - 「工期进度」Tab：整体进度（大号 % + 条）+ 工期灯色点与状态文案（预警提示）+ 工序清单（紧凑：名/状态点/进度，≤11 行）+ 「打开甘特图 →」；无排程 → 诚实空态 + 引导。
-    - 「设计进度」Tab：填真（M5 遗留补课）——总量 + 按状态计数徽章 + 逾期数 + 「打开设计看板 →」；空态诚实。
+    - 「设计进度」Tab：填真（M5 遗留补课）——总量 + 按状态计数徽章（五态中文文案在 `ProjectTabs.tsx` 内**局部副本**并注明「与 design 模块同源：跨模块禁引，故抄录」）+ 「打开设计看板 →」；空态诚实。
     - 「基础信息」健康度卡：「工期」灯与「整体进度」接真值；质量/预算仍显「未接入（M7/M8 起）」。
   - `/projects` 列表「进度」列：读排程聚合 `overallProgress`；无排程显灰色「未排程」（撤掉恒「未接入」文案）。
   - `qa-shots` 加 `?tab=schedule` 与 `?tab=design` 两个目标。

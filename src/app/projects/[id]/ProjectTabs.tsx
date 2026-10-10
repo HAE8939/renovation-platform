@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { SectionTitle } from "@/core/ui";
+import { Badge, SectionTitle } from "@/core/ui";
 import { formatCny, formatPercent } from "@/core/domain/pricing";
+import type { Light } from "@/core/domain/health";
 import type { ProjectHub } from "@/modules/projects/server/projectDetail";
 
 const TABS = [
@@ -16,7 +17,7 @@ const TABS = [
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
-/** 项目六合一详情的 Tab 面板（M4-b）。只读聚合；设计/工期/质量数据源未建 → 诚实空状态。 */
+/** 项目六合一详情的 Tab 面板（M4-b + M6-e）。只读聚合；工期/设计接真数据，质量仍空态。 */
 export function ProjectTabs({ hub, initialTab }: { hub: ProjectHub; initialTab?: string }) {
   const valid = TABS.some((t) => t.key === initialTab);
   const [tab, setTab] = useState<TabKey>(valid ? (initialTab as TabKey) : "basic");
@@ -41,12 +42,8 @@ export function ProjectTabs({ hub, initialTab }: { hub: ProjectHub; initialTab?:
 
       <div className="pt-6">
         {tab === "basic" && <BasicTab hub={hub} />}
-        {tab === "design" && (
-          <EmptyTab title="设计管理模块开发中" note="方案版本、任务分派与图纸协同将在 M5 上线。" />
-        )}
-        {tab === "schedule" && (
-          <EmptyTab title="时间管控模块开发中" note="工序排程与甘特图将在 M6 上线。" />
-        )}
+        {tab === "design" && <DesignTab hub={hub} />}
+        {tab === "schedule" && <ScheduleTab hub={hub} />}
         {tab === "quality" && (
           <EmptyTab title="质量管控模块开发中" note="验收节点与问题台账将在 M7 上线。" />
         )}
@@ -97,21 +94,52 @@ function BasicTab({ hub }: { hub: ProjectHub }) {
       <div className="rounded-card border border-line bg-surface p-5">
         <SectionTitle className="mb-3">项目健康度</SectionTitle>
         <div className="flex flex-wrap gap-x-8 gap-y-3 text-[13px]">
-          <Light label="工期" />
-          <Light label="质量" />
-          <Light label="预算" />
-          <span className="text-muted">整体进度：未接入（工期数据 M6 起）</span>
+          <Light
+            label="工期"
+            tone={hub.schedule.hasSchedule ? hub.schedule.light : "gray"}
+            text={
+              hub.schedule.hasSchedule
+                ? hub.schedule.light === "green"
+                  ? "正常"
+                  : hub.schedule.light === "yellow"
+                    ? "预警"
+                    : "超期"
+                  : "未排程"
+            }
+          />
+          <Light label="质量" tone="gray" text="未接入（M7 起）" />
+          <Light label="预算" tone="gray" text="未接入（M8 起）" />
+          <span className="text-muted">
+            整体进度：
+            {hub.schedule.hasSchedule ? `${hub.schedule.progress}%` : "未排程"}
+          </span>
         </div>
       </div>
     </div>
   );
 }
 
-function Light({ label }: { label: string }) {
+function Light({
+  label,
+  tone,
+  text,
+}: {
+  label: string;
+  tone: Light | "gray";
+  text: string;
+}) {
+  const dotCls =
+    tone === "green"
+      ? "bg-success"
+      : tone === "yellow"
+        ? "bg-warning"
+        : tone === "red"
+          ? "bg-danger"
+          : "bg-sunken";
   return (
     <span className="flex items-center gap-2 text-secondary">
-      <span aria-hidden className="inline-block h-2 w-2 rounded-full bg-surface-sunken" />
-      {label}：未接入
+      <span aria-hidden className={`inline-block h-2 w-2 rounded-full ${dotCls}`} />
+      {label}：{text}
     </span>
   );
 }
@@ -147,7 +175,7 @@ function BudgetTab({ hub }: { hub: ProjectHub }) {
                 </span>
               </div>
               <div
-                className="mt-2 h-2 w-full overflow-hidden rounded-inner bg-surface-sunken"
+                className="mt-2 h-2 w-full overflow-hidden rounded-inner bg-sunken"
                 aria-label={`${c.categoryName} 占比 ${formatPercent(c.pct)}`}
               >
                 <div className="h-full bg-accent" style={{ width: `${Math.min(100, c.pct * 100)}%` }} />
@@ -191,6 +219,157 @@ function PeopleTab({ hub }: { hub: ProjectHub }) {
       <p className="mt-4 text-xs leading-relaxed text-muted">
         绩效得分与考核维度将在「人员管控」模块上线后接入此处。
       </p>
+    </div>
+  );
+}
+
+/* ── 工期进度 Tab（M6-e）：排程聚合真数据；无排程诚实空态 ────────── */
+
+function ScheduleStatusDot({ status }: { status: string }) {
+  const cls =
+    status === "completed"
+      ? "bg-success"
+      : status === "in_progress"
+        ? "bg-accent"
+        : "bg-muted";
+  return (
+    <span aria-hidden className={`inline-block h-2 w-2 shrink-0 rounded-full ${cls}`} />
+  );
+}
+
+function ScheduleLightRow({ light }: { light: Light }) {
+  const cfg =
+    light === "green"
+      ? { dot: "bg-success", label: "正常", note: "工期处于健康区间，按计划推进。" }
+      : light === "yellow"
+        ? { dot: "bg-warning", label: "预警", note: "距计划完工不足 7 天且进度低于 80%，需关注。" }
+        : { dot: "bg-danger", label: "超期", note: "实际完工已超过计划工期，请尽快复盘。" };
+  return (
+    <span className="flex items-center gap-2 text-secondary">
+      <span aria-hidden className={`inline-block h-2 w-2 shrink-0 rounded-full ${cfg.dot}`} />
+      <span className="font-medium text-primary">{cfg.label}</span>
+      <span className="text-muted">{cfg.note}</span>
+    </span>
+  );
+}
+
+function ScheduleTab({ hub }: { hub: ProjectHub }) {
+  const s = hub.schedule;
+  if (!s.hasSchedule) {
+    return (
+      <div className="rounded-card border border-line bg-surface px-5 py-12 text-center">
+        <p className="text-[15px] font-medium text-secondary">该项目暂无排程</p>
+        <p className="mx-auto mt-2 max-w-prose text-[13px] leading-relaxed text-muted">
+          在「时间管控」按面积档一键生成排程后，这里会显示整体进度、工期预警与工序清单。
+        </p>
+        <Link
+          href={`/schedule/${hub.id}`}
+          className="mt-4 inline-block whitespace-nowrap text-[13px] text-accent-ink hover:underline underline-offset-4"
+        >
+          去生成 →
+        </Link>
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-6">
+      <div className="rounded-card border border-line bg-surface p-5">
+        <div className="flex items-baseline justify-between gap-4">
+          <SectionTitle>整体进度</SectionTitle>
+          <span className="num text-[28px] font-semibold text-primary whitespace-nowrap">
+            {s.progress}%
+          </span>
+        </div>
+        <div
+          className="mt-4 h-2 w-full overflow-hidden rounded-inner bg-sunken"
+          aria-label={`整体进度 ${s.progress}%`}
+        >
+          <div className="h-full bg-accent" style={{ width: `${Math.min(100, s.progress)}%` }} />
+        </div>
+      </div>
+
+      <div className="rounded-card border border-line bg-surface p-5">
+        <SectionTitle className="mb-3">工期状态</SectionTitle>
+        <ScheduleLightRow light={s.light} />
+      </div>
+
+      <div className="rounded-card border border-line bg-surface p-5">
+        <SectionTitle className="mb-3">工序清单</SectionTitle>
+        <ul className="divide-y divide-line">
+          {s.tasks.map((t) => (
+            <li key={t.order} className="flex items-center gap-3 py-2 text-[13px]">
+              <span className="num w-6 shrink-0 text-secondary">{t.order}.</span>
+              <ScheduleStatusDot status={t.status} />
+              <span className="min-w-0 flex-1 truncate">{t.name}</span>
+              <span className="num shrink-0 text-secondary whitespace-nowrap">{t.progress}%</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <Link
+        href={`/schedule/${hub.id}`}
+        className="inline-block whitespace-nowrap text-[13px] text-accent-ink hover:underline underline-offset-4"
+      >
+        打开甘特图 →
+      </Link>
+    </div>
+  );
+}
+
+/* ── 设计进度 Tab（M6-e 补课）：设计聚合真数据；无任务诚实空态 ───── */
+
+// 与 design 模块文案同源：跨模块禁引，故抄录；改文案须两处同步。
+const DESIGN_STATUS_LABEL: Record<string, string> = {
+  pending: "待分配",
+  assigned: "进行中",
+  submitted: "待审核",
+  revisions: "待返修",
+  approved: "已通过",
+};
+
+function DesignTab({ hub }: { hub: ProjectHub }) {
+  const d = hub.design;
+  if (d.total === 0) {
+    return (
+      <div className="rounded-card border border-line bg-surface px-5 py-12 text-center">
+        <p className="text-[15px] font-medium text-secondary">该项目暂无设计任务</p>
+        <p className="mx-auto mt-2 max-w-prose text-[13px] leading-relaxed text-muted">
+          在「设计管理」为该项目分派设计任务后，这里会显示任务总量与各状态分布。
+        </p>
+      </div>
+    );
+  }
+  const statuses: { status: string; variant: "neutral" | "warning" | "danger" | "success" }[] = [
+    { status: "pending", variant: "neutral" },
+    { status: "assigned", variant: "neutral" },
+    { status: "submitted", variant: "warning" },
+    { status: "revisions", variant: "danger" },
+    { status: "approved", variant: "success" },
+  ];
+  return (
+    <div className="space-y-6">
+      <div className="rounded-card border border-line bg-surface p-5">
+        <div className="flex items-baseline justify-between gap-4">
+          <SectionTitle>设计任务</SectionTitle>
+          <span className="num text-[20px] font-semibold text-primary whitespace-nowrap">
+            共 {d.total}
+          </span>
+        </div>
+        <div className="mt-4 flex flex-wrap gap-3">
+          {statuses.map(({ status, variant }) => (
+            <Badge key={status} variant={variant}>
+              {DESIGN_STATUS_LABEL[status]}：{d.byStatus[status as keyof typeof d.byStatus]}
+            </Badge>
+          ))}
+        </div>
+      </div>
+      <Link
+        href="/design"
+        className="inline-block whitespace-nowrap text-[13px] text-accent-ink hover:underline underline-offset-4"
+      >
+        打开设计看板 →
+      </Link>
     </div>
   );
 }
