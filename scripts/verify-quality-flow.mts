@@ -3,9 +3,10 @@
  *
  * 为什么存在：verify-quality.mjs 只断言纯函数；syncAcceptanceNodes / submitNode /
  * reviewNode 的事务、守卫、联动路径必须真跑生产服务层才能覆盖——承 M3-d2 教训
- * （跨函数事务不共享连接，只有端到端集成能抓）。本脚本覆盖 M7-b 节点流部分：
+ * （跨函数事务不共享连接，只有端到端集成能抓）。本脚本覆盖 M7-b 节点流 + M7-c 问题流：
  * 同步建/删/幂等 + 进度联动同事务 + 非 pending 永不自动删 + 提交守卫 + 重提门控
- * + 审核通过/退回建问题 + 重复审核拒绝。
+ * + 审核通过/退回建问题 + 重复审核拒绝 + 整改/复验通过/复验退回（再锁）全链
+ * + 手工新建问题校验（拒绝用例 + 成功字段逐一断言）。
  *
  * 运行配方（三步，指向一个临时库；在仓库根跑）：
  *   DATABASE_URL="file:../_scratch/quality-flow.db" npx prisma migrate deploy
@@ -18,6 +19,12 @@ import { syncAcceptanceNodes } from "@/core/domain/acceptance";
 import { updateTaskProgress } from "@/modules/schedule/server/updates";
 import { submitNode, QualityNodeError } from "@/modules/quality/server/nodes";
 import { reviewNode, QualityReviewError } from "@/modules/quality/server/review";
+import {
+  rectifyIssue,
+  recheckIssue,
+  createIssue,
+  QualityIssueError,
+} from "@/modules/quality/server/issues";
 import { getPlaceholderUser } from "@/modules/quality/currentUser";
 
 const results: { name: string; ok: boolean }[] = [];
@@ -214,13 +221,22 @@ async function main() {
   }
   chk("returned + open 问题 → 重提被拒", errResub.includes("未整改"), errResub);
 
-  // 直接改库：问题 open → rectified（M7-c 服务未上线）
-  await prisma.issue.updateMany({
+  // 直接改库已替换为生产 rectifyIssue（M7-c 已上线）：断言 status/rectifyNote/rectifiedAt 落库
+  const niniOpenIssue = await prisma.issue.findFirst({
     where: { nodeId: niniForResub!.id, status: "open" },
-    data: { status: "rectified" },
+    select: { id: true },
   });
+  chk("前置：003 泥工节点关联 open 问题可取", !!niniOpenIssue, niniOpenIssue?.id ?? "无");
+  await rectifyIssue(niniOpenIssue!.id, "已拆除空鼓部位重新抹灰");
+  const niniRectifiedIssue = await prisma.issue.findUnique({
+    where: { id: niniOpenIssue!.id },
+    select: { status: true, rectifyNote: true, rectifiedAt: true },
+  });
+  chk("rectifyIssue → status=rectified", niniRectifiedIssue?.status === "rectified", niniRectifiedIssue?.status ?? "无");
+  chk("rectifyIssue → rectifyNote 落库", niniRectifiedIssue?.rectifyNote === "已拆除空鼓部位重新抹灰", niniRectifiedIssue?.rectifyNote ?? "空");
+  chk("rectifyIssue → rectifiedAt 落库", !!niniRectifiedIssue?.rectifiedAt, niniRectifiedIssue?.rectifiedAt?.toISOString() ?? "空");
   const niniNoOpen = await prisma.issue.count({ where: { nodeId: niniForResub!.id, status: "open" } });
-  chk("改库 rectified → open 问题 = 0", niniNoOpen === 0, `实际 ${niniNoOpen}`);
+  chk("rectifyIssue → open 问题 = 0", niniNoOpen === 0, `实际 ${niniNoOpen}`);
 
   // 重提通过 → status=submitted
   const niniChecksForResub = await prisma.nodeCheck.findMany({
@@ -300,6 +316,193 @@ async function main() {
     errReReview = e instanceof Error ? e.message : String(e);
   }
   chk("对 passed 再审 → 拒绝「仅待审核」", errReReview.includes("仅待审核"), errReReview);
+
+  // ── 6) 问题流全链（003 防水工程节点，pending → 复验退回再锁 → 全链 open→rectified→closed）──
+  // 6a：定位 003 防水工程节点（seed 物化为 pending）
+  const fangshuiNode = await prisma.acceptanceNode.findFirst({
+    where: { project: { code: "RP-2026-003" }, name: "防水工程" },
+  });
+  chk("前置：003 防水工程节点存在", !!fangshuiNode, fangshuiNode?.id ?? "无");
+  chk("前置：003 防水工程节点 = pending", fangshuiNode?.status === "pending", fangshuiNode?.status ?? "无");
+
+  // 6b：submitNode（全填 pass）→ submitted
+  const fangshuiChecks0 = await prisma.nodeCheck.findMany({
+    where: { nodeId: fangshuiNode!.id },
+    select: { id: true },
+    orderBy: { order: "asc" },
+  });
+  await submitNode(fangshuiNode!.id, {
+    checks: fangshuiChecks0.map((c) => ({ id: c.id, result: "pass" as const, note: "" })),
+    submitNote: "防水工程自检通过",
+  });
+  const fangshuiSubmitted = await prisma.acceptanceNode.findUnique({ where: { id: fangshuiNode!.id } });
+  chk("6b 防水 submitNode → submitted", fangshuiSubmitted?.status === "submitted", fangshuiSubmitted?.status ?? "无");
+
+  // 6c：reviewNode(return, reason, normal) → returned + 新问题 A（open）
+  const issueBeforeFangshuiReturn = await prisma.issue.count();
+  await reviewNode(fangshuiNode!.id, {
+    approve: false,
+    reason: "防水上翻高度不足",
+    severity: "normal",
+  });
+  const fangshuiReturned = await prisma.acceptanceNode.findUnique({ where: { id: fangshuiNode!.id } });
+  chk("6c 防水 reviewNode(return) → returned", fangshuiReturned?.status === "returned", fangshuiReturned?.status ?? "无");
+  const issueCountAfterFangshuiReturn = await prisma.issue.count();
+  chk("6c 退回建问题 A（数量 +1）", issueCountAfterFangshuiReturn === issueBeforeFangshuiReturn + 1, `前 ${issueBeforeFangshuiReturn} 后 ${issueCountAfterFangshuiReturn}`);
+  const issueA = await prisma.issue.findFirst({
+    where: { nodeId: fangshuiNode!.id },
+    orderBy: { createdAt: "desc" },
+  });
+  chk("6c 问题 A.title = 防水工程验收退回", issueA?.title === "防水工程验收退回", issueA?.title ?? "空");
+  chk("6c 问题 A.severity = normal", issueA?.severity === "normal", issueA?.severity ?? "空");
+  chk("6c 问题 A.status = open", issueA?.status === "open", issueA?.status ?? "空");
+  chk("6c 问题 A.nodeId = 防水节点", issueA?.nodeId === fangshuiNode!.id, issueA?.nodeId ?? "空");
+  chk("6c 问题 A.projectId = 003", issueA?.projectId === p3.id, issueA?.projectId ?? "空");
+  const issueAId = issueA!.id;
+
+  // 6d：returned + open 问题 → 重提被拒（尚未整改）
+  let errFangshuiResub1: string = "";
+  try {
+    const fc = await prisma.nodeCheck.findMany({ where: { nodeId: fangshuiNode!.id }, select: { id: true } });
+    await submitNode(fangshuiNode!.id, {
+      checks: fc.map((c) => ({ id: c.id, result: "pass" as const, note: "" })),
+      submitNote: "未整改不应重提",
+    });
+  } catch (e) {
+    errFangshuiResub1 = e instanceof Error ? e.message : String(e);
+  }
+  chk("6d 未整改重提 → 拒「存在未整改问题」", errFangshuiResub1.includes("未整改"), errFangshuiResub1);
+
+  // 6e：rectifyIssue(A) → rectified
+  await rectifyIssue(issueAId, "已整改上翻高度至 30cm");
+  const issueARectified = await prisma.issue.findUnique({ where: { id: issueAId } });
+  chk("6e rectifyIssue → status=rectified", issueARectified?.status === "rectified", issueARectified?.status ?? "无");
+  chk("6e rectifyIssue → rectifyNote 落库", issueARectified?.rectifyNote === "已整改上翻高度至 30cm", issueARectified?.rectifyNote ?? "空");
+  chk("6e rectifyIssue → rectifiedAt 落库", !!issueARectified?.rectifiedAt, issueARectified?.rectifiedAt?.toISOString() ?? "空");
+
+  // 6f：recheckIssue(A, pass=false) → A 回 open + recheckNote 落库（复验退回，历史保留）
+  await recheckIssue(issueAId, { pass: false, note: "仍未处理到位" });
+  const issueAReopened = await prisma.issue.findUnique({ where: { id: issueAId } });
+  chk("6f 复验退回 → status=open", issueAReopened?.status === "open", issueAReopened?.status ?? "无");
+  chk("6f 复验退回 → recheckNote 落库", issueAReopened?.recheckNote === "仍未处理到位", issueAReopened?.recheckNote ?? "空");
+  chk("6f 复验退回 → rectifyNote 历史保留", issueAReopened?.rectifyNote === "已整改上翻高度至 30cm", issueAReopened?.rectifyNote ?? "空");
+  chk("6f 复验退回 → rectifiedAt 历史保留", !!issueAReopened?.rectifiedAt, issueAReopened?.rectifiedAt?.toISOString() ?? "空");
+
+  // 6g：复验退回再锁——A 回 open 后重提仍被拒（关键断言）
+  let errFangshuiResub2: string = "";
+  try {
+    const fc = await prisma.nodeCheck.findMany({ where: { nodeId: fangshuiNode!.id }, select: { id: true } });
+    await submitNode(fangshuiNode!.id, {
+      checks: fc.map((c) => ({ id: c.id, result: "pass" as const, note: "" })),
+      submitNote: "复验退回后不应重提",
+    });
+  } catch (e) {
+    errFangshuiResub2 = e instanceof Error ? e.message : String(e);
+  }
+  chk("6g 复验退回再锁 → 重提被拒「存在未整改问题」", errFangshuiResub2.includes("未整改"), errFangshuiResub2);
+
+  // 6h：rectifyIssue(A) 二次整改 → rectified（rectifyNote 更新为最新）
+  await rectifyIssue(issueAId, "二次整改完成");
+  const issueARectified2 = await prisma.issue.findUnique({ where: { id: issueAId } });
+  chk("6h 二次 rectifyIssue → status=rectified", issueARectified2?.status === "rectified", issueARectified2?.status ?? "无");
+  chk("6h 二次 rectifyIssue → rectifyNote 更新", issueARectified2?.rectifyNote === "二次整改完成", issueARectified2?.rectifyNote ?? "空");
+
+  // 6i：重提通过（A=rectified，canResubmitAfterReturn 通过）→ submitted
+  const fcResub = await prisma.nodeCheck.findMany({ where: { nodeId: fangshuiNode!.id }, select: { id: true } });
+  await submitNode(fangshuiNode!.id, {
+    checks: fcResub.map((c) => ({ id: c.id, result: "pass" as const, note: "" })),
+    submitNote: "二次整改后重提",
+  });
+  const fangshuiResubmitted = await prisma.acceptanceNode.findUnique({ where: { id: fangshuiNode!.id } });
+  chk("6i 整改后重提 → status=submitted", fangshuiResubmitted?.status === "submitted", fangshuiResubmitted?.status ?? "无");
+
+  // 6j：recheckIssue(A, pass=true) → closed + closedAt 落库（全链 open→rectified→closed）
+  await recheckIssue(issueAId, { pass: true, note: "复验合格" });
+  const issueAClosed = await prisma.issue.findUnique({ where: { id: issueAId } });
+  chk("6j 复验通过 → status=closed", issueAClosed?.status === "closed", issueAClosed?.status ?? "无");
+  chk("6j 复验通过 → closedAt 落库", !!issueAClosed?.closedAt, issueAClosed?.closedAt?.toISOString() ?? "空");
+  chk("6j 复验通过 → recheckNote = 复验合格", issueAClosed?.recheckNote === "复验合格", issueAClosed?.recheckNote ?? "空");
+
+  // 6k：对 closed 的 A 再 rectifyIssue → 拒「当前状态不可整改」
+  let errRectifyClosed: string = "";
+  let errRectifyClosedClass = false;
+  try {
+    await rectifyIssue(issueAId, "不应通过");
+  } catch (e) {
+    errRectifyClosed = e instanceof Error ? e.message : String(e);
+    errRectifyClosedClass = e instanceof QualityIssueError;
+  }
+  chk("6k 对 closed rectifyIssue → 拒「当前状态不可整改」", errRectifyClosed.includes("不可整改"), errRectifyClosed);
+  chk("6k 拒绝类 = QualityIssueError", errRectifyClosedClass);
+
+  // ── 7) 手工新建 createIssue 校验 ──────────────────────────────
+  // 7a：项目不存在 → 拒
+  let errNoProject: string = "";
+  try {
+    await createIssue({
+      projectId: "no-such-project",
+      title: "标题合法但项目不存在",
+      desc: "",
+      severity: "normal",
+      assigneeId: null,
+      dueDateIso: null,
+    });
+  } catch (e) {
+    errNoProject = e instanceof Error ? e.message : String(e);
+  }
+  chk("7a createIssue 项目不存在 → 拒「项目不存在」", errNoProject.includes("项目不存在"), errNoProject);
+
+  // 7b：标题空 → 拒
+  let errEmptyTitle: string = "";
+  try {
+    await createIssue({
+      projectId: p3.id,
+      title: "   ",
+      desc: "",
+      severity: "normal",
+      assigneeId: null,
+      dueDateIso: null,
+    });
+  } catch (e) {
+    errEmptyTitle = e instanceof Error ? e.message : String(e);
+  }
+  chk("7b createIssue 标题空 → 拒「问题标题不能为空」", errEmptyTitle.includes("不能为空"), errEmptyTitle);
+
+  // 7c：严重度非法 → 拒
+  let errBadSeverity: string = "";
+  try {
+    await createIssue({
+      projectId: p3.id,
+      title: "严重度非法用例",
+      desc: "",
+      severity: "critical",
+      assigneeId: null,
+      dueDateIso: null,
+    });
+  } catch (e) {
+    errBadSeverity = e instanceof Error ? e.message : String(e);
+  }
+  chk("7c createIssue 严重度非法 → 拒「严重度取值非法」", errBadSeverity.includes("严重度"), errBadSeverity);
+
+  // 7d：成功新建 → 字段逐一断言（status=open / reportedBy=占位提交人 / nodeId=null / dueDate 可空）
+  const submitUser = await getPlaceholderUser("submit");
+  chk("前置：占位提交用户存在（inspector/pm）", !!submitUser, submitUser?.name ?? "无");
+  const created = await createIssue({
+    projectId: p3.id,
+    title: "手工新建测试问题",
+    desc: "  描述前后空白  ",
+    severity: "major",
+    assigneeId: null,
+    dueDateIso: null,
+  });
+  const createdIssue = await prisma.issue.findUnique({ where: { id: created.id } });
+  chk("7d createIssue 成功 → status=open", createdIssue?.status === "open", createdIssue?.status ?? "无");
+  chk("7d createIssue 成功 → reportedBy=占位提交人", createdIssue?.reportedBy === submitUser?.id, `${createdIssue?.reportedBy} vs ${submitUser?.id}`);
+  chk("7d createIssue 成功 → nodeId=null（手工建无来源节点）", createdIssue?.nodeId === null, createdIssue?.nodeId ?? "非空");
+  chk("7d createIssue 成功 → dueDate=null（可空）", createdIssue?.dueDate === null, createdIssue?.dueDate?.toISOString() ?? "非空");
+  chk("7d createIssue 成功 → desc 去空白", createdIssue?.desc === "描述前后空白", createdIssue?.desc ?? "空");
+  chk("7d createIssue 成功 → severity=major", createdIssue?.severity === "major", createdIssue?.severity ?? "无");
+  chk("7d createIssue 成功 → projectId=003", createdIssue?.projectId === p3.id, createdIssue?.projectId ?? "空");
 
   const failed = results.filter((r) => !r.ok).length;
   console.log(`\n${failed === 0 ? "全部通过" : `失败 ${failed} 项`} · 共 ${results.length} 项检查\n`);

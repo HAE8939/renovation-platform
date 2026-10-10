@@ -261,7 +261,12 @@ export default async function NodeDetailPage({
         <div className="flex items-baseline justify-between gap-4">
           <h2 className="text-[15px] font-semibold">关联问题</h2>
           <span className="text-[13px] text-secondary whitespace-nowrap">
-            台账详情将在 M7-c 上线
+            <Link
+              href={`/quality/issues?projectId=${detail.projectId}`}
+              className="text-accent-ink hover:underline"
+            >
+              打开问题台账 →
+            </Link>
           </span>
         </div>
         {detail.issues.length === 0 ? (

@@ -1,6 +1,6 @@
 # 任务卡 M7 · 质量管控（`quality` 模块）
 
-> 状态：**执行中**（M7-a / M7-b 已合入 2026-10-10 · build + verify-quality 66 + 集成门禁 flow 52 + 五既有门禁零回退；下一步 M7-c 问题台账） ｜ 承 `docs/PLAN_FULL_SERVICE_V1.md` v1.2 §5-M7；业务细节源 `Full-Service Project Management/装修经营管理平台 — 网站设计指导文档 v5.1.md` §6.6（只取业务不取皮）
+> 状态：**执行中**（M7-a / M7-b / M7-c 已合入 2026-10-10 · build + verify-quality 66 + 集成门禁 flow 94 + 五既有门禁零回退；下一步 M7-d 质量档案） ｜ 承 `docs/PLAN_FULL_SERVICE_V1.md` v1.2 §5-M7；业务细节源 `Full-Service Project Management/装修经营管理平台 — 网站设计指导文档 v5.1.md` §6.6（只取业务不取皮）
 > 前置：M2-A 主脊（Project + health.ts）+ M3/M4/M5/M6 均已合入；`health.ts` 的质量灯在本 M 接真数据源；**接活 M6 留的「排程 100% → 建验收节点」副作用**
 > 执行通道：codebuddy（`custom-local:glm-5.2` → 8787 三号池），master 串行；集成者守 build + 断言 + 截图
 > 四项架构决策已与 HAE 确认（2026-10-10）：① 节点生成＝core 整合器（即时+读取兜底）；② 节点 4 态 + 「整改中」派生 + 重提门控；③ 检查项结果＝第 4 张行表 `NodeCheck`（计划原文「三表」→ 实际 4 张私有表）；④ 台账含最小「手工新建问题」

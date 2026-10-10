@@ -204,6 +204,7 @@ const targets = [
   returnedNode
     ? { name: "19-quality-node-returned", path: `/quality/nodes/${returnedNode.id}` }
     : { name: "19-quality-node-returned", path: "/quality/__none__" },
+  { name: "20-quality-issues", path: "/quality/issues" },
 ];
 
 const shot = (url, file) =>
