@@ -64,7 +64,7 @@
 - **全案四决策（2026-10-09 与用户确认，详见 `PLAN_FULL_SERVICE_V1.md` §1）**：① 视觉守 V0.3（v5.1 靛蓝/玻璃拟态作废，三色灯渲色点非 emoji）；② 垂直切片·主脊优先；③ 单用户 + 角色切换模拟视角（真 RBAC/登录 DEFERRED）；④ 本期不做通知/群机器人/公开表，状态机副作用照做、通知抽 `notify()` no-op。
 - **M3 两处架构决定（已定）**：`createProject` 从 budget 模块上收 `core/domain`（crm 签约也要建项目，模块不互 import 内部）；签约按**手机号归并** Client，有意取代既有「按客户名 upsert」。
 - **M2-A 角色偏差纠正**：codebuddy 曾把 `USER_ROLE` 编成通用公司角色（foreman/engineer/accountant…），集成者已改回 v5.1 §4.1 装修 11 角色（boss/ops/biz_mgr/designer/design_asst/floor_plan/construction/rendering/budget_mgr/pm/inspector + viewer 占位）；`USER_ROLE` 现无消费者，M3 建 `rbac.ts` 时接。
-- 执行通道（2026-10-09 更新）：默认 **`--model glm-5.2`**（命中账号内置模型，走 `copilot.tencent.com`，省积分；M5-c/d 实测用它跑通）。**新配的本地代理 `127.0.0.1:8787`（buddy2api）** 走 `custom-local:auto` 等（`--model auto` 即命中它，M5-a/b 用过，HTTP 200 无回落）；要走代理里的具体模型须写全前缀 `custom-local:glm-5.2`（裸 `glm-5.2` 会命中腾讯内置而非代理）。sensenova 降为备份。
+- 执行通道（2026-10-10 更正）：默认 **`--model custom-local:glm-5.2`**——provider 前缀命中 models.json 自定义条目，**走本地代理 `127.0.0.1:8787`（buddy2api）三号池**（M6-b 起启用；日志验证 `Using custom URL … 8787` + HTTP 200）。裸 `--model glm-5.2` 会被账号内置目录抢先命中、直打 `copilot.tencent.com`（单账号、绕开池子；M5-c/d 与 M6-a 的旧配方，仅作后备）。sensenova 降为备份。
 - Logo 上传从 B3 拆出，归 M1.5 与 `PlatformSetting` 一起做（无表可存文件路径，硬做只能靠约定猜文件名）。
 - 工作区约定：非交付物一律进 `_scratch/`（日志/截图/试验分子目录）、**禁止在仓库根新建 `.log` 或下划线目录**、决策类产物归 `docs/`、一次性脚手架禁止与项目平级建目录。
 
@@ -124,8 +124,8 @@
 
 - **进度**：M2-A → **M5 全部合入 master**（见 §1，M5 四单元 `21cafb2`/`6a429ac`/`0c20825`/`d5ca7f9`），工作树干净、门禁全绿。设计管理模块完整上线：看板双视角 + 提交版本历史 + 审核通过/退回(原因必填) + 返修率 + 日历 + 跳预算。
 - **下一个里程碑 = M6 工程排程**（明天开工）：工序排程、甘特图、按面积档模板与工期预警（见 `PLAN_FULL_SERVICE_V1.md` §M6）。开工前先起草 `docs/TASK_M6.md`（照 `TASK_M4.md`/`TASK_M5.md` 写法：范围 / 单元拆分 / 硬约束 / 门禁 / 诚实空状态）。M6 私有表随模块下沉、经 `projectId` 挂共享 Project；`health.ts` 的工期灯届时可接真排程数据源（现走降级）。⚠️ 排程 100% 完成→建验收节点的副作用属 M7，M6 只留位不提前实现（红线三）。
-- **驱动 codebuddy 的命令（本会话验证可用，glm-5.2 省积分）**：
-  `codebuddy -p --model glm-5.2 --session-id <id> --permission-mode bypassPermissions --disallowedTools "Bash(git:*),Bash(pnpm dev:*)" < _scratch/logs/cb_<单元>_prompt.md > _scratch/logs/cb_<单元>_out.log 2>&1`（后台跑）。纪律：一轮一个界面单元；429 冷却可续、失败原卡重跑；改动留工作区由集成者 commit；**codebuddy 自述不作数，集成者必独立复跑门禁**；schema/seed 的**执行**（migrate/db seed）归集成者，codebuddy 只写文件。跑完 grep `~/.codebuddy/logs/<date>/renovation-platform__*.log` 的 `resolved model=` 确认没静默回落。
+- **驱动 codebuddy 的命令（2026-10-10 更正：默认走 Provider 池）**：
+  `codebuddy -p --model custom-local:glm-5.2 --session-id <id> --permission-mode bypassPermissions --disallowedTools "Bash(git:*),Bash(pnpm dev:*),Bash(pnpm prisma migrate:*),Bash(pnpm db:*)" < _scratch/logs/cb_<单元>_prompt.md > _scratch/logs/cb_<单元>_out.log 2>&1`（后台跑）。纪律：一轮一个界面单元；429 冷却可续、失败原卡重跑；改动留工作区由集成者 commit；**codebuddy 自述不作数，集成者必独立复跑门禁**；schema/seed 的**执行**（migrate/db seed）归集成者，codebuddy 只写文件。跑完 grep `~/.codebuddy/logs/<date>/renovation-platform__*.log` 的 `Using custom URL`/`url=`，确认命中 `http://127.0.0.1:8787/…`（别落回 copilot.tencent.com 内置口）。
 - **门禁套件（合入前必跑）**：`pnpm build` + `node scripts/verify-quote.mjs`(17) + `verify-crm.mjs`(11) + `verify-health.mjs`(20) + `verify-design.mjs`(28) + `verify-sign.mts`(12，签约/事务改动时，跑法见脚本头) + `node scripts/qa-shots.mjs`（截图目检——真缺陷历史上全靠它抓，断言过≠对；375 溢出争议用 §5 的 DOM 探针量 scrollWidth，别只信肉眼）。
 - **局域网预览（如需再开）**：`npx next start -H 0.0.0.0 -p 3000` + 防火墙入站规则；本机局域网 IP `192.168.3.29`（会变，用前 `Get-NetIPAddress` 复核）。
 - **遗留**：① 防火墙规则 `renovation-preview-3000` 仍在（服务已停、规则空转），要删下次一条命令 + UAC；② M3-e 商务漏斗延至 M9 驾驶舱；③ 单用户免登录，「角色切换模拟视角」尚未接（`rbac.ts` 有骨架）。
