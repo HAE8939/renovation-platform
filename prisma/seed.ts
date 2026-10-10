@@ -3,6 +3,9 @@ import { PrismaClient } from "@prisma/client";
 import { USER_ROLE, DEPARTMENT } from "../src/core/domain/types";
 import { buildSchedule, chainEdges } from "../src/modules/schedule/plan";
 import { syncAcceptanceNodes } from "../src/core/domain/acceptance";
+import { buildPaymentPlan } from "../src/modules/finance/payment";
+import { marginRate } from "../src/core/domain/ledger";
+import { getFinanceUser } from "../src/modules/finance/currentUser";
 
 const prisma = new PrismaClient();
 
@@ -276,6 +279,8 @@ async function main() {
   await seedSchedule();
   // M7-a：质量管控 seed（检查项 35 条 + 演示节点流状态，幂等）。
   await seedQuality();
+  // M8-a：财务管控 seed（合同额回填 + 三项目五段计划 + 演示收支撑账 + 已付标记，幂等）。
+  await seedFinance();
 }
 
 /** M1a/M2-A 基础数据：组织 + 用户 + 客户 + 项目 + 报价 + 科目模板 + 线索。 */
@@ -1511,3 +1516,208 @@ main()
     process.exitCode = 1;
   })
   .finally(() => prisma.$disconnect());
+
+// ── M8-a 财务管控 seed ──────────────────────────────────────────
+// 五步幂等（仿 seedQuality 写法）：① 合同额回填（仅当 ==0 才 update，不覆盖人工值）
+// ② 001/002/003 各五段 PaymentNode（已有则整项目跳过）；保修金 unlocksAt =
+// actualEndDate ?? endDate ?? today + 12 个月（UTC 月算术，不引 dayjs）；
+// ③ 标记已付 + 对应 income/contract 台账（两本账金额/日期一致）；
+// ④ 支出台账 7 笔（001 材料+人工、002 材料+人工、003 材料+人工+其他）；
+// ⑤ 自检断言报数取 DB 真值。
+//
+// 计数说明：faithful 总数 = 4 income（两本账一致）+ 7 expense（三项目毛利率锁死）= 11。
+// TASK_M8 §3 标 financeRecord=9，但 §3 同时要求 4 笔 income（两本账一致）+
+// 7 笔 expense（001/002/003 毛利率 35%/37.5%/22.7% 由金额锁死）= 11；9 与金额/毛利
+// 约束不可兼得，取 11（金额与毛利优先，count 让位，集成者复跑见末尾报数）。
+async function seedFinance() {
+  const DAY = 24 * 60 * 60 * 1000;
+  const addDays = (base: Date, n: number) => new Date(base.getTime() + n * DAY);
+  // UTC 月算术：Date.UTC 构造器自动处理月份溢出（如 13 月 → 次年 1 月）。
+  const addMonthsUTC = (base: Date, months: number) =>
+    new Date(
+      Date.UTC(base.getUTCFullYear(), base.getUTCMonth() + months, base.getUTCDate())
+    );
+
+  // ── ① 合同额回填（仅当当前 ==0 才 update，不覆盖人工值）──
+  const CONTRACT_BACKFILL: { code: string; amount: number }[] = [
+    { code: "RP-2026-001", amount: 62000 },
+    { code: "RP-2026-002", amount: 160000 },
+    { code: "RP-2026-003", amount: 128000 },
+    // 004 留 0 = 未录入诚实空态位（手测生成守卫）
+  ];
+  for (const { code, amount } of CONTRACT_BACKFILL) {
+    const p = await prisma.project.findUnique({ where: { code }, select: { id: true, contractAmount: true } });
+    if (p && p.contractAmount === 0) {
+      await prisma.project.update({ where: { id: p.id }, data: { contractAmount: amount } });
+    }
+  }
+
+  // ── ② 付款计划：001/002/003 各五段（幂等：该项目已有 PaymentNode 则跳过）──
+  const planTargets = await prisma.project.findMany({
+    where: { code: { in: ["RP-2026-001", "RP-2026-002", "RP-2026-003"] } },
+    select: { id: true, code: true, contractAmount: true, startDate: true, endDate: true, actualEndDate: true },
+  });
+  for (const p of planTargets) {
+    const existing = await prisma.paymentNode.count({ where: { projectId: p.id } });
+    if (existing > 0) continue;
+    if (!p.contractAmount || p.contractAmount <= 0) continue; // 守卫
+    const plan = buildPaymentPlan(p.contractAmount);
+    const warrantyBase = p.actualEndDate ?? p.endDate ?? new Date();
+    const rows = plan.map((row) => ({
+      projectId: p.id,
+      order: row.order,
+      name: row.name,
+      percent: row.percent,
+      amountDue: row.amountDue,
+      trigger: row.trigger,
+      triggerStages: row.triggerStages,
+      unlocksAt: row.unlocksAtOffsetMonths
+        ? addMonthsUTC(warrantyBase, row.unlocksAtOffsetMonths)
+        : null,
+    }));
+    await prisma.$transaction(
+      rows.map((r) => prisma.paymentNode.create({ data: r }))
+    );
+  }
+
+  // ── ③④ 标记已付 + 台账收 + 支出台账（幂等：financeRecord 已有任何行则跳过）──
+  const frCount = await prisma.financeRecord.count();
+  if (frCount > 0) {
+    console.log(`已存在 ${frCount} 条收支记录，M8-a 台账+已付标记 seed 跳过。`);
+  } else {
+    const financeUser = await getFinanceUser();
+    const uid = financeUser?.id ?? null;
+
+    // 取 001/002/003 项目（含 startDate 用于开工款 paidAt）
+    const [p1, p2, p3] = await Promise.all([
+      prisma.project.findUnique({ where: { code: "RP-2026-001" }, select: { id: true, startDate: true } }),
+      prisma.project.findUnique({ where: { code: "RP-2026-002" }, select: { id: true, startDate: true } }),
+      prisma.project.findUnique({ where: { code: "RP-2026-003" }, select: { id: true, startDate: true } }),
+    ]);
+    if (!p1 || !p2 || !p3) {
+      throw new Error("finance seed 自检失败：未找到演示项目 001/002/003，请先运行 schedule seed");
+    }
+
+    // 003 水电工程节点 reviewedAt（M7 seed 已置 passed；paidAt = reviewedAt + 1d）
+    const p3ShuiDianNode = await prisma.acceptanceNode.findFirst({
+      where: { projectId: p3.id, name: "水电工程" },
+      select: { reviewedAt: true },
+    });
+    const p3Start = p3.startDate ?? new Date();
+    const kaigongPaidAt = addDays(p3Start, 2);
+    const shuiDianPaidAt = p3ShuiDianNode?.reviewedAt
+      ? addDays(p3ShuiDianNode.reviewedAt, 1)
+      : addDays(p3Start, 10);
+    const p1PaidAt = p1.startDate ? addDays(p1.startDate, 2) : new Date();
+    const p2PaidAt = p2.startDate ? addDays(p2.startDate, 2) : new Date();
+
+    // 取四段的 amountDue（与台账 income 金额一致 = 两本账一致）
+    const [p3o1, p3o2, p1o1, p2o1] = await Promise.all([
+      prisma.paymentNode.findFirst({ where: { projectId: p3.id, order: 1 }, select: { id: true, amountDue: true } }),
+      prisma.paymentNode.findFirst({ where: { projectId: p3.id, order: 2 }, select: { id: true, amountDue: true } }),
+      prisma.paymentNode.findFirst({ where: { projectId: p1.id, order: 1 }, select: { id: true, amountDue: true } }),
+      prisma.paymentNode.findFirst({ where: { projectId: p2.id, order: 1 }, select: { id: true, amountDue: true } }),
+    ]);
+    if (!p3o1 || !p3o2 || !p1o1 || !p2o1) {
+      throw new Error("finance seed 自检失败：未找到应标记已付的付款段（请先跑步骤②）");
+    }
+
+    await prisma.$transaction(async (tx) => {
+      // ③ 标记已付 + income/contract 台账（两本账金额/日期一致）
+      await tx.paymentNode.update({ where: { id: p3o1.id }, data: { paid: true, paidAt: kaigongPaidAt, paidBy: uid } });
+      await tx.financeRecord.create({ data: { projectId: p3.id, type: "income", category: "contract", amount: p3o1.amountDue, date: kaigongPaidAt, description: "开工款", recordedBy: uid } });
+
+      await tx.paymentNode.update({ where: { id: p3o2.id }, data: { paid: true, paidAt: shuiDianPaidAt, paidBy: uid } });
+      await tx.financeRecord.create({ data: { projectId: p3.id, type: "income", category: "contract", amount: p3o2.amountDue, date: shuiDianPaidAt, description: "水电完成款", recordedBy: uid } });
+
+      await tx.paymentNode.update({ where: { id: p1o1.id }, data: { paid: true, paidAt: p1PaidAt, paidBy: uid } });
+      await tx.financeRecord.create({ data: { projectId: p1.id, type: "income", category: "contract", amount: p1o1.amountDue, date: p1PaidAt, description: "开工款", recordedBy: uid } });
+
+      await tx.paymentNode.update({ where: { id: p2o1.id }, data: { paid: true, paidAt: p2PaidAt, paidBy: uid } });
+      await tx.financeRecord.create({ data: { projectId: p2.id, type: "income", category: "contract", amount: p2o1.amountDue, date: p2PaidAt, description: "开工款", recordedBy: uid } });
+
+      // ④ 支出台账 7 笔（001 材料+人工、002 材料+人工、003 材料+人工+其他）
+      // 日期按各自开工日起算的工序进度落在施工期内（承 STATUS §5「演示数据时间自洽要主动
+      // 回填」教训：全塞 seed 时刻会让已竣工项目出现「完工后才买主材」的反序）。
+      // dayOffset 若越过今天则钳到今天之前（001 开工日固定，偏移大时会跑到未来）。
+      const expenses: {
+        code: string;
+        category: string;
+        amount: number;
+        description: string;
+        dayOffset: number;
+      }[] = [
+        { code: "RP-2026-001", category: "material", amount: 24500, description: "主材采购（瓷砖/地板）", dayOffset: 18 },
+        { code: "RP-2026-001", category: "labor", amount: 15800, description: "泥工班组第二期人工", dayOffset: 35 },
+        { code: "RP-2026-002", category: "material", amount: 62000, description: "全屋主材采购", dayOffset: 15 },
+        { code: "RP-2026-002", category: "labor", amount: 38000, description: "水电与泥工人工", dayOffset: 35 },
+        { code: "RP-2026-003", category: "material", amount: 58000, description: "主材与辅料", dayOffset: 12 },
+        { code: "RP-2026-003", category: "labor", amount: 39000, description: "全屋人工", dayOffset: 30 },
+        { code: "RP-2026-003", category: "other", amount: 2000, description: "垃圾清运与零星分包", dayOffset: 55 },
+      ];
+      const now = new Date();
+      for (const e of expenses) {
+        const p = e.code === "RP-2026-001" ? p1 : e.code === "RP-2026-002" ? p2 : p3;
+        const start = p.startDate ?? now;
+        const raw = addDays(start, e.dayOffset);
+        const date = raw.getTime() > now.getTime() ? addDays(now, -1) : raw;
+        await tx.financeRecord.create({
+          data: { projectId: p.id, type: "expense", category: e.category, amount: e.amount, date, description: e.description, recordedBy: uid },
+        });
+      }
+    });
+  }
+
+  // ── ⑤ 自检断言（报数取 DB 真值）──
+  const [pnTotal, frTotal, p1Sum, p2Sum, p3Sum, p3Contract, p1Contract, p2Contract, p3ShuiDian, p3Zhuti, p4Pn, p4Fr, p3ExpenseRecords] = await Promise.all([
+    prisma.paymentNode.count(),
+    prisma.financeRecord.count(),
+    prisma.paymentNode.aggregate({ where: { project: { code: "RP-2026-001" } }, _sum: { amountDue: true } }),
+    prisma.paymentNode.aggregate({ where: { project: { code: "RP-2026-002" } }, _sum: { amountDue: true } }),
+    prisma.paymentNode.aggregate({ where: { project: { code: "RP-2026-003" } }, _sum: { amountDue: true } }),
+    prisma.project.findUnique({ where: { code: "RP-2026-003" }, select: { contractAmount: true } }),
+    prisma.project.findUnique({ where: { code: "RP-2026-001" }, select: { contractAmount: true } }),
+    prisma.project.findUnique({ where: { code: "RP-2026-002" }, select: { contractAmount: true } }),
+    prisma.paymentNode.findFirst({ where: { project: { code: "RP-2026-003" }, order: 2 }, select: { paid: true } }),
+    prisma.paymentNode.findFirst({ where: { project: { code: "RP-2026-003" }, order: 3 }, select: { paid: true } }),
+    prisma.paymentNode.count({ where: { project: { code: "RP-2026-004" } } }),
+    prisma.financeRecord.count({ where: { project: { code: "RP-2026-004" } } }),
+    prisma.financeRecord.findMany({ where: { project: { code: "RP-2026-003" }, type: "expense" }, select: { amount: true } }),
+  ]);
+
+  const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+  const p3Expense = round2(p3ExpenseRecords.reduce((s, r) => s + r.amount, 0));
+  const p3Margin = marginRate({ contractAmount: p3Contract?.contractAmount ?? 0, changeTotal: 0, expenseTotal: p3Expense });
+
+  console.log(
+    `M8-a seed 完成：付款段 ${pnTotal} · 收支记录 ${frTotal}（003 毛利率 ${p3Margin !== null ? (p3Margin * 100).toFixed(1) + "%" : "—"}）`
+  );
+
+  if (pnTotal !== 15) {
+    throw new Error(`finance seed 自检失败：付款段应 15，实际 ${pnTotal}`);
+  }
+  if (frTotal !== 11) {
+    throw new Error(`finance seed 自检失败：收支记录应 11（4 income + 7 expense），实际 ${frTotal}`);
+  }
+  if (round2(p1Sum._sum.amountDue ?? 0) !== p1Contract?.contractAmount) {
+    throw new Error(`finance seed 自检失败：001 五段之和 ${p1Sum._sum.amountDue} ≠ 合同额 ${p1Contract?.contractAmount}`);
+  }
+  if (round2(p2Sum._sum.amountDue ?? 0) !== p2Contract?.contractAmount) {
+    throw new Error(`finance seed 自检失败：002 五段之和 ${p2Sum._sum.amountDue} ≠ 合同额 ${p2Contract?.contractAmount}`);
+  }
+  if (round2(p3Sum._sum.amountDue ?? 0) !== p3Contract?.contractAmount) {
+    throw new Error(`finance seed 自检失败：003 五段之和 ${p3Sum._sum.amountDue} ≠ 合同额 ${p3Contract?.contractAmount}`);
+  }
+  if (!p3ShuiDian || p3ShuiDian.paid !== true) {
+    throw new Error("finance seed 自检失败：003 水电段应已付");
+  }
+  if (!p3Zhuti || p3Zhuti.paid !== false) {
+    throw new Error("finance seed 自检失败：003 主体段应未付");
+  }
+  if (p4Pn !== 0 || p4Fr !== 0) {
+    throw new Error(`finance seed 自检失败：004 应零行（实际 pn=${p4Pn} fr=${p4Fr}）`);
+  }
+  if (p3Margin === null || p3Margin < 0.15 || p3Margin > 0.25) {
+    throw new Error(`finance seed 自检失败：003 毛利率应落在 [0.15,0.25]，实际 ${p3Margin}`);
+  }
+}

@@ -21,6 +21,7 @@ export interface ProjectSettingsValues {
   clientPhone: string | null;
   startDate: string | null;
   endDate: string | null;
+  contractAmount: number;
 }
 
 const initialState: ProjectFormState = {};
@@ -93,6 +94,18 @@ export function ProjectSettingsForm({ values }: { values: ProjectSettingsValues 
             step="0.1"
             defaultValue={values.area}
             required
+          />
+        </Field>
+        <Field
+          label="合同额（元）"
+          hint="0＝未录入；清空＝保存时不改动此列。影响毛利粗算与付款计划生成"
+        >
+          <Input
+            name="contractAmount"
+            type="number"
+            min="0"
+            step="0.01"
+            defaultValue={values.contractAmount ?? 0}
           />
         </Field>
         <Field label="状态">

@@ -62,6 +62,10 @@ export async function updateProjectAction(
     const text = (key: string) => String(formData.get(key) ?? "").trim();
     const areaRaw = text("area");
     const area = areaRaw === "" ? 0 : Number(areaRaw);
+    // 合同额：留空 = 未传（updateProject 不改此列）；否则透传数值。
+    const contractAmountRaw = text("contractAmount");
+    const contractAmount =
+      contractAmountRaw === "" ? undefined : Number(contractAmountRaw);
 
     await updateProject(projectId, {
       name: text("name"),
@@ -75,6 +79,7 @@ export async function updateProjectAction(
       status: text("status") || undefined,
       startDate: String(formData.get("startDate") ?? "") || null,
       endDate: String(formData.get("endDate") ?? "") || null,
+      contractAmount,
     });
 
     revalidatePath(`/budget/${projectId}`);

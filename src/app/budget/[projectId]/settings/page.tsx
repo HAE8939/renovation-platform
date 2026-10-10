@@ -44,6 +44,7 @@ export default async function ProjectSettingsPage({ params }: PageProps) {
           clientPhone: detail.clientPhone,
           startDate: detail.startDate ? detail.startDate.toISOString() : null,
           endDate: detail.endDate ? detail.endDate.toISOString() : null,
+          contractAmount: detail.contractAmount,
         }}
       />
     </div>

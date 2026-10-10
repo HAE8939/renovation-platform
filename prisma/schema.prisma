@@ -89,6 +89,8 @@ model Project {
   scheduleTasks ScheduleTask[]           // 反向：排程工序（M6-a，真源在 ScheduleTask.projectId）
   acceptanceNodes AcceptanceNode[]       // 反向：验收节点（M7-a，真源在 AcceptanceNode.projectId）
   issues    Issue[]                       // 反向：质量问题（M7-a，真源在 Issue.projectId）
+  financeRecords FinanceRecord[]          // 反向：收支台账（M8-a，真源在 FinanceRecord.projectId）
+  paymentNodes PaymentNode[]              // 反向：付款段（M8-a，真源在 PaymentNode.projectId）
 
   @@map("projects")
 }
@@ -408,4 +410,57 @@ model Issue {
   @@index([status])
   @@index([severity])
   @@map("issues")
+}
+
+// ─────────────────────────────────────────────────────────────
+// 财务管控模块自有实体 (modules/finance) — M8-a
+// 收支记录与付款段均经 projectId 外键引用共享 core/domain Project。
+// 付款段的「解锁/可收款」态【不落库】：读取时由 finance/payment.ts 纯函数派生（决策①）。
+// paid/paidAt/paidBy 是唯一落库的执行事实（人工标记），不自动生 FinanceRecord（决策②）。
+// ─────────────────────────────────────────────────────────────
+
+// 收支台账：录入即入账（无审批态，§0 范围红线）。
+model FinanceRecord {
+  id          String   @id @default(cuid())
+  projectId   String
+  type        String   // income | expense
+  category    String   // contract | change | refund | material | labor | other
+  amount      Float                       // 恒为正数；方向由 type 决定（免符号歧义）
+  date        DateTime                    // 发生日期
+  description String   @default("")       // 摘要，如「泥工班组第二期人工」
+  recordedBy  String?                     // ★ userId（占位当前用户，P4 接登录）
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id])
+
+  @@index([projectId])
+  @@index([type])
+  @@index([date])
+  @@map("finance_records")
+}
+
+// 付款段：五段计划，金额生成时快照自 Project.contractAmount（决策④）。
+model PaymentNode {
+  id             String    @id @default(cuid())
+  projectId      String
+  order          Int                      // 1..5
+  name           String                   // 段名快照，如「水电完成款」
+  percent        Float                    // 比例快照（30 = 30%），展示用
+  amountDue      Float                    // ★ 应收金额快照（生成时合同额 × 比例，尾差归末段）
+  trigger        String                   // none | stages | all  —— 解锁依赖的验收条件
+  triggerStages  String    @default("")    // 逗号分隔工序名，仅 trigger=="stages" 用
+  unlocksAt      DateTime?                // 可选：不早于此日可付（保修金用；null=无日期约束）
+  note           String    @default("")
+  paid           Boolean   @default(false)
+  paidAt         DateTime?
+  paidBy         String?                  // ★ userId
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id])
+
+  @@unique([projectId, order])
+  @@index([projectId])
+  @@map("payment_nodes")
 }

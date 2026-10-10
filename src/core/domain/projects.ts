@@ -95,6 +95,7 @@ export interface ProjectDetail {
   clientPhone: string | null;
   startDate: Date | null;
   endDate: Date | null;
+  contractAmount: number;
   taxRate: number;
   quoteStatus: string;
   items: QuoteItemRow[];
@@ -148,6 +149,7 @@ export async function getProjectDetail(projectId: string): Promise<ProjectDetail
     clientPhone: project.client.phone,
     startDate: project.startDate,
     endDate: project.endDate,
+    contractAmount: project.contractAmount,
     taxRate: quote?.taxRate ?? 0.03,
     quoteStatus: quote?.status ?? "draft",
     items,
@@ -190,6 +192,7 @@ export interface UpdateProjectInput {
   status?: string;
   startDate?: string | null;
   endDate?: string | null;
+  contractAmount?: number; // M8-a：合同额录入入口（哨兵 0 = 未录入）；undefined = 不改此列
 }
 
 /**
@@ -299,6 +302,17 @@ export async function updateProject(
 
   const status = input.status ?? PROJECT_STATUS.draft;
 
+  // 合同额：undefined = 不改此列；0 = 未录入哨兵（合法）；负数 → 抛中文校验错。
+  // 同源 createProject 的写法，但 update 需区分"未传"与"传 0"。
+  let contractAmountPatch: { contractAmount?: number } = {};
+  if (input.contractAmount !== undefined) {
+    const n = Number(input.contractAmount);
+    if (!Number.isFinite(n) || n < 0) {
+      throw new ValidationError("合同额需为非负数字");
+    }
+    contractAmountPatch = { contractAmount: n };
+  }
+
   await prisma.$transaction(async (tx) => {
     const project = await tx.project.findUnique({
       where: { id: projectId },
@@ -331,6 +345,7 @@ export async function updateProject(
         status,
         startDate: parseDateInput(input.startDate),
         endDate: parseDateInput(input.endDate),
+        ...contractAmountPatch,
       },
     });
   });
