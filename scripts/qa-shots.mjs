@@ -146,6 +146,15 @@ const designTask =
   null;
 const submittedTask =
   (await prisma.designTask?.findFirst({ where: { status: "submitted" } })) ?? null;
+// M7-b：质量节点详情两态（002 水电 submitted / 003 泥工 returned）
+const submittedNode =
+  (await prisma.acceptanceNode?.findFirst({
+    where: { project: { code: "RP-2026-002" }, name: "水电工程" },
+  })) ?? null;
+const returnedNode =
+  (await prisma.acceptanceNode?.findFirst({
+    where: { project: { code: "RP-2026-003" }, name: "泥工工程" },
+  })) ?? null;
 await prisma.$disconnect();
 
 const targets = [
@@ -189,6 +198,12 @@ const targets = [
   })),
   { name: "17-schedule-templates", path: "/schedule/templates" },
   { name: "18-quality", path: "/quality" },
+  submittedNode
+    ? { name: "19-quality-node-submitted", path: `/quality/nodes/${submittedNode.id}` }
+    : { name: "19-quality-node-submitted", path: "/quality/__none__" },
+  returnedNode
+    ? { name: "19-quality-node-returned", path: `/quality/nodes/${returnedNode.id}` }
+    : { name: "19-quality-node-returned", path: "/quality/__none__" },
 ];
 
 const shot = (url, file) =>
