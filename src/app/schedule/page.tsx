@@ -154,7 +154,7 @@ export default async function ScheduleBoardPage() {
             <h1 className="text-[28px] font-semibold">时间管控</h1>
             <p className="mt-2 max-w-prose text-[15px] leading-relaxed text-secondary">
               全部在建项目的工期预警看板：已排程项目按工期灯分红/黄/绿三区，
-              未排程项目单列灰区。点击卡片进入甘特图（M6-b 上线）。
+              未排程项目单列灰区。点击卡片进入甘特图。
             </p>
           </div>
         </div>

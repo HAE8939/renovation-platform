@@ -1,25 +1,40 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import prisma from "@/core/db";
+import { Badge } from "@/core/ui";
+import { getProjectSchedule } from "@/modules/schedule/server/tasks";
+import { GanttChart } from "./GanttChart";
+import { ClearScheduleButton } from "./ClearScheduleButton";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "排程甘特" };
 
-/** 排程甘特占位页（M6-a 防死链；甘特主体在 M6-b 上线）。 */
+/** UTC 日期格式（与图体刻度同源，避免时区偏移）。 */
+function fmtDate(iso: string | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(d.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${dd}`;
+}
+
+/**
+ * 排程甘特页（M6-b）：顶部项目信息 + 右侧清空排程（有任务时）+
+ * 空态（可生成预览 / 不可生成诚实说明）或图体（双轨 SVG + 依赖连线 + 今日线）。
+ */
 export default async function ScheduleProjectPage({
   params,
 }: {
   params: { projectId: string };
 }) {
-  const project = await prisma.project.findUnique({
-    where: { id: params.projectId },
-    select: { id: true, name: true, code: true },
-  });
-  if (!project) notFound();
+  const data = await getProjectSchedule(params.projectId);
+  if (!data) notFound();
+
+  const hasTasks = data.tasks.length > 0;
 
   return (
-    <div>
-      <div className="mb-6">
+    <div className="space-y-6">
+      <div>
         <Link
           href="/schedule"
           className="whitespace-nowrap text-[13px] text-secondary transition-colors hover:text-accent-ink"
@@ -29,27 +44,45 @@ export default async function ScheduleProjectPage({
       </div>
 
       <header className="border-b border-line pb-6">
-        <h1 className="text-[28px] font-semibold leading-tight">{project.name}</h1>
-        <p className="mt-2 text-[13px] text-secondary">{project.code}</p>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-[13px] num text-secondary">{data.project.code}</p>
+            <h1 className="mt-1 text-[28px] font-semibold leading-tight">
+              {data.project.name}
+            </h1>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <Badge variant="neutral">
+                {data.tier ? data.tierLabel : "未定档"}
+              </Badge>
+              <span className="text-[13px] text-secondary whitespace-nowrap">
+                面积
+                <span className="num text-primary">
+                  {" "}
+                  {data.project.area > 0 ? `${data.project.area} ㎡` : "—"}
+                </span>
+              </span>
+              <span className="text-[13px] text-secondary whitespace-nowrap">
+                计划开工
+                <span className="num text-primary"> {fmtDate(data.project.startDate)} </span>
+              </span>
+              <span className="text-[13px] text-secondary whitespace-nowrap">
+                计划完工
+                <span className="num text-primary"> {fmtDate(data.project.endDate)} </span>
+              </span>
+            </div>
+            <Link
+              href={`/projects/${data.project.id}`}
+              className="mt-3 inline-flex text-[13px] text-accent-ink whitespace-nowrap underline-offset-4 hover:underline"
+            >
+              项目详情 →
+            </Link>
+          </div>
+
+          {hasTasks && <ClearScheduleButton projectId={data.project.id} />}
+        </div>
       </header>
 
-      {/* 诚实空态：不画线、不造数，明说甘特主体在 M6-b 上线 */}
-      <div className="mt-8 rounded-card border border-line bg-surface px-8 py-12 text-center">
-        <p className="text-[15px] font-medium text-primary">
-          甘特图将在 M6-b 上线
-        </p>
-        <p className="mt-2 text-[13px] leading-relaxed text-secondary">
-          工序排程的甘特视图（双轨进度条、依赖连线、今日竖线、一键生成与清空）
-          在 M6-b 单元交付。当前可从预警看板查看项目工期灯与进度，生成流程空态预览
-          与拖拽调期随后到位。
-        </p>
-        <Link
-          href="/schedule"
-          className="mt-4 inline-flex h-8 items-center rounded-inner bg-accent px-3 text-[13px] font-medium text-white whitespace-nowrap transition-colors hover:opacity-90"
-        >
-          返回预警看板
-        </Link>
-      </div>
+      <GanttChart data={data} />
     </div>
   );
 }

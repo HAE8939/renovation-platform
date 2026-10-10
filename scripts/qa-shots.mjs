@@ -132,6 +132,11 @@ console.log("✓ 服务就绪且身份核对通过\n");
 const { PrismaClient } = await import("@prisma/client");
 const prisma = new PrismaClient();
 const project = await prisma.project.findFirst({ orderBy: { createdAt: "asc" } });
+// M6-b：演示项目 002/003/004 的甘特/空态各一张（002 落后·003 全完成·004 未排程空态）
+const scheduleProjects = await prisma.project.findMany({
+  where: { code: { in: ["RP-2026-002", "RP-2026-003", "RP-2026-004"] } },
+  orderBy: { code: "asc" },
+});
 const designTask =
   (await prisma.designTask?.findFirst({
     where: { submissions: { some: { result: "rejected" } } },
@@ -172,6 +177,10 @@ const targets = [
   project
     ? { name: "16-schedule-project", path: `/schedule/${project.id}` }
     : { name: "16-schedule-project", path: "/schedule/__none__" },
+  ...scheduleProjects.map((p) => ({
+    name: `16-schedule-${p.code.slice(-3)}`,
+    path: `/schedule/${p.id}`,
+  })),
   { name: "17-schedule-templates", path: "/schedule/templates" },
 ];
 
