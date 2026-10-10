@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useFormState, useFormStatus } from "react-dom";
 import { Badge, Button, Drawer, Field, Input, Select } from "@/core/ui";
 import {
@@ -219,6 +220,22 @@ function TaskDrawerInner({
                 : "无"
             }
           />
+        </div>
+      </section>
+
+      {/* 验收入口（M7-e）：仅深链跳转，不读 quality 表 */}
+      <section className="border-t border-line pt-4">
+        <h5 className="text-[13px] font-medium text-secondary">验收</h5>
+        <div className="mt-3 space-y-2">
+          <Link
+            href={`/quality?taskId=${task.id}`}
+            className="inline-block whitespace-nowrap text-[13px] text-accent-ink hover:underline underline-offset-4"
+          >
+            打开验收节点 →
+          </Link>
+          <p className="text-[13px] text-secondary">
+            工序完工后自动生成验收节点；提交与审核在质量管控模块进行。
+          </p>
         </div>
       </section>
     </div>

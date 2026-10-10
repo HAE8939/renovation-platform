@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Badge, SectionTitle } from "@/core/ui";
+import { Badge, SectionTitle, type BadgeVariant } from "@/core/ui";
 import { formatCny, formatPercent } from "@/core/domain/pricing";
 import type { Light } from "@/core/domain/health";
 import type { ProjectHub } from "@/modules/projects/server/projectDetail";
@@ -17,7 +17,7 @@ const TABS = [
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
-/** 项目六合一详情的 Tab 面板（M4-b + M6-e）。只读聚合；工期/设计接真数据，质量仍空态。 */
+/** 项目六合一详情的 Tab 面板（M4-b + M6-e + M7-e）。只读聚合；工期/设计/质量接真数据。 */
 export function ProjectTabs({ hub, initialTab }: { hub: ProjectHub; initialTab?: string }) {
   const valid = TABS.some((t) => t.key === initialTab);
   const [tab, setTab] = useState<TabKey>(valid ? (initialTab as TabKey) : "basic");
@@ -44,9 +44,7 @@ export function ProjectTabs({ hub, initialTab }: { hub: ProjectHub; initialTab?:
         {tab === "basic" && <BasicTab hub={hub} />}
         {tab === "design" && <DesignTab hub={hub} />}
         {tab === "schedule" && <ScheduleTab hub={hub} />}
-        {tab === "quality" && (
-          <EmptyTab title="质量管控模块开发中" note="验收节点与问题台账将在 M7 上线。" />
-        )}
+        {tab === "quality" && <QualityTab hub={hub} />}
         {tab === "budget" && <BudgetTab hub={hub} />}
         {tab === "people" && <PeopleTab hub={hub} />}
       </div>
@@ -107,7 +105,19 @@ function BasicTab({ hub }: { hub: ProjectHub }) {
                   : "未排程"
             }
           />
-          <Light label="质量" tone="gray" text="未接入（M7 起）" />
+          <Light
+            label="质量"
+            tone={hub.quality.hasNodes ? hub.quality.light : "gray"}
+            text={
+              !hub.quality.hasNodes
+                ? "暂无验收"
+                : hub.quality.light === "green"
+                  ? "正常"
+                  : hub.quality.light === "yellow"
+                    ? "待验收"
+                    : "存在问题"
+            }
+          />
           <Light label="预算" tone="gray" text="未接入（M8 起）" />
           <span className="text-muted">
             整体进度：
@@ -369,6 +379,137 @@ function DesignTab({ hub }: { hub: ProjectHub }) {
         className="inline-block whitespace-nowrap text-[13px] text-accent-ink hover:underline underline-offset-4"
       >
         打开设计看板 →
+      </Link>
+    </div>
+  );
+}
+
+/* ── 质量验收 Tab（M7-e）：验收节点/问题聚合真数据；无节点诚实空态 ───── */
+
+// 与 quality 模块文案同源：跨模块禁引，故抄录；改文案须两处同步。
+// 节点 4 态 + 问题严重度/状态 label / badge variant 映射（status.ts 同源）。
+const NODE_STATUS_LABEL: Record<string, string> = {
+  pending: "待提交",
+  submitted: "待审核",
+  returned: "已退回",
+  passed: "已通过",
+};
+
+const NODE_BADGE_VARIANT: Record<string, BadgeVariant> = {
+  pending: "neutral",
+  submitted: "accent",
+  returned: "danger",
+  passed: "success",
+};
+
+const ISSUE_SEVERITY_LABEL: Record<string, string> = {
+  minor: "轻微",
+  normal: "一般",
+  major: "严重",
+};
+
+const ISSUE_SEVERITY_VARIANT: Record<string, BadgeVariant> = {
+  minor: "neutral",
+  normal: "warning",
+  major: "danger",
+};
+
+const ISSUE_STATUS_LABEL: Record<string, string> = {
+  open: "待整改",
+  rectified: "待复验",
+  closed: "已关闭",
+};
+
+const ISSUE_STATUS_VARIANT: Record<string, BadgeVariant> = {
+  open: "danger",
+  rectified: "warning",
+  closed: "neutral",
+};
+
+function QualityTab({ hub }: { hub: ProjectHub }) {
+  const q = hub.quality;
+  if (!q.hasNodes) {
+    return (
+      <div className="rounded-card border border-line bg-surface px-5 py-12 text-center">
+        <p className="text-[15px] font-medium text-secondary">暂无验收节点</p>
+        <p className="mx-auto mt-2 max-w-prose text-[13px] leading-relaxed text-muted">
+          工序完工后自动生成验收节点；排程推进到 100% 的工序将在此处出现。
+        </p>
+        <Link
+          href={`/quality?projectId=${hub.id}`}
+          className="mt-4 inline-block whitespace-nowrap text-[13px] text-accent-ink hover:underline underline-offset-4"
+        >
+          打开质量管控 →
+        </Link>
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-6">
+      <div className="rounded-card border border-line bg-surface p-5">
+        <div className="flex items-baseline justify-between gap-4">
+          <SectionTitle>验收节点</SectionTitle>
+          <span className="num text-[20px] font-semibold text-primary whitespace-nowrap">
+            共 {q.total}
+          </span>
+        </div>
+        <p className="mt-3 text-[13px] leading-relaxed text-secondary">
+          节点 {q.total} · 通过 {q.passed} · 待审 {q.submitted} · 退回{" "}
+          {q.returned} · 未关闭问题 {q.openIssues}
+        </p>
+        <ul className="mt-4 divide-y divide-line">
+          {q.nodes.map((n) => (
+            <li key={n.id} className="flex items-center gap-3 py-2 text-[13px]">
+              <span className="num w-6 shrink-0 text-secondary">{n.order}.</span>
+              <Link
+                href={`/quality/nodes/${n.id}`}
+                className="min-w-0 flex-1 truncate hover:underline underline-offset-4"
+              >
+                {n.name}
+              </Link>
+              <Badge variant={NODE_BADGE_VARIANT[n.status] ?? "neutral"}>
+                {NODE_STATUS_LABEL[n.status] ?? n.status}
+              </Badge>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div className="rounded-card border border-line bg-surface p-5">
+        <SectionTitle className="mb-3">未关闭问题</SectionTitle>
+        {q.recentIssues.length === 0 ? (
+          <p className="text-[13px] text-muted">无未关闭问题</p>
+        ) : (
+          <ul className="divide-y divide-line">
+            {q.recentIssues.map((i) => (
+              <li
+                key={i.id}
+                className="flex items-center gap-3 py-2 text-[13px]"
+              >
+                <span className="min-w-0 flex-1 truncate">{i.title}</span>
+                <Badge variant={ISSUE_SEVERITY_VARIANT[i.severity] ?? "neutral"}>
+                  {ISSUE_SEVERITY_LABEL[i.severity] ?? i.severity}
+                </Badge>
+                <Badge variant={ISSUE_STATUS_VARIANT[i.status] ?? "neutral"}>
+                  {ISSUE_STATUS_LABEL[i.status] ?? i.status}
+                </Badge>
+              </li>
+            ))}
+          </ul>
+        )}
+        <Link
+          href={`/quality/issues?projectId=${hub.id}`}
+          className="mt-4 inline-block whitespace-nowrap text-[13px] text-accent-ink hover:underline underline-offset-4"
+        >
+          查看问题台账 →
+        </Link>
+      </div>
+
+      <Link
+        href={`/quality?projectId=${hub.id}`}
+        className="inline-block whitespace-nowrap text-[13px] text-accent-ink hover:underline underline-offset-4"
+      >
+        打开质量管控 →
       </Link>
     </div>
   );

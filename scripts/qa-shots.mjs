@@ -185,6 +185,9 @@ const targets = [
   project
     ? { name: "09c-project-design", path: `/projects/${project.id}?tab=design` }
     : { name: "09c-project-design", path: "/projects/__none__" },
+  project
+    ? { name: "09d-project-quality", path: `/projects/${project.id}?tab=quality` }
+    : { name: "09d-project-quality", path: "/projects/__none__" },
   { name: "10-design-board", path: "/design" },
   { name: "11-design-mine", path: "/design?scope=mine" },
   designTask

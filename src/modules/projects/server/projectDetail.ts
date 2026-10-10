@@ -8,8 +8,10 @@ import { PROJECT_STATUS_LABEL, type ProjectStatus } from "@/core/domain/types";
 import {
   overallProgress,
   scheduleLight,
+  qualityLight,
   type Light,
 } from "@/core/domain/health";
+import { syncAcceptanceNodes } from "@/core/domain/acceptance";
 
 /**
  * 项目中心详情读模型（projects 模块 M4-b）。
@@ -18,6 +20,9 @@ import {
  * 排程聚合经 prisma 直读 ScheduleTask，工期口径复用 core/domain/health
  * （overallProgress / scheduleLight）；不 import schedule 模块内部。
  * 设计聚合经 prisma 直读 DesignTask 计数；不 import design 模块内部。
+ * 质量聚合：读前先 syncAcceptanceNodes 兜底（core 整合器，M7-e 调用点③），
+ * 再 prisma 直读 AcceptanceNode/Issue 计数；灯复用 core/domain/health.qualityLight
+ * （不改公式）；不 import quality 模块内部。
  */
 
 export interface HubCategory {
@@ -55,6 +60,27 @@ export interface HubDesign {
   };
 }
 
+export interface HubQuality {
+  hasNodes: boolean;
+  total: number;
+  passed: number;
+  submitted: number;
+  returned: number;
+  pending: number;
+  /** status !== "closed" 计数（§1-5 口径） */
+  openIssues: number;
+  light: Light;
+  /** order asc，≤11 行 */
+  nodes: { id: string; name: string; order: number; status: string }[];
+  /** 未关闭，createdAt desc，≤3 */
+  recentIssues: {
+    id: string;
+    title: string;
+    severity: string;
+    status: string;
+  }[];
+}
+
 export interface ProjectHub {
   id: string;
   code: string;
@@ -90,6 +116,7 @@ export interface ProjectHub {
   } | null;
   schedule: HubSchedule;
   design: HubDesign;
+  quality: HubQuality;
 }
 
 function fmtDate(d: Date | null): string | null {
@@ -125,6 +152,9 @@ export async function getProjectHub(projectId: string): Promise<ProjectHub | nul
     },
   });
   if (!project) return null;
+
+  // 调用点③（§1-1）：质量聚合前先同步验收节点（core 整合器兜底）。
+  await syncAcceptanceNodes(projectId);
 
   let quote: ProjectHub["quote"] = null;
   const q = project.quotes[0];
@@ -205,6 +235,56 @@ export async function getProjectHub(projectId: string): Promise<ProjectHub | nul
     byStatus,
   };
 
+  // ── 质量聚合（prisma 直读 AcceptanceNode/Issue，灯复用 core/domain/health；
+  //    不 import quality 模块内部。计数口径 §1-5：openIssues=未关闭问题，pendingNodes=未通过节点）──
+  const acceptanceNodes = await prisma.acceptanceNode.findMany({
+    where: { projectId },
+    select: { id: true, name: true, order: true, status: true },
+    orderBy: { order: "asc" },
+  });
+  const recentIssues = await prisma.issue.findMany({
+    where: { projectId, status: { not: "closed" } },
+    select: { id: true, title: true, severity: true, status: true },
+    orderBy: { createdAt: "desc" },
+    take: 3,
+  });
+  const openIssues = await prisma.issue.count({
+    where: { projectId, status: { not: "closed" } },
+  });
+  const nodeCounts: Record<string, number> = {
+    pending: 0,
+    submitted: 0,
+    returned: 0,
+    passed: 0,
+  };
+  for (const n of acceptanceNodes) {
+    if (n.status in nodeCounts) nodeCounts[n.status]++;
+  }
+  const totalNodes = acceptanceNodes.length;
+  const passed = nodeCounts.passed;
+  const quality: HubQuality = {
+    hasNodes: totalNodes > 0,
+    total: totalNodes,
+    passed,
+    submitted: nodeCounts.submitted,
+    returned: nodeCounts.returned,
+    pending: nodeCounts.pending,
+    openIssues,
+    light: qualityLight({ openIssues, pendingNodes: totalNodes - passed }),
+    nodes: acceptanceNodes.slice(0, 11).map((n) => ({
+      id: n.id,
+      name: n.name,
+      order: n.order,
+      status: n.status,
+    })),
+    recentIssues: recentIssues.map((i) => ({
+      id: i.id,
+      title: i.title,
+      severity: i.severity,
+      status: i.status,
+    })),
+  };
+
   return {
     id: project.id,
     code: project.code,
@@ -230,5 +310,6 @@ export async function getProjectHub(projectId: string): Promise<ProjectHub | nul
     quote,
     schedule,
     design,
+    quality,
   };
 }

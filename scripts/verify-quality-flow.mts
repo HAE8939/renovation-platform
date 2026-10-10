@@ -12,6 +12,9 @@
  *   DATABASE_URL="file:../_scratch/quality-flow.db" npx prisma migrate deploy
  *   DATABASE_URL="file:../_scratch/quality-flow.db" npx prisma db seed
  *   DATABASE_URL="file:../_scratch/quality-flow.db" npx tsx --tsconfig tsconfig.json scripts/verify-quality-flow.mts
+ * ⚠ 本脚本会**改库状态**：同一库不可直接重跑（会依据上次残留状态误报失败）。
+ *   每次运行前须先重置：把第 1 步换成 `npx prisma migrate reset --force --skip-generate`
+ *   （reset 自动重跑 seed），或删除该临时库文件后重走三步。
  * 退出码 0=全过，1=有 FAIL。临时库在 _scratch 下，不入库。
  */
 import { prisma } from "@/core/db";
@@ -34,6 +37,22 @@ const chk = (name: string, ok: boolean, detail = "") => {
 };
 
 async function main() {
+  // 库初态守卫：本脚本会改库、不可重跑（见头注 ⚠）。检测演示基线
+  // （fresh seed = 22 节点 / 1 问题；基线随 seed 演化同步更新此两数），
+  // 不符即视为上次运行残留 → 明确提示先重置，避免一串误导性级联失败。
+  const [baselineNodes, baselineIssues] = await Promise.all([
+    prisma.acceptanceNode.count(),
+    prisma.issue.count(),
+  ]);
+  if (baselineNodes !== 22 || baselineIssues !== 1) {
+    console.error(
+      `✗ 库非初始态（节点 ${baselineNodes}/22 · 问题 ${baselineIssues}/1，疑为上次运行残留）。\n` +
+        `  请先重置临时库再跑：\n` +
+        `  DATABASE_URL="file:../_scratch/quality-flow.db" npx prisma migrate reset --force --skip-generate`
+    );
+    process.exit(1);
+  }
+
   // 占位审核人（用于断言 Issue.reportedBy）
   const reviewer = await getPlaceholderUser("review");
   chk("前置：占位审核用户存在（pm/inspector）", !!reviewer, reviewer?.name ?? "无");
