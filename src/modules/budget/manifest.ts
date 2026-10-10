@@ -6,7 +6,9 @@ export const budgetManifest: ModuleManifest = {
   name: "装修预算报价",
   description: "按工程科目编制报价明细，实时汇总直接费、税金与单方造价",
   icon: "¥",
-  order: 1,
+  // order 调为 7（M7-a 对齐 PLAN §6 目标导航顺序 …schedule·quality·budget…，
+  // 仅动顺序不动路由；HAE 已知晓）。
+  order: 7,
   entryPath: "/budget",
   requiresAuth: false,
   nav: [

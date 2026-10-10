@@ -3,6 +3,7 @@ import { crmManifest } from "./crm/manifest";
 import { projectsManifest } from "./projects/manifest";
 import { designManifest } from "./design/manifest";
 import { scheduleManifest } from "./schedule/manifest";
+import { qualityManifest } from "./quality/manifest";
 import type { DeferredModule, ModuleManifest } from "./types";
 
 /**
@@ -17,6 +18,7 @@ export const modules: ModuleManifest[] = [
   projectsManifest,
   designManifest,
   scheduleManifest,
+  qualityManifest,
 ].sort((a, b) => a.order - b.order);
 
 /** DEFERRED 占位模块：首页可见、不可点、不进导航。
@@ -27,11 +29,6 @@ export const deferredModules: DeferredModule[] = [
     id: "dashboard",
     name: "数据驾驶舱",
     description: "在建项目、签单额、回款率、健康三色灯与全局待办的聚合首页",
-  },
-  {
-    id: "quality",
-    name: "质量管控",
-    description: "验收节点、SOP 检查项、质量问题台账与整改闭环",
   },
   {
     id: "finance",

@@ -2,6 +2,7 @@ import prisma from "@/core/db";
 import type { ScheduleTaskStatus } from "../types";
 import { applyProgressUpdate } from "../status";
 import { shiftDates } from "../plan";
+import { syncAcceptanceNodes } from "@/core/domain/acceptance";
 
 /**
  * 排程任务更新服务（M6-c）。
@@ -92,6 +93,7 @@ export async function updateTaskProgress(
     where: { id: taskId },
     select: {
       id: true,
+      projectId: true, // M7-a：进度联动同事务建/删验收节点需读 projectId
       progress: true,
       status: true,
       actualStart: true,
@@ -121,6 +123,9 @@ export async function updateTaskProgress(
         actualEnd: next.actualEnd,
       },
     });
+    // M7-a 调用点①：进度→100 即生验收节点 / 回落清 pending 节点（同事务，幂等）。
+    // syncAcceptanceNodes 是 quality 私有表唯一跨模块写入点（见 core/domain/acceptance.ts）。
+    await syncAcceptanceNodes(task.projectId, tx);
   });
 }
 

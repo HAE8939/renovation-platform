@@ -188,6 +188,7 @@ const targets = [
     path: `/schedule/${p.id}`,
   })),
   { name: "17-schedule-templates", path: "/schedule/templates" },
+  { name: "18-quality", path: "/quality" },
 ];
 
 const shot = (url, file) =>

@@ -2,6 +2,7 @@
 import { PrismaClient } from "@prisma/client";
 import { USER_ROLE, DEPARTMENT } from "../src/core/domain/types";
 import { buildSchedule, chainEdges } from "../src/modules/schedule/plan";
+import { syncAcceptanceNodes } from "../src/core/domain/acceptance";
 
 const prisma = new PrismaClient();
 
@@ -273,6 +274,8 @@ async function main() {
   await seedTaskSubmissions();
   // M6-a：工程排程 seed（模板 33 行 + 演示项目排程，幂等）。
   await seedSchedule();
+  // M7-a：质量管控 seed（检查项 35 条 + 演示节点流状态，幂等）。
+  await seedQuality();
 }
 
 /** M1a/M2-A 基础数据：组织 + 用户 + 客户 + 项目 + 报价 + 科目模板 + 线索。 */
@@ -1151,6 +1154,327 @@ async function createScheduleDeps(taskIds: string[]) {
       })
     )
   );
+}
+
+// ── M7-a 质量管控 seed ──────────────────────────────────────────
+// CheckItem 35 条（照抄 TASK_M7 §3 检查项清单表，11 工序）。
+// 文字为策展改写版，与参考素材对应但不整段照抄原文档。
+const CHECK_ITEMS: {
+  stage: string;
+  order: number;
+  name: string;
+  standard: string;
+}[] = [
+  { stage: "拆除工程", order: 1, name: "拆除范围核对", standard: "拆除边界与交底一致；承重结构、保留部位不得误拆" },
+  { stage: "拆除工程", order: 2, name: "现场原状交接", standard: "防盗门/门窗玻璃/下水/强电等原状逐项记录确认" },
+  { stage: "拆除工程", order: 3, name: "建渣清运", standard: "拆除垃圾清运完毕，现场具备下道工序进场条件" },
+  { stage: "水电工程", order: 1, name: "强弱电间距", standard: "强弱电管线间距≥30cm，交叉处做屏蔽处理" },
+  { stage: "水电工程", order: 2, name: "线管与穿线", standard: "线管无接头，管内穿线截面占比≤40%" },
+  { stage: "水电工程", order: 3, name: "水管排布", standard: "横平竖直、左热右冷；排水坡度 0.5%~1%" },
+  { stage: "水电工程", order: 4, name: "水压试验", standard: "试验压力 1.0MPa 保压 0.5h，压降<0.05MPa 且无渗漏" },
+  { stage: "泥工工程", order: 1, name: "垂直度与平整度", standard: "砌筑/抹灰垂直度、平整度符合验收标准" },
+  { stage: "泥工工程", order: 2, name: "空鼓率检查", standard: "墙面空鼓率受控，无大面积空鼓" },
+  { stage: "泥工工程", order: 3, name: "阴阳角方正", standard: "阴阳角方正顺直、无明显缺损" },
+  { stage: "防水工程", order: 1, name: "防水层质量", standard: "涂刷均匀、厚度达标，上翻高度符合规范" },
+  { stage: "防水工程", order: 2, name: "管根节点处理", standard: "管根、地漏、阴阳角加强层处理到位" },
+  { stage: "防水工程", order: 3, name: "闭水试验", standard: "蓄水深度≥2cm 静置 24h，楼下无渗漏" },
+  { stage: "地面工程", order: 1, name: "地面找平", standard: "找平层平整度合格，无空鼓起砂" },
+  { stage: "地面工程", order: 2, name: "地砖坡度", standard: "坡度朝向地漏，泼水无积水" },
+  { stage: "地面工程", order: 3, name: "地板留缝", standard: "留缝约 0.3mm 均匀一致（铺装阶段）" },
+  { stage: "墙面工程", order: 1, name: "基层处理", standard: "基层坚实、无空鼓开裂，防裂处理到位" },
+  { stage: "墙面工程", order: 2, name: "垂直与平整", standard: "墙面垂直度、平整度符合验收要求" },
+  { stage: "墙面工程", order: 3, name: "饰面观感", standard: "饰面排布规整、无明显色差" },
+  { stage: "天花工程", order: 1, name: "龙骨安装", standard: "龙骨间距合格、固定牢固，吊杆无松动" },
+  { stage: "天花工程", order: 2, name: "石膏板接缝", standard: "接缝错缝安装、防裂处理到位" },
+  { stage: "天花工程", order: 3, name: "防锈防潮", standard: "钉眼防锈、板材防潮处理到位" },
+  { stage: "乳胶漆工程", order: 1, name: "涂装前保护", standard: "开关、灯具、地面等成品保护到位" },
+  { stage: "乳胶漆工程", order: 2, name: "漆膜质量", standard: "漆膜丰满、无刷痕流挂、颜色均匀" },
+  { stage: "乳胶漆工程", order: 3, name: "分色线", standard: "分色线通直、边界清晰" },
+  { stage: "乳胶漆工程", order: 4, name: "阴阳角护角", standard: "阳角内置护角安装到位" },
+  { stage: "定制工程", order: 1, name: "板材进场核对", standard: "板材/五金品牌、规格与约定一致" },
+  { stage: "定制工程", order: 2, name: "安装牢固度", standard: "柜体安装牢固、水平垂直、收口平整" },
+  { stage: "定制工程", order: 3, name: "五金功能", standard: "铰链、滑轨、拉手开启顺畅无杂音" },
+  { stage: "水电安装", order: 1, name: "洁具安装", standard: "洁具安装牢固、密封良好，通水无渗漏" },
+  { stage: "水电安装", order: 2, name: "灯具开关插座", standard: "安装端正、通电功能正常" },
+  { stage: "水电安装", order: 3, name: "绝缘电阻", standard: "电路绝缘电阻实测合格" },
+  { stage: "竣工清洁", order: 1, name: "全屋清洁", standard: "全屋保洁达标、无施工残留" },
+  { stage: "竣工清洁", order: 2, name: "竣工质量验收", standard: "水电路复查合格、成品完好" },
+  { stage: "竣工清洁", order: 3, name: "资料移交", standard: "竣工资料、质保凭证移交齐全" },
+];
+
+async function seedQuality() {
+  // 工程侧用户：老郑（巡检·提交）/ 周工（PM·审核），由 seedSchedule upsert 创建。
+  // 此处只读不建：若未找到说明 seedSchedule 未跑，演示流无法落库 → 抛错指明前置。
+  const submitter = await prisma.user.findUnique({
+    where: { email: "laozheng@renovation.local" },
+    select: { id: true, name: true },
+  });
+  if (!submitter) {
+    throw new Error(
+      "quality seed 自检失败：未找到巡检用户老郑，请先运行 schedule seed"
+    );
+  }
+  const reviewer = await prisma.user.findUnique({
+    where: { email: "zhougong@renovation.local" },
+    select: { id: true, name: true },
+  });
+  if (!reviewer) {
+    throw new Error(
+      "quality seed 自检失败：未找到项目经理周工，请先运行 schedule seed"
+    );
+  }
+
+  // ── CheckItem 35 条（幂等：count==0 才灌）──
+  const checkItemCount = await prisma.checkItem.count();
+  if (checkItemCount === 0) {
+    await prisma.$transaction(
+      CHECK_ITEMS.map((it) => prisma.checkItem.create({ data: it }))
+    );
+  }
+  const realCheckItems = await prisma.checkItem.count();
+  const stageRows = await prisma.checkItem.groupBy({ by: ["stage"], _count: true });
+  const stageCount = stageRows.length;
+  if (realCheckItems !== 35 || stageCount !== 11) {
+    throw new Error(
+      `quality seed 自检失败：检查项应 35 条 11 工序，实际 ${realCheckItems} 条 ${stageCount} 工序`
+    );
+  }
+
+  // ── 物化：对全部项目调用 syncAcceptanceNodes（调用点④），由完工工序生成节点 ──
+  const allProjects = await prisma.project.findMany({ select: { id: true } });
+  for (const p of allProjects) {
+    await syncAcceptanceNodes(p.id);
+  }
+
+  // ── 演示流状态（幂等：issue.count()==0 才灌；灌前断言目标节点存在）──
+  const issueCount = await prisma.issue.count();
+  if (issueCount > 0) {
+    console.log(`已存在 ${issueCount} 条问题，M7-a 演示流状态 seed 跳过。`);
+  } else {
+    const DAY = 24 * 60 * 60 * 1000;
+    const addDays = (base: Date, n: number) => new Date(base.getTime() + n * DAY);
+
+    // 003「老街 21 号院」—— 拆除/水电 passed、泥工 returned + Issue
+    const p3 = await prisma.project.findUnique({
+      where: { code: "RP-2026-003" },
+      select: { id: true },
+    });
+    // 002「金域蓝湾 2 栋 802」—— 拆除 passed、水电 submitted
+    const p2 = await prisma.project.findUnique({
+      where: { code: "RP-2026-002" },
+      select: { id: true },
+    });
+    if (!p3 || !p2) {
+      throw new Error(
+        "quality seed 自检失败：未找到演示项目 002/003，请先运行 schedule seed"
+      );
+    }
+
+    // 取目标节点 + 对应任务的 actualEnd（提交时间取 actualEnd，审核时间取次日）
+    const fetchNodeAndTask = async (projectId: string, name: string) => {
+      const node = await prisma.acceptanceNode.findFirst({
+        where: { projectId, name },
+        select: { id: true },
+      });
+      if (!node) {
+        throw new Error(
+          `quality seed 自检失败：项目 ${projectId} 的「${name}」验收节点未生成（syncAcceptanceNodes 应已物化）`
+        );
+      }
+      const task = await prisma.scheduleTask.findFirst({
+        where: { projectId, name },
+        select: { actualEnd: true },
+      });
+      if (!task || !task.actualEnd) {
+        throw new Error(
+          `quality seed 自检失败：「${name}」任务未完工或无 actualEnd，无法取提交时间`
+        );
+      }
+      return { nodeId: node.id, actualEnd: task.actualEnd };
+    };
+
+    // 003 拆除工程 → passed（全 pass）
+    {
+      const { nodeId, actualEnd } = await fetchNodeAndTask(p3.id, "拆除工程");
+      await prisma.acceptanceNode.update({
+        where: { id: nodeId },
+        data: {
+          status: "passed",
+          submittedBy: submitter.id,
+          submittedAt: actualEnd,
+          reviewedBy: reviewer.id,
+          reviewedAt: addDays(actualEnd, 1),
+        },
+      });
+      await prisma.nodeCheck.updateMany({
+        where: { nodeId },
+        data: { result: "pass" },
+      });
+    }
+    // 003 水电工程 → passed（全 pass）
+    {
+      const { nodeId, actualEnd } = await fetchNodeAndTask(p3.id, "水电工程");
+      await prisma.acceptanceNode.update({
+        where: { id: nodeId },
+        data: {
+          status: "passed",
+          submittedBy: submitter.id,
+          submittedAt: actualEnd,
+          reviewedBy: reviewer.id,
+          reviewedAt: addDays(actualEnd, 1),
+        },
+      });
+      await prisma.nodeCheck.updateMany({
+        where: { nodeId },
+        data: { result: "pass" },
+      });
+    }
+    // 003 泥工工程 → returned（空鼓率检查 fail，其余 pass）+ Issue
+    {
+      const { nodeId, actualEnd } = await fetchNodeAndTask(p3.id, "泥工工程");
+      const returnReason = "厨卫墙面局部空鼓，需整改后复验";
+      await prisma.acceptanceNode.update({
+        where: { id: nodeId },
+        data: {
+          status: "returned",
+          submittedBy: submitter.id,
+          submittedAt: actualEnd,
+          reviewedBy: reviewer.id,
+          reviewedAt: addDays(actualEnd, 1),
+          returnReason,
+        },
+      });
+      // 先全 pass，再把「空鼓率检查」置 fail
+      await prisma.nodeCheck.updateMany({
+        where: { nodeId },
+        data: { result: "pass" },
+      });
+      await prisma.nodeCheck.updateMany({
+        where: { nodeId, name: "空鼓率检查" },
+        data: { result: "fail" },
+      });
+      // 关联 Issue（退回自动建；reportedBy=审核人=周工，assigneeId=周工）
+      await prisma.issue.create({
+        data: {
+          projectId: p3.id,
+          nodeId,
+          title: "泥工工程验收退回",
+          desc: returnReason,
+          severity: "normal",
+          status: "open",
+          reportedBy: reviewer.id,
+          assigneeId: reviewer.id,
+          dueDate: addDays(new Date(), 3),
+        },
+      });
+    }
+    // 002 拆除工程 → passed（全 pass）
+    {
+      const { nodeId, actualEnd } = await fetchNodeAndTask(p2.id, "拆除工程");
+      await prisma.acceptanceNode.update({
+        where: { id: nodeId },
+        data: {
+          status: "passed",
+          submittedBy: submitter.id,
+          submittedAt: actualEnd,
+          reviewedBy: reviewer.id,
+          reviewedAt: addDays(actualEnd, 1),
+        },
+      });
+      await prisma.nodeCheck.updateMany({
+        where: { nodeId },
+        data: { result: "pass" },
+      });
+    }
+    // 002 水电工程 → submitted（全 pass，待审核）
+    {
+      const { nodeId, actualEnd } = await fetchNodeAndTask(p2.id, "水电工程");
+      await prisma.acceptanceNode.update({
+        where: { id: nodeId },
+        data: {
+          status: "submitted",
+          submittedBy: submitter.id,
+          submittedAt: actualEnd,
+        },
+      });
+      await prisma.nodeCheck.updateMany({
+        where: { nodeId },
+        data: { result: "pass" },
+      });
+    }
+  }
+
+  // ── 自检断言（报数取 DB 真值）──
+  const [
+    realIssues,
+    p3NodeCount,
+    p2NodeCount,
+    p4NodeCount,
+    p1CompletedTasks,
+    p1Nodes,
+    p3Nini,
+    p2ShuiDian,
+    openIssues,
+  ] = await Promise.all([
+    prisma.issue.count(),
+    prisma.acceptanceNode.count({ where: { project: { code: "RP-2026-003" } } }),
+    prisma.acceptanceNode.count({ where: { project: { code: "RP-2026-002" } } }),
+    prisma.acceptanceNode.count({ where: { project: { code: "RP-2026-004" } } }),
+    prisma.scheduleTask.count({
+      where: { project: { code: "RP-2026-001" }, status: "completed" },
+    }),
+    prisma.acceptanceNode.count({
+      where: { project: { code: "RP-2026-001" } },
+    }),
+    prisma.acceptanceNode.findFirst({
+      where: { project: { code: "RP-2026-003" }, name: "泥工工程" },
+      select: { status: true },
+    }),
+    prisma.acceptanceNode.findFirst({
+      where: { project: { code: "RP-2026-002" }, name: "水电工程" },
+      select: { status: true },
+    }),
+    prisma.issue.count({ where: { status: "open" } }),
+  ]);
+
+  console.log(
+    `M7-a seed 完成：检查项 ${realCheckItems}（11 工序）· 问题 ${realIssues}（open ${openIssues}）· 节点 002=${p2NodeCount} / 003=${p3NodeCount} / 004=${p4NodeCount} / 001=${p1Nodes}（completed 任务 ${p1CompletedTasks}）`
+  );
+
+  if (realCheckItems !== 35 || stageCount !== 11) {
+    throw new Error(
+      `quality seed 自检失败：检查项应 35 条 11 工序，实际 ${realCheckItems} 条 ${stageCount} 工序`
+    );
+  }
+  if (p3NodeCount !== 11) {
+    throw new Error(`quality seed 自检失败：003 节点应 11，实际 ${p3NodeCount}`);
+  }
+  if (p2NodeCount !== 6) {
+    throw new Error(`quality seed 自检失败：002 节点应 6，实际 ${p2NodeCount}`);
+  }
+  if (p4NodeCount !== 0) {
+    throw new Error(`quality seed 自检失败：004 节点应 0，实际 ${p4NodeCount}`);
+  }
+  if (p1Nodes !== p1CompletedTasks) {
+    throw new Error(
+      `quality seed 自检失败：001 节点数 ${p1Nodes} 应等于 completed 任务数 ${p1CompletedTasks}`
+    );
+  }
+  if (realIssues !== 1 || openIssues !== 1) {
+    throw new Error(
+      `quality seed 自检失败：问题应 1 条 open，实际 ${realIssues} 条（open ${openIssues}）`
+    );
+  }
+  if (!p3Nini || p3Nini.status !== "returned") {
+    throw new Error(
+      `quality seed 自检失败：003 泥工节点应 returned，实际 ${p3Nini?.status ?? "（无节点）"}`
+    );
+  }
+  if (!p2ShuiDian || p2ShuiDian.status !== "submitted") {
+    throw new Error(
+      `quality seed 自检失败：002 水电节点应 submitted，实际 ${p2ShuiDian?.status ?? "（无节点）"}`
+    );
+  }
 }
 
 main()

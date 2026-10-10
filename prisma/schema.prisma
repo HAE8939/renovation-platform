@@ -87,6 +87,8 @@ model Project {
   lead      Lead?                        // 反向：签约线索（真源在 Lead.projectId @unique）
   designTasks DesignTask[]               // 反向：设计任务（M5-a，真源在 DesignTask.projectId）
   scheduleTasks ScheduleTask[]           // 反向：排程工序（M6-a，真源在 ScheduleTask.projectId）
+  acceptanceNodes AcceptanceNode[]       // 反向：验收节点（M7-a，真源在 AcceptanceNode.projectId）
+  issues    Issue[]                       // 反向：质量问题（M7-a，真源在 Issue.projectId）
 
   @@map("projects")
 }
@@ -314,4 +316,96 @@ model ScheduleTaskDependency {
 
   @@unique([taskId, dependsOnId])
   @@map("schedule_task_deps")
+}
+
+// ─────────────────────────────────────────────────────────────
+// 质量管控模块自有实体 (modules/quality) — M7-a
+// 节点/问题经 projectId 外键引用共享 core/domain Project；
+// node.taskId 为对 ScheduleTask 的【逻辑引用】（跨模块不建 @relation，仿 assigneeId 策略）。
+// 检查项库仅 seed 灌入（v5.1 无编辑页）。
+// ─────────────────────────────────────────────────────────────
+
+// 检查项库（SOP）：按 stage（=工序名，与 ProcessTemplate.name 同字面）映射 11 工序。
+model CheckItem {
+  id        String   @id @default(cuid())
+  stage     String   // 工序名，如"水电工程"
+  name      String   // 检查项名，如"强弱电间距"
+  standard  String   // 验收标准
+  order     Int      // 工序内排序
+  createdAt DateTime @default(now())
+
+  @@unique([stage, order])
+  @@map("check_items")
+}
+
+// 验收节点：工序完工自动生成（core 整合器），一工序一节点。
+model AcceptanceNode {
+  id           String    @id @default(cuid())
+  projectId    String
+  taskId       String?   @unique        // ★ 逻辑引用 ScheduleTask.id；清空排程后允许悬垂
+  name         String                    // 工序名快照
+  order        Int                       // 工序顺序快照
+  status       String    @default("pending") // pending|submitted|returned|passed
+  submitNote   String    @default("")    // 提交说明
+  submittedBy  String?                   // ★ userId（占位当前用户）
+  submittedAt  DateTime?
+  reviewedBy   String?                   // ★ userId
+  reviewedAt   DateTime?
+  returnReason String?                   // 退回原因（最近一次；详情页展示）
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  project Project     @relation(fields: [projectId], references: [id])
+  checks  NodeCheck[]
+  issues  Issue[]
+
+  @@index([projectId])
+  @@index([status])
+  @@map("acceptance_nodes")
+}
+
+// 节点检查项快照行：生成时从 CheckItem 拷入；提交时填结果。
+model NodeCheck {
+  id        String   @id @default(cuid())
+  nodeId    String
+  name      String   // 快照
+  standard  String   // 快照
+  order     Int
+  result    String?  // null=未检 | pass | fail
+  note      String   @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  node AcceptanceNode @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+
+  @@unique([nodeId, order])
+  @@map("node_checks")
+}
+
+// 问题台账：验收退回自动建；亦可手工新建。
+model Issue {
+  id          String    @id @default(cuid())
+  projectId   String
+  nodeId      String?                   // 来源节点（手工建可为空）
+  title       String                    // 问题标题
+  desc        String    @default("")    // 详细描述
+  severity    String    @default("normal") // minor|normal|major
+  status      String    @default("open")   // open|rectified|closed
+  reportedBy  String                    // ★ userId
+  assigneeId  String?                   // ★ 责任人 userId
+  dueDate     DateTime?                 // 截止日期
+  rectifyNote String?                   // 整改说明
+  rectifiedAt DateTime?
+  recheckNote String?                   // 复验意见（关闭/退回共用，取最近一次）
+  closedAt    DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  project Project         @relation(fields: [projectId], references: [id])
+  node    AcceptanceNode? @relation(fields: [nodeId], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+  @@index([status])
+  @@index([severity])
+  @@map("issues")
 }
