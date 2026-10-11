@@ -256,3 +256,17 @@ codebuddy 实现台账写入，集成者独立验收。自报 3 处不确定点�
 3. **`.mts` 是否被 `tsc --noEmit` 检查**：**已实测无碍**。`npx tsc --noEmit` exit 0；`npx tsx` 跑 flow 门禁 26/26 通过，脚本与既有 `verify-quality-flow.mts`/`verify-schedule-gen.mts` 同范式（`import { prisma } from "@/core/db"` 命名导出可用）。
 
 集成者独立验收：`pnpm build` 绿 + tsc 0 + **`verify-finance-flow.mts` 26/26**（隔离库 `_scratch/finance-flow.db` 三步）+ 七纯函数门禁零回退（quote37/crm11/health20/design28/schedule55/quality108/finance115）+ qa-shots 30 页全 200 + `/finance` 目检无回归 + **375 DOM 探针 scrollWidth=360≤375**（补 M8-a 欠的随页复核）。**未改 core/domain 或 seed.ts → 三既有集成门禁按 STATUS §8 规则无需重跑**。交互写回（浏览器点新建/编辑/删除看汇总即时变化）候 HAE 手测。
+
+## 11. M8-c 执行记录与集成者裁定（2026-10-11 合入）
+
+codebuddy 实现付款计划页，集成者独立验收。自报 5 处不确定点，逐条裁定（**本单元无真缺陷，五处均属合理判断**）：
+
+1. **`GeneratePlanForm` 与 `PaymentPlanBoard` 同文件导出**：**准**。空态生成按钮需 `useFormState`（客户端），不能放 server 页面；同文件两独立导出、页面按 `hasPlan` 条件渲染其一，合理。
+2. **清空按钮放 `PaymentPlanBoard` 内部**：**准**。两步确认 + 错误回显需客户端，与 board 同文件顶部，合理。
+3. **对照条 `ledgerContractIncome` 用 `prisma.aggregate` 直查 income+contract 切片**：**准**。`ledger.ts` 的 `receivedTotal` 是 Σ(全部 income)，对照条要的是 Σ(income & category=contract) 这个更窄的切片，`ledger.ts` 无对应函数；在 **service 层**用 `prisma.financeRecord.aggregate({where:{type:"income",category:"contract"}})` 直查（与 `records.ts` 的 `dbSums` 同范式），**未在页面写算式**，不违反单一口径。
+4. **保修金 `unlocksAt` 跨年月算术**：**准**。照 seed 的 `addMonthsUTC`（`Date.UTC` 构造器自动月份进位），未引 dayjs；004 无 `endDate`/`actualEndDate` → `warrantyBase=today`，`unlocksAt=today+12月`，门禁用同公式同 base 精确比对。
+5. **`verify-finance-flow.mts` 付款部分 28 断言（超卡文"约 14~18"）**：**准**。多出的是逐段 5×1 + 保修金 unlocksAt 拆 2 + unmarkPaid 三字段分拆 + 改验收状态后 FinanceRecord/PaymentNode 行数分拆，均属 §4-M8-c 清单自然覆盖，非灌水。
+
+**关键验证**：M7→段解锁派生回环（把 002 水电 `AcceptanceNode.status` 置 passed、**只改这张表不碰 finance 表**、重读 `paymentUnlockState` 即由未解锁变可收款、且段 `paid/amountDue` 不变）已由门禁断言证明——这条正是 `TASK_M7.md` §7-6 欠的回环闭环。`markPaid` 断言 `FinanceRecord` 行数不变（12→12）＝决策②两本账分离落地。
+
+集成者独立验收：`pnpm build` 绿 + tsc 0 + **`verify-finance-flow.mts` 54/54**（隔离库三步）+ 七纯函数门禁零回退（含 finance115）+ qa-shots 31 页全 200（含 `23-finance-payments`）+ `/finance/payments` 三态目检（001 已付+未解锁 / 003 带 missing 清单 / 004 空态生成禁用+链设置）+ **375 探针 scrollWidth=360≤375 无溢出**。**未改 payment.ts/ledger.ts/schema/seed → 三既有集成门禁无需重跑**。交互（点生成/清空/标记已付/撤销 + 质量页翻节点看计划页解锁）候 HAE 手测。
