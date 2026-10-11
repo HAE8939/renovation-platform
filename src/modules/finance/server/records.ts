@@ -16,7 +16,8 @@ import {
   receivedTotal,
 } from "@/core/domain/ledger";
 import { round2 } from "@/core/domain/pricing";
-import type { FinanceType } from "../types";
+import { categoriesFor, type FinanceCategory, type FinanceType } from "../types";
+import { getFinanceUser } from "../currentUser";
 
 /** 项目下拉选项（非 archived）。 */
 export interface ProjectOption {
@@ -174,4 +175,148 @@ export async function listRecords(
   };
 
   return { rows, projectOptions, summary };
+}
+
+// ── 写操作（M8-b）──────────────────────────────────────────────
+
+/** 台账业务错误：中文文案直达 UI（仿 QualityIssueError）。 */
+export class FinanceRecordError extends Error {}
+
+/** 合法收支类型集合（枚举校验用）。 */
+const VALID_TYPES: ReadonlySet<string> = new Set(["income", "expense"]);
+
+/** 新建/编辑记录的公共入参（全字段覆盖式编辑）。 */
+export interface RecordInput {
+  projectId: string;
+  type: string;
+  category: string;
+  amount: number;
+  dateIso: string;
+  description?: string;
+}
+
+/**
+ * 校验纯输入（开事务前）：type / category 匹配 / amount 正有限 / date 可解析 / description 去空白。
+ * 占位录入人也在事务前取（null → 拒绝）。返回可直接落库的归一化字段。
+ */
+function validateRecordInput(input: RecordInput): {
+  type: FinanceType;
+  category: FinanceCategory;
+  amount: number;
+  date: Date;
+  description: string;
+} {
+  if (!VALID_TYPES.has(input.type)) {
+    throw new FinanceRecordError("收支类型非法");
+  }
+  const type = input.type as FinanceType;
+  const cats = categoriesFor(type);
+  if (!cats.includes(input.category as FinanceCategory)) {
+    throw new FinanceRecordError("科目与收支类型不匹配");
+  }
+  const category = input.category as FinanceCategory;
+
+  // amount 必须为有限数且 > 0（方向由 type 决定，不接受负数）
+  const amount = Number(input.amount);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new FinanceRecordError("金额需为大于 0 的数字");
+  }
+
+  // dateIso 可解析为有效日期
+  const d = new Date(input.dateIso);
+  if (isNaN(d.getTime())) {
+    throw new FinanceRecordError("日期格式非法");
+  }
+
+  const description = (input.description ?? "").trim();
+
+  return { type, category, amount, date: d, description };
+}
+
+/**
+ * 新建收支记录（M8-b）。
+ * 守卫（纯输入校验在开事务前，存在性校验在事务内，仿 createIssue）：
+ * - type ∈ {income, expense}（「收支类型非法」）；
+ * - category ∈ categoriesFor(type)（「科目与收支类型不匹配」——防错账第一道闸）；
+ * - amount 有限数且 > 0（「金额需为大于 0 的数字」；方向由 type 决定、不接受负数）；
+ * - dateIso 可解析（「日期格式非法」）；
+ * - 占位录入人 getFinanceUser()，null → 「未找到录入人，请先运行 seed 初始化用户」；
+ * - description 去空白、可空（存 ""）。
+ * 事务内：project.findUnique 不存在 → 「项目不存在」。写 recordedBy=占位用户 id。
+ */
+export async function createRecord(input: RecordInput): Promise<{ id: string }> {
+  const { type, category, amount, date, description } = validateRecordInput(input);
+
+  const me = await getFinanceUser();
+  if (!me) {
+    throw new FinanceRecordError("未找到录入人，请先运行 seed 初始化用户");
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const project = await tx.project.findUnique({
+      where: { id: input.projectId },
+      select: { id: true },
+    });
+    if (!project) throw new FinanceRecordError("项目不存在");
+
+    const created = await tx.financeRecord.create({
+      data: {
+        projectId: input.projectId,
+        type,
+        category,
+        amount,
+        date,
+        description,
+        recordedBy: me.id,
+      },
+      select: { id: true },
+    });
+    return { id: created.id };
+  });
+}
+
+/**
+ * 编辑记录（M8-b，全字段覆盖式编辑）。
+ * 守卫同 createRecord；额外：id 不存在 → 「记录不存在」。
+ * 不改 recordedBy（保留原录入人=创建者）；updatedAt 由 @updatedAt 自动。
+ */
+export async function updateRecord(id: string, input: RecordInput): Promise<void> {
+  const { type, category, amount, date, description } = validateRecordInput(input);
+
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.financeRecord.findUnique({
+      where: { id },
+      select: { id: true, recordedBy: true },
+    });
+    if (!existing) throw new FinanceRecordError("记录不存在");
+
+    await tx.financeRecord.update({
+      where: { id },
+      data: {
+        type,
+        category,
+        amount,
+        date,
+        description,
+        // recordedBy 保留原值（不改录入人）
+        recordedBy: existing.recordedBy,
+      },
+    });
+  });
+}
+
+/**
+ * 删除记录（M8-b，硬删——单用户无回收站，TASK §4-M8-b）。
+ * id 不存在 → 「记录不存在」。删除不需要 getFinanceUser。
+ */
+export async function deleteRecord(id: string): Promise<void> {
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.financeRecord.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+    if (!existing) throw new FinanceRecordError("记录不存在");
+
+    await tx.financeRecord.delete({ where: { id } });
+  });
 }

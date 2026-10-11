@@ -1,13 +1,9 @@
 import Link from "next/link";
-import { Badge, Card, Table, Th, Td } from "@/core/ui";
 import { formatCny, formatPercent } from "@/core/domain/pricing";
-import {
-  CATEGORY_LABEL,
-  CATEGORY_TONE,
-} from "@/modules/finance/status";
-import type { FinanceCategory } from "@/modules/finance/types";
 import { listRecords } from "@/modules/finance/server/records";
 import { ViewToggle } from "./ViewToggle";
+import { NewRecordModal } from "./NewRecordModal";
+import { FinanceLedger } from "./FinanceLedger";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "财务管控" };
@@ -25,16 +21,6 @@ function MarginDot({ light }: { light: "green" | "yellow" | "red" | "neutral" })
   return (
     <span aria-hidden className={`inline-block h-2 w-2 shrink-0 rounded-full ${cls}`} />
   );
-}
-
-/** 仅日期。 */
-function formatDate(d: Date | null): string {
-  if (!d) return "—";
-  return new Date(d).toLocaleDateString("zh-CN", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
 }
 
 /** 汇总条单格：标签 + 金额 + 可选色点。无阴影、气声描边。 */
@@ -64,11 +50,11 @@ function StatBox({
 }
 
 /**
- * 收支台账只读页（M8-a）。
+ * 收支台账页（M8-a 只读 + M8-b 写入）。
  * - ?view=income|expense 双 Tab（默认收入）；?projectId= 项目筛选。
  * - 汇总条口径不受 Tab 切换影响（取全部记录口径）。
  * - 待收款（合同额−已收，缺口口径）与计划未付合计（Σ 未付段 amountDue）分列两框（§7-12）。
- * - 本单元不放新建按钮（M8-b 才接写）。
+ * - 表格抽成客户端 FinanceLedger（行可点开编辑/删除抽屉）；汇总与筛选留 server。
  */
 export default async function FinanceLedgerPage({
   searchParams,
@@ -98,7 +84,14 @@ export default async function FinanceLedgerPage({
               展示五段应收与解锁进度。
             </p>
           </div>
-          <ViewToggle view={view} />
+          <div className="flex flex-wrap items-center gap-4">
+            <NewRecordModal
+              projects={projectOptions}
+              defaultView={view}
+              defaultProjectId={projectId ?? null}
+            />
+            <ViewToggle view={view} />
+          </div>
         </div>
       </header>
 
@@ -174,54 +167,14 @@ export default async function FinanceLedgerPage({
         </div>
 
         {rows.length > 0 ? (
-          <Card padded={false} className="mt-3">
-            <Table>
-              <thead>
-                <tr>
-                  <Th>日期</Th>
-                  <Th>科目</Th>
-                  <Th>摘要</Th>
-                  <Th>项目</Th>
-                  <Th align="right">金额</Th>
-                  <Th>录入人</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r) => (
-                  <tr key={r.id}>
-                    <Td className="num text-secondary whitespace-nowrap">
-                      {formatDate(r.date)}
-                    </Td>
-                    <Td>
-                      <Badge variant={CATEGORY_TONE[r.category as FinanceCategory] ?? "neutral"}>
-                        {CATEGORY_LABEL[r.category as FinanceCategory] ?? r.category}
-                      </Badge>
-                    </Td>
-                    <Td className="text-primary">
-                      <span className="block max-w-[18rem] truncate" title={r.description}>
-                        {r.description || "—"}
-                      </span>
-                    </Td>
-                    <Td className="text-secondary">{r.projectName}</Td>
-                    <Td
-                      align="right"
-                      className="num whitespace-nowrap font-medium text-primary"
-                    >
-                      {formatCny(r.amount)}
-                    </Td>
-                    <Td className="text-secondary">{r.recordedByName ?? "—"}</Td>
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
-          </Card>
+          <FinanceLedger rows={rows} />
         ) : (
           <div className="mt-3 rounded-card border border-line bg-surface px-8 py-12 text-center">
             <p className="text-[15px] font-medium text-primary">
               暂无{view === "income" ? "收入" : "支出"}记录——台账手工录入
             </p>
             <p className="mt-2 text-[13px] leading-relaxed text-secondary">
-              录入入口将在 M8-b 上线；届时可在本页新建、编辑与删除收支记录。
+              点击右上角「+ 新建记录」录入第一笔。
             </p>
           </div>
         )}
