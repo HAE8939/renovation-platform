@@ -193,6 +193,8 @@ const targets = [
     ? { name: "09d-project-quality", path: `/projects/${project.id}?tab=quality` }
     : { name: "09d-project-quality", path: "/projects/__none__" },
   { name: "24-fields", path: "/fields" },
+  // M9-d：平台设置页（主题四套选择器 + Logo；目检色块预览是否正确取到各插槽色）
+  { name: "25-settings", path: "/settings" },
   // M9-c c-2：带自定义字段筛选深链的项目列表（目检"已按自定义字段筛选"行与结果数是否对得上）
   { name: "06b-projects-cfv", path: "/projects?cfv=warranty_years:3" },
   { name: "10-design-board", path: "/design" },

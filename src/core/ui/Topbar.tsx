@@ -39,7 +39,20 @@ export function Topbar({ modules }: TopbarProps) {
           <span className="text-sm font-semibold">{PLATFORM.name}</span>
         )}
       </div>
-      <span className="hidden text-xs text-muted sm:inline">{PLATFORM.status}</span>
+      <div className="flex items-center gap-4">
+        <span className="hidden text-xs text-muted sm:inline">{PLATFORM.status}</span>
+        {/* 平台设置入口（M9-d）：主题 + Logo，属平台工具，不进业务模块导航，故放顶栏。 */}
+        <Link
+          href="/settings"
+          className={`text-xs transition-colors duration-150 hover:text-accent-ink ${
+            pathname === "/settings" || pathname.startsWith("/settings/")
+              ? "font-medium text-accent-ink"
+              : "text-secondary"
+          }`}
+        >
+          设置
+        </Link>
+      </div>
     </header>
   );
 }

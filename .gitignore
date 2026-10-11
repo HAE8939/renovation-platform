@@ -35,6 +35,9 @@ prisma/dev.db-journal
 prisma/dev.db-wal
 prisma/dev.db-shm
 
+# 用户上传的品牌 Logo（M9-d）：落盘即生效，不进版本库（服务端按需 mkdir，无需占位文件）
+/public/uploads/
+
 # vercel
 .vercel
 

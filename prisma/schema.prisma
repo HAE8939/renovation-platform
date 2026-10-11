@@ -542,3 +542,21 @@ model CustomFieldValue {
   @@index([fieldId, valueDate])
   @@map("custom_field_values")
 }
+
+// ─────────────────────────────────────────────────────────────
+// M9-d 平台设置（PlatformSetting）—— 主题切换 + 品牌 Logo（core 平台原语，非业务模块）
+// 决策 R1 / TASK_M9 决策 7：**只存插槽键名**（cobalt/rust/emerald/teal），绝不存自由色值——
+// 否则客户能自助调出对比度不达标的主题、拆掉 V0.3 对比度零点纪律。键名口径唯一真源在
+// src/core/domain/theme.ts；实际四套色值只在 tokens.css。脏键读取时经 normalizeThemeKey 回落。
+// 单用户免登录 → 全平台一行（id 固定 "platform"，服务层 get-or-create）。
+// logoFile 只存**文件名**（非路径、非 URL）：文件落在 public/uploads/branding/（gitignore），
+// 渲染时拼固定目录 → 客户端永远无法借文件名做路径穿越；目录与命名由服务端单点生成。
+// ─────────────────────────────────────────────────────────────
+model PlatformSetting {
+  id       String  @id @default("platform") // 单例行主键固定字面量（免 cuid 漂移）
+  themeKey String  @default("cobalt")        // 主题插槽键名，仅认 theme.ts 的四套
+  logoFile String?                            // 品牌 Logo 文件名；null=未上传（品牌区回落文字标识）
+  updatedAt DateTime @updatedAt
+
+  @@map("platform_settings")
+}

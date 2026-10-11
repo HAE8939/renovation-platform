@@ -2,7 +2,16 @@
    MT Creator Design System V0.3 → CSS variables
    首次落成。值以 V0.3 为唯一真源，禁止凭感觉改。
    Accent 换钴蓝主题（V0.3 §2.4）：铁锈红默认色与 --danger 撞车，故整族替换。
-   只改 --accent 一族四个值，其余 token 保持 V0.3 默认。
+   只改 --accent 一族，其余 token（纸底 / 灰阶 / 描边 / 状态 / 圆角 / 字体）保持 V0.3 默认。
+
+   主题切换（M9-d）：`--accent` 一族现为**四值**——accent / ink / tint / fg。
+   · --accent      强调色（选中块 / 主按钮底）
+   · --accent-ink  强调色做文字 / 图标 / 小字（对纸底达标的深色）
+   · --accent-tint 强调色的浅晕（选中行淡底 / hover 晕 / 标签底）
+   · --accent-fg   主按钮上的前景字色（V0.3：浅强调色上不许用白字，故 teal 落深墨、余三套白）
+   :root 存钴蓝作**回落**（无 data-theme 或脏值时）；各 `data-theme` 选择器块覆盖一族四值。
+   键名口径唯一真源在 src/core/domain/theme.ts；两处键集合由 scripts/verify-theme.mjs 交叉锁死。
+   色值取自 docs/preview/theme-picker.html（已评审的四套实测值，未做任何调色）。
    ──────────────────────────────────────────────────────────────── */
 
 :root {
@@ -16,10 +25,11 @@
   --text-secondary: #6E6A5E;  /* 注释/元数据/时间戳，对纸 4.8:1 */
   --text-disabled: #A8A294;   /* 禁用，2.5–3:1 */
 
-  /* ── Accent（钴蓝主题，V0.3 §2.4）───────────────────────────── */
+  /* ── Accent（钴蓝主题，默认与回落）──────────────────────────── */
   --accent: #3368A0;       /* 选中块 / 主按钮，白字 5.8:1 */
   --accent-ink: #2A4E7A;   /* accent 做文字 / 图标 / 小字 */
   --accent-tint: #DCE8F4;  /* 选中行淡底 / hover 晕 / 标签底 */
+  --accent-fg: #FFFFFF;    /* 主按钮前景（钴蓝上白字达标） */
 
   /* ── Line（气声描边，对纸 ≈1.15:1，不许更重）─────────────────── */
   --border: #E7E1D6;
@@ -40,4 +50,37 @@
     "Noto Sans SC", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono", "Maple Mono", ui-monospace, "SFMono-Regular",
     Menlo, Consolas, monospace;
+}
+
+/* ── 主题插槽：每套只重写 --accent 一族四值，其余 token 一律不动 ──
+   外壳读 PlatformSetting.themeKey 后打在 <html data-theme="...">（M9-d）。
+   无属性时落 :root 的钴蓝回落；脏键在 normalizeThemeKey 处即被归一，不会命中不到。 */
+
+:root[data-theme="cobalt"] {
+  --accent: #3368A0;
+  --accent-ink: #2A4E7A;
+  --accent-tint: #DCE8F4;
+  --accent-fg: #FFFFFF;
+}
+
+:root[data-theme="rust"] {
+  --accent: #B7472A;
+  --accent-ink: #7A2E1A;
+  --accent-tint: #F3E3DB;
+  --accent-fg: #FFFFFF;
+}
+
+:root[data-theme="emerald"] {
+  --accent: #009473;
+  --accent-ink: #0B5C47;
+  --accent-tint: #DBF0EB;
+  --accent-fg: #FFFFFF;
+}
+
+:root[data-theme="teal"] {
+  /* 浅青底上白字「发飘」（≈1.6:1），主按钮前景改用深墨＝同套 --accent-ink。 */
+  --accent: #81D8D0;
+  --accent-ink: #0A7680;
+  --accent-tint: #E2F2F0;
+  --accent-fg: #0A7680;
 }
