@@ -270,3 +270,15 @@ codebuddy 实现付款计划页，集成者独立验收。自报 5 处不确定�
 **关键验证**：M7→段解锁派生回环（把 002 水电 `AcceptanceNode.status` 置 passed、**只改这张表不碰 finance 表**、重读 `paymentUnlockState` 即由未解锁变可收款、且段 `paid/amountDue` 不变）已由门禁断言证明——这条正是 `TASK_M7.md` §7-6 欠的回环闭环。`markPaid` 断言 `FinanceRecord` 行数不变（12→12）＝决策②两本账分离落地。
 
 集成者独立验收：`pnpm build` 绿 + tsc 0 + **`verify-finance-flow.mts` 54/54**（隔离库三步）+ 七纯函数门禁零回退（含 finance115）+ qa-shots 31 页全 200（含 `23-finance-payments`）+ `/finance/payments` 三态目检（001 已付+未解锁 / 003 带 missing 清单 / 004 空态生成禁用+链设置）+ **375 探针 scrollWidth=360≤375 无溢出**。**未改 payment.ts/ledger.ts/schema/seed → 三既有集成门禁无需重跑**。交互（点生成/清空/标记已付/撤销 + 质量页翻节点看计划页解锁）候 HAE 手测。
+
+## 12. M8-d 执行记录与集成者裁定（2026-10-11 合入 → M8 全案结案）
+
+codebuddy 实现项目中心接线 + 视觉收口，集成者独立验收。自报 3 处不确定点，逐条裁定（**本单元无真缺陷，三处均属合理判断**）：
+
+1. **预算灯文案「已收 x%」与工期/质量灯状态词格式不对称**：**准**。§1-3 决策③明确「预算灯语义=合同执行/收款进度，文案改『已收 x%』免误读」——它是数值进度不是三态判定，与工期「正常/预警/超期」、质量「正常/待验收/存在问题」本就不同语义，不对称是对的，未自创额外状态词。
+2. **汇总条阶梯选「毛利独占一行 + 余五格 `lg:grid-cols-5`」而非 col-span-2**：**准**。xl 六格 + col-span-2 需 7 格位产生不规则换行（2+5=7），独占一行更干净，且 V0.3 §7.4「慎用 50/50」精神更彻底（主级/次级两层而非三档混排）。靠字号（28 vs 17）与换行成阶梯，不靠粗线或花哨色，守单点 accent。
+3. **`marginLight` 与 `budgetLight` 在项目中心同屏**：**准**。预算灯位只接 `budgetLight`（收款进度），毛利卡色点接 `marginLight`（毛利率色档），两者语义不同、不同灯位（§1-3、§7-12），未在项目中心三灯位外新增第四灯位（不扩范围）。
+
+**跨模块读铁律复核**：`projectDetail.ts` 财务块 prisma 直读 `financeRecord` + 口径调 `core/domain/ledger.ts`/`health.ts`，**未 import `modules/finance/**` 内部**；M7 两处文案**只写 URL 链、不读 finance 表**。诚实降级复核：合同额≤0 → 预算灯灰「未录入合同额」、毛利率「—」+「不可算」，不假绿不造 0%（001 实测「已收 30%」绿、毛利 ¥21,700/35% 绿与 seed 吻合）。
+
+集成者独立验收：`pnpm build` 绿 + tsc 0 + 七纯函数门禁零回退（quote37/crm11/health20/design28/schedule55/quality108/finance115）+ qa-shots 31 页全 200 + 目检四件（09 毛利卡 / 08b 预算灯「已收 30%」/ 22 汇总条毛利主级 / 19c passed 横幅付款计划链）+ **375 探针 /finance 与 /projects/[id] 均 scrollWidth=360≤375 无溢出**。**未改 core/seed → 三既有集成门禁免重跑**。**M8 财务基础四单元（a 基座 / b 台账 / c 付款计划含 M7→段解锁回环 / d 项目中心接线）全部结案**，下一步 M9（变更单/利润分析/PlatformSetting/商务漏斗/EAV，候 HAE 定范围）。
