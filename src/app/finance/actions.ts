@@ -8,6 +8,13 @@ import {
   deleteRecord,
   type RecordInput,
 } from "@/modules/finance/server/records";
+import {
+  PaymentPlanError,
+  generatePlan,
+  clearPlan,
+  markPaid,
+  unmarkPaid,
+} from "@/modules/finance/server/payments";
 
 /**
  * 财务管控 Server Action（M8-b，仿 quality/actions.ts）。
@@ -85,6 +92,90 @@ export async function deleteRecordAction(
   } catch (e) {
     if (e instanceof FinanceRecordError) return { error: e.message };
     console.error("[deleteRecordAction]", e);
+    return { error: "操作失败，请稍后重试" };
+  }
+}
+
+// ── 付款计划（M8-c）─────────────────────────────────────────────
+
+/** 付款计划 Action 状态（与 FinanceFormState 同形，独立命名便于扩展）。 */
+export interface PaymentActionState {
+  error?: string;
+  ok?: boolean;
+}
+
+/** 生成付款计划：generatePlan(projectId)。FormData: projectId。 */
+export async function generatePlanAction(
+  _prev: PaymentActionState,
+  formData: FormData
+): Promise<PaymentActionState> {
+  try {
+    const projectId = String(formData.get("projectId") ?? "").trim();
+    if (!projectId) return { error: "缺少项目标识，请刷新页面后重试" };
+
+    await generatePlan(projectId);
+    revalidatePath("/finance/payments");
+    return { ok: true };
+  } catch (e) {
+    if (e instanceof PaymentPlanError) return { error: e.message };
+    console.error("[generatePlanAction]", e);
+    return { error: "操作失败，请稍后重试" };
+  }
+}
+
+/** 清空付款计划：clearPlan(projectId)。FormData: projectId。 */
+export async function clearPlanAction(
+  _prev: PaymentActionState,
+  formData: FormData
+): Promise<PaymentActionState> {
+  try {
+    const projectId = String(formData.get("projectId") ?? "").trim();
+    if (!projectId) return { error: "缺少项目标识，请刷新页面后重试" };
+
+    await clearPlan(projectId);
+    revalidatePath("/finance/payments");
+    return { ok: true };
+  } catch (e) {
+    if (e instanceof PaymentPlanError) return { error: e.message };
+    console.error("[clearPlanAction]", e);
+    return { error: "操作失败，请稍后重试" };
+  }
+}
+
+/** 标记已付：markPaid(id)。FormData: id。 */
+export async function markPaidAction(
+  _prev: PaymentActionState,
+  formData: FormData
+): Promise<PaymentActionState> {
+  try {
+    const id = String(formData.get("id") ?? "").trim();
+    if (!id) return { error: "缺少段标识，请刷新页面后重试" };
+
+    await markPaid(id);
+    revalidatePath("/finance/payments");
+    return { ok: true };
+  } catch (e) {
+    if (e instanceof PaymentPlanError) return { error: e.message };
+    console.error("[markPaidAction]", e);
+    return { error: "操作失败，请稍后重试" };
+  }
+}
+
+/** 撤销已付：unmarkPaid(id)。FormData: id。 */
+export async function unmarkPaidAction(
+  _prev: PaymentActionState,
+  formData: FormData
+): Promise<PaymentActionState> {
+  try {
+    const id = String(formData.get("id") ?? "").trim();
+    if (!id) return { error: "缺少段标识，请刷新页面后重试" };
+
+    await unmarkPaid(id);
+    revalidatePath("/finance/payments");
+    return { ok: true };
+  } catch (e) {
+    if (e instanceof PaymentPlanError) return { error: e.message };
+    console.error("[unmarkPaidAction]", e);
     return { error: "操作失败，请稍后重试" };
   }
 }

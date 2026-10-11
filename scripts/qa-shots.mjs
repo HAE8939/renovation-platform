@@ -219,6 +219,7 @@ const targets = [
     ? { name: "21b-quality-archive-project", path: `/quality/archive/${archiveProject.id}` }
     : { name: "21b-quality-archive-project", path: "/quality/archive/__none__" },
   { name: "22-finance", path: "/finance" },
+  { name: "23-finance-payments", path: "/finance/payments" },
 ];
 
 const shot = (url, file) =>

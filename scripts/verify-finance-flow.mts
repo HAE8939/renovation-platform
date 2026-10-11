@@ -3,9 +3,11 @@
  *
  * 为什么存在：verify-finance.mjs 只断言纯函数；createRecord / updateRecord / deleteRecord
  * 的事务、守卫、联动路径必须真跑生产服务层才能覆盖——承 M3-d2 教训（跨函数事务不共享
- * 连接，只有端到端集成能抓）。本脚本覆盖 M8-b 台账部分：建/改/删后
- * receivedTotal/expenseTotal/grossProfit/marginRate 在同请求内即时复算正确；
- * 非法类别拒绝 / 负数·零·NaN 金额拒绝 / 不存在项目拒绝 / 科目与类型不匹配拒绝。
+ * 连接，只有端到端集成能抓）。本脚本覆盖：
+ * - M8-b 台账部分：建/改/删后 receivedTotal/expenseTotal/grossProfit/marginRate 在同请求内
+ *   即时复算正确；非法类别拒绝 / 负数·零·NaN 金额拒绝 / 不存在项目拒绝 / 科目与类型不匹配拒绝。
+ * - M8-c 付款部分：生成逐段一致 / 重复生成拒 / 清空守卫 / 标记已付+撤销（不建 FinanceRecord）/
+ *   未解锁拒标记 / M7 验收 passed → 付款段派生解锁回环 / 改合同额不回溯快照。
  *
  * 运行配方（三步，指向一个临时库；在仓库根跑）：
  *   ① DATABASE_URL="file:../_scratch/finance-flow.db" npx prisma migrate reset --force --skip-generate
@@ -22,6 +24,15 @@ import {
   updateRecord,
   deleteRecord,
 } from "@/modules/finance/server/records";
+import {
+  PaymentPlanError,
+  generatePlan,
+  clearPlan,
+  markPaid,
+  unmarkPaid,
+  getPlanView,
+} from "@/modules/finance/server/payments";
+import { buildPaymentPlan } from "@/modules/finance/payment";
 import {
   expenseTotal,
   grossProfit,
@@ -440,6 +451,286 @@ async function main() {
       e instanceof Error ? e.message : "非 Error"
     );
   }
+
+  // ── 付款部分（M8-c）──────────────────────────────────────────
+  // 覆盖：生成逐段一致 / 重复生成拒 / 清空守卫 / 标记已付+撤销 /
+  //       未解锁拒标记 / M7→段解锁派生回环 / 改合同额不回溯快照。
+
+  /** UTC 月算术（照 seed / payments.ts 写法，别引 dayjs）。 */
+  const addMonthsUTC = (base: Date, months: number) =>
+    new Date(
+      Date.UTC(base.getUTCFullYear(), base.getUTCMonth() + months, base.getUTCDate())
+    );
+
+  // 前置：取演示项目 002/003/004
+  const [p2, p3, p4] = await Promise.all([
+    prisma.project.findUnique({
+      where: { code: "RP-2026-002" },
+      select: { id: true, contractAmount: true, endDate: true, actualEndDate: true },
+    }),
+    prisma.project.findUnique({
+      where: { code: "RP-2026-003" },
+      select: { id: true },
+    }),
+    prisma.project.findUnique({
+      where: { code: "RP-2026-004" },
+      select: { id: true, contractAmount: true, endDate: true, actualEndDate: true },
+    }),
+  ]);
+  if (!p2 || !p3 || !p4)
+    throw new Error("前置失败：未找到演示项目 002/003/004，请先跑 prisma db seed");
+
+  // ── 7) 生成逐段一致 ──────────────────────────────────────────
+  // 004 contractAmount=0 → generatePlan 拒绝
+  try {
+    await generatePlan(p4.id);
+    chk("付款：004 contractAmount=0 generatePlan → 抛错", false, "未抛错");
+  } catch (e) {
+    chk(
+      "付款：004 contractAmount=0 → 「先在项目设置录入合同额」",
+      e instanceof PaymentPlanError && e.message === "先在项目设置录入合同额",
+      e instanceof Error ? e.message : "非 Error"
+    );
+  }
+
+  // 给 004 设 contractAmount=100000 后 generatePlan
+  await prisma.project.update({
+    where: { id: p4.id },
+    data: { contractAmount: 100000 },
+  });
+  await generatePlan(p4.id);
+  const p4Nodes = await prisma.paymentNode.findMany({
+    where: { projectId: p4.id },
+    orderBy: { order: "asc" },
+  });
+  chk("付款：004 generatePlan → 5 段", p4Nodes.length === 5, `${p4Nodes.length}`);
+
+  // 逐段 amountDue/percent/trigger 与 buildPaymentPlan(100000) 一致
+  const expectedPlan = buildPaymentPlan(100000);
+  for (let i = 0; i < 5; i++) {
+    const exp = expectedPlan[i];
+    const act = p4Nodes[i];
+    chk(
+      `付款：004 段${i + 1}（${exp.name}）amountDue/percent/trigger 一致`,
+      centEq(act.amountDue, exp.amountDue) &&
+        act.percent === exp.percent &&
+        act.trigger === exp.trigger,
+      `amountDue ${act.amountDue} vs ${exp.amountDue}, percent ${act.percent} vs ${exp.percent}, trigger ${act.trigger} vs ${exp.trigger}`
+    );
+  }
+
+  // Σ 恰等 100000（cent 硬精确）
+  const p4Sum = p4Nodes.reduce((s, n) => s + n.amountDue, 0);
+  chk("付款：004 五段之和 = 100000", centEq(p4Sum, 100000), `${p4Sum}`);
+
+  // 保修金段 unlocksAt 非空且 = 竣工+12月
+  const warrantyNode = p4Nodes.find((n) => n.order === 5);
+  const p4WarrantyBase = p4.actualEndDate ?? p4.endDate ?? new Date();
+  const p4ExpectedUnlock = addMonthsUTC(p4WarrantyBase, 12);
+  chk(
+    "付款：004 保修金段 unlocksAt 非空",
+    !!warrantyNode?.unlocksAt,
+    warrantyNode?.unlocksAt?.toISOString() ?? "null"
+  );
+  chk(
+    "付款：004 保修金段 unlocksAt = 竣工+12月",
+    warrantyNode?.unlocksAt?.getTime() === p4ExpectedUnlock.getTime(),
+    `${warrantyNode?.unlocksAt?.toISOString()} vs ${p4ExpectedUnlock.toISOString()}`
+  );
+
+  // ── 8) 重复生成拒 ────────────────────────────────────────────
+  try {
+    await generatePlan(p4.id);
+    chk("付款：004 重复 generatePlan → 抛错", false, "未抛错");
+  } catch (e) {
+    chk(
+      "付款：004 重复 generatePlan → 「已存在付款计划，请先清空再生成」",
+      e instanceof PaymentPlanError &&
+        e.message === "已存在付款计划，请先清空再生成",
+      e instanceof Error ? e.message : "非 Error"
+    );
+  }
+
+  // ── 9) 清空守卫 ──────────────────────────────────────────────
+  // 003 有 paid 段 → clearPlan 拒绝
+  try {
+    await clearPlan(p3.id);
+    chk("付款：003 clearPlan（有 paid 段）→ 抛错", false, "未抛错");
+  } catch (e) {
+    chk(
+      "付款：003 clearPlan → 「已标记已付的段不可清空…」",
+      e instanceof PaymentPlanError &&
+        e.message.includes("已标记已付的段不可清空"),
+      e instanceof Error ? e.message : "非 Error"
+    );
+  }
+
+  // 004 无 paid 段 → clearPlan 成功、段数归 0
+  await clearPlan(p4.id);
+  const p4CountAfterClear = await prisma.paymentNode.count({
+    where: { projectId: p4.id },
+  });
+  chk("付款：004 clearPlan → 段数归 0", p4CountAfterClear === 0, `${p4CountAfterClear}`);
+
+  // ── 10) 标记已付 + 撤销 ───────────────────────────────────────
+  // 重新生成 004 计划
+  await generatePlan(p4.id);
+  const p4o1 = await prisma.paymentNode.findFirst({
+    where: { projectId: p4.id, order: 1 },
+    select: { id: true },
+  });
+  if (!p4o1) throw new Error("前置失败：004 重新生成后未找到 order1");
+
+  // markPaid → paid=true 且 paidBy=占位用户
+  const frCountBeforeMark = await prisma.financeRecord.count();
+  await markPaid(p4o1.id);
+  const p4o1AfterMark = await prisma.paymentNode.findUnique({
+    where: { id: p4o1.id },
+    select: { paid: true, paidBy: true },
+  });
+  chk("付款：004 order1 markPaid → paid=true", p4o1AfterMark?.paid === true);
+  chk(
+    "付款：004 order1 markPaid → paidBy=占位用户",
+    p4o1AfterMark?.paidBy === me?.id,
+    `${p4o1AfterMark?.paidBy} vs ${me?.id}`
+  );
+
+  // 断言未新增任何 FinanceRecord（决策②：markPaid 不建台账记录）
+  const frCountAfterMark = await prisma.financeRecord.count();
+  chk(
+    "付款：markPaid 不建 FinanceRecord（决策②）",
+    frCountAfterMark === frCountBeforeMark,
+    `${frCountBeforeMark} → ${frCountAfterMark}`
+  );
+
+  // unmarkPaid → paid=false / paidAt=null / paidBy=null
+  await unmarkPaid(p4o1.id);
+  const p4o1AfterUnmark = await prisma.paymentNode.findUnique({
+    where: { id: p4o1.id },
+    select: { paid: true, paidAt: true, paidBy: true },
+  });
+  chk("付款：004 order1 unmarkPaid → paid=false", p4o1AfterUnmark?.paid === false);
+  chk("付款：004 order1 unmarkPaid → paidAt=null", p4o1AfterUnmark?.paidAt === null);
+  chk("付款：004 order1 unmarkPaid → paidBy=null", p4o1AfterUnmark?.paidBy === null);
+
+  // ── 11) 未解锁拒标记 ─────────────────────────────────────────
+  // 002 order3（主体完工款，trigger stages 泥工/防水/地面/天花，seed 未全 passed）
+  const p2o3 = await prisma.paymentNode.findFirst({
+    where: { projectId: p2.id, order: 3 },
+    select: { id: true },
+  });
+  if (!p2o3) throw new Error("前置失败：002 未找到 order3");
+  try {
+    await markPaid(p2o3.id);
+    chk("付款：002 order3 markPaid（未解锁）→ 抛错", false, "未抛错");
+  } catch (e) {
+    chk(
+      "付款：002 order3 markPaid → 「未解锁不可标记已付：…」",
+      e instanceof PaymentPlanError &&
+        e.message.startsWith("未解锁不可标记已付："),
+      e instanceof Error ? e.message : "非 Error"
+    );
+  }
+
+  // ── 12) ★ M7→段解锁派生回环 ──────────────────────────────────
+  // 002 order2（水电完成款，triggerStages="水电工程"）
+  const p2o2 = await prisma.paymentNode.findFirst({
+    where: { projectId: p2.id, order: 2 },
+    select: { id: true, paid: true, amountDue: true },
+  });
+  if (!p2o2) throw new Error("前置失败：002 未找到 order2");
+
+  // 确保 002「水电工程」AcceptanceNode.status 非 passed（若 seed 已 passed 则先置 submitted）
+  const sdNode = await prisma.acceptanceNode.findFirst({
+    where: { projectId: p2.id, name: "水电工程" },
+    select: { id: true, status: true },
+  });
+  if (!sdNode)
+    throw new Error("前置失败：002 未找到「水电工程」验收节点，请先跑 M7 seed");
+  if (sdNode.status === "passed") {
+    await prisma.acceptanceNode.update({
+      where: { id: sdNode.id },
+      data: { status: "submitted" },
+    });
+  }
+
+  // getPlanView → order2 state.unlocked=false, missing 含「水电工程」
+  const viewBefore = await getPlanView(p2.id);
+  const segBefore = viewBefore.segments.find((s) => s.order === 2);
+  chk(
+    "付款：002 order2 解锁前 → 未解锁",
+    segBefore?.state.unlocked === false
+  );
+  chk(
+    "付款：002 order2 解锁前 → missing 含「水电工程」",
+    segBefore?.state.missing.includes("水电工程") === true,
+    segBefore?.state.missing.join(",") ?? ""
+  );
+
+  // 记录 paid/amountDue 快照（证明解锁是派生非落库）
+  const paidBefore = p2o2.paid;
+  const amountDueBefore = p2o2.amountDue;
+
+  // 仅用 prisma 把该 AcceptanceNode.status 改成 "passed"（不写任何 finance 表）
+  const frCountBeforeUnlock = await prisma.financeRecord.count();
+  const pnCountBeforeUnlock = await prisma.paymentNode.count();
+  await prisma.acceptanceNode.update({
+    where: { id: sdNode.id },
+    data: { status: "passed" },
+  });
+
+  // 断言 finance 表行数未变（解锁是派生，不落库）
+  const frCountAfterUnlock = await prisma.financeRecord.count();
+  const pnCountAfterUnlock = await prisma.paymentNode.count();
+  chk(
+    "付款：改验收节点状态 → FinanceRecord 行数不变",
+    frCountAfterUnlock === frCountBeforeUnlock,
+    `${frCountBeforeUnlock} → ${frCountAfterUnlock}`
+  );
+  chk(
+    "付款：改验收节点状态 → PaymentNode 行数不变",
+    pnCountAfterUnlock === pnCountBeforeUnlock,
+    `${pnCountBeforeUnlock} → ${pnCountAfterUnlock}`
+  );
+
+  // 重读 getPlanView → order2 state.unlocked=true（派生解锁）
+  const viewAfter = await getPlanView(p2.id);
+  const segAfter = viewAfter.segments.find((s) => s.order === 2);
+  chk(
+    "付款：002 order2 验收通过后 → 解锁（派生）",
+    segAfter?.state.unlocked === true
+  );
+
+  // 断言 PaymentNode 行本身 paid/amountDue 未因这次改状态而变化
+  const p2o2After = await prisma.paymentNode.findUnique({
+    where: { id: p2o2.id },
+    select: { paid: true, amountDue: true },
+  });
+  chk(
+    "付款：002 order2 paid 未因改验收状态而变",
+    p2o2After?.paid === paidBefore
+  );
+  chk(
+    "付款：002 order2 amountDue 未因改验收状态而变",
+    centEq(p2o2After?.amountDue ?? 0, amountDueBefore),
+    `${amountDueBefore} vs ${p2o2After?.amountDue}`
+  );
+
+  // ── 13) 改合同额不回溯快照 ────────────────────────────────────
+  const p2ContractOriginal = p2.contractAmount ?? 0;
+  await prisma.project.update({
+    where: { id: p2.id },
+    data: { contractAmount: p2ContractOriginal * 2 },
+  });
+  const p2o2AfterContractChange = await prisma.paymentNode.findUnique({
+    where: { id: p2o2.id },
+    select: { amountDue: true },
+  });
+  chk(
+    "付款：改合同额 → amountDue 不变（快照 §1-4）",
+    centEq(p2o2AfterContractChange?.amountDue ?? 0, amountDueBefore),
+    `${amountDueBefore} vs ${p2o2AfterContractChange?.amountDue}`
+  );
 
   const failed = results.filter((r) => !r.ok).length;
   console.log(
