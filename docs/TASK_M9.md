@@ -154,6 +154,10 @@ _（M9-a 起，每单元合入后在此追加「执行记录与裁定」，规�
   **集成者另修 2 处**：页根用 `<main>` 与外壳 `<main>` 嵌套（HTML 只允许一个 `main`）+ 自设 `max-w-[1200px]` 破外壳 `max-w-6xl` 节奏 → 改 `<div className="space-y-12">`（同 `/finance`、`/projects` 惯例）；进度条宽度 `Math.min(1,rate)*100` 出 `15.620000000000001%` 浮点尾差 → 服务层舍到两位小数（换算仍唯一一处）。
   **登记债**：`budget/[projectId]/changes/page.tsx` 与 `stats/page.tsx` 同样以 `<main>` 为根（M9-a / M1b 既有），与外壳嵌套——本单元不牵动，入 `STATUS.md` §4-15 候收口批。
 - **M9-b-2 候开卡**：商务漏斗（M3-e 清账）+ 月度现金折线 + 项目毛利率排行条形 + seed 补演示（§6-9）；**动 seed ⇒ 四隔离库集成门禁全量重跑**。
+- **M9-b-2a 商务漏斗 + seed 补线索（2026-10-11 合入 · codebuddy `custom-local:glm-5.2`）**：交付 5 文件（`core/domain/dashboard.ts` 追加 `FUNNEL_STAGE_ORDER`/`funnelCounts`/`leadConversion` / `prisma/seed.ts` 新增 `seedLeads()` / `dashboard/server/overview.ts` 加 `DashboardFunnel` / `dashboard/page.tsx` 漏斗块 / `scripts/verify-dashboard.mjs` 扩断言）。**验收**：build 绿 + tsc 0 + 八纯门禁零回退（quote **79**（新增 1 张草稿报价单，逐单循环计数上浮，属 §7-5 预期）/ crm 11 / health 20 / design 28 / schedule 55 / quality 108 / finance 135 / dashboard **58**）+ **四隔离库集成门禁全量重跑**（sign 12 / schedgen 27 / quality-flow 94 / finance-flow 76，各自 `migrate reset --force` 重灌 seed 后全过）+ qa-shots 33 页全 200 + 目检（漏斗五阶段条 2/2/2/2/3、签约率 27.3%、副标题「阶段存量分布（非累计流量）」、本月签单额环比首次显「较上月 +172.7%」）+ 375 探针三页（`/dashboard`·`/projects`·`/crm`）零真实溢出 + **实值巡检 33 项全过**（新增漏斗计数/签约率/条宽三条独立复算断言）+ **seed 幂等双跑验证**（连跑两次：线索 11、项目 7 不变）。
+  **集成者修真缺陷 1 处（codebuddy 未自报、seed 首跑即崩）**：`seedLeads` 的已签循环「按 code 复用已有项目」在真实 dev.db 上必撞 `Lead.projectId @unique`（`P2002`）——手测早已把 `RP-2026-005/006` 建成签约项目并被 `LEAD-2026-001` 占用。正解三件：**①** 复用条件加 `lead: { is: null }`（只复用未被任何线索占用的项目）；**②** 签约位改**按月判定**——该月已有「带线索的项目」就跳过补建（净库照建、脏库不重复占位）；**③** code 被占则走 `nextFreeProjectCode()` 递增取空闲号（实得 `RP-2026-007`＝上月签约位）。自检同步从「按固定 code 断言合同额 218000/176000」改为**按签约月断言本月/上月各 ≥1 条**（脏库净库都成立）。承 M9-a `ensureQuote` 的同族教训：**seed 假定数据形状前必须先对真实 dev.db（含手测数据）验证**，已补进 `STATUS.md` §5。
+  **集成者另修 3 处**：① 未签线索改**按 DB 真值逐阶段补到 2 条**（固定 code 清单保证不了「五阶段各 ≥2」——dev.db 里 `LEAD-2026-001` 已被手测推进成 signed，`contacted` 只剩 1 条）；② `FUNNEL_STAGE_ORDER` 从 `overview.ts` 局部常量**上收 `core/domain/dashboard.ts`**，并在 `verify-dashboard.mjs` 加**漂移护栏**断言它与 `crm/stages.ts` 的 `LEAD_STAGE_ORDER` 同序同值（应用层仍不跨模块 import，靠门禁锁）；③ 漏斗与两块占位同排时 `grid` 会把占位卡拉成整列空白 → 加 `items-start`（V0.3 §7.4 节奏）；另把 codebuddy 的 `UNSIGED`/`unsiged*` 拼写改为 `UNSIGNED_LEADS`/`unsigned*`、修一条 `1e-9` 陈旧注释（实际容差 1e-3）。
+  **codebuddy 四处自报偏离裁定**：① 未签线索用 009/010 避开与已签 007/008 撞号——**可接受**（卡面确有号段重叠）；② 新建项目 `status="draft"`——**可接受且正确**（核实 `signLead` 建的项目同为 `PROJECT_STATUS.draft`，与真实签约一致）；③ `pct` 合 1 容差取 1e-3——**可接受**（各值独立 `round4`，1e-9 数学上不可能成立）；④ 本月签约项目不回填 `createdAt`（`createProject` 默认 `now` 已在当月）——**可接受**。
 
 ## 6. M9-b 详细范围（数据驾驶舱 · 权威规格）
 
@@ -308,3 +312,43 @@ export interface TodoGroup {
 | 底部左 = 本月签单趋势折线 | 月度**现金收付**折线（b-2） | 项目毛利率口径无时间序列（§1-12） |
 | 待办中心 = 待审批绩效 / 超预算预警 / 逾期未完工 / **待确认变更单** | 六类真口径 + 绩效灰占位（§6-4 表）；**无"待确认变更单"** | 本期无审批流（§1-2），变更单录入即生效，无"待确认"态可数 |
 | 预算灯 = 超预算红 / 已用超 85% 黄 | 沿用 `health.budgetLight`（已收 vs 合同额+变更）语义不动 | 20 条断言锁死（§0 红线），驾驶舱只消费不重定义 |
+
+## 7. M9-b-2 详细范围（图表批 · 权威规格）
+
+> 拆两轮：**M9-b-2a = seed 补线索 + 商务漏斗（M3-e 清账）**｜ **M9-b-2b = 月度现金折线 + 项目毛利率排行条形（含台账增补）**。
+> 拆由：`seedFinance()` 的自检把「收支 11 笔」与三项目毛利率锁死（`prisma/seed.ts` 末尾自检块），而 `verify-finance-flow.mts` 的**库初态守卫**同样硬编码「付款段 15 · 收支记录 11 · 变更单 2」——**动收支＝牵动毛利断言 + 守卫常量 + 目检基线三处**，与漏斗不是一回事，故分轮隔离风险。执行通道：**codebuddy（`custom-local:glm-5.2` → 8787 三号池）**（Loomy 暂停，见工作手册 §8.2）。
+
+### 7-1 商务漏斗口径（本轮集成者裁定，替代 v5.1 §6.2.4 的"转化率漏斗"画法）
+
+- **只画当前 `stage` 存量分布**（五阶段各多少条线索），**不画相邻阶段转化率**——本平台没有阶段流水表，`Lead.stage` 只有现值，"到达过某阶段"的累计数**算不出来**；用存量比冒充转化率＝造假日指标（违反 §0 禁 mock 完成准则）。
+- 唯一真指标：**签约率 = `signed` 线索数 / 全部线索数**（`core/domain/dashboard.ts` 新增纯函数 `leadConversion(leads: {stage:string}[]): number|null`，分母 0 → null，UI 显「—」）。
+- 阶段计数纯函数同文件新增：`funnelCounts(rows: {stage:string}[], order: readonly string[]): {stage:string; count:number; pct:number}[]`，按传入 `order` 顺序输出、`pct = count/total`（total 0 → 各 `pct` 0）；**中文标签不进 core**（`crm/stages.ts` 属模块私有禁区，dashboard 不得 import）→ 服务层只回 stage 串，页面用本地常量映射中文（站内 `ProjectTabs`/`finance` 各自本地映射是既有先例）。
+- 累计漏斗（需 `LeadStageLog` 流水表）= **DEFERRED**，卡上不许顺手建表。
+
+### 7-2 seed 补线索（幂等 + 自检 + 时间自洽）
+
+`prisma/seed.ts` 新增 `seedLeads()`（照 `seedChanges()` 幂等范式：**按 `code` 存在性跳过**，不靠总数判断）：
+
+- 未签四阶段各补至 **≥2 条**（现仅 `LEAD-2026-001 contacted` / `002 quoted`）→ 新增 `leads` / `confirmed` 各 2 条 + `contacted` / `quoted` 各 1 条，共 6 条；`intentLevel` 有 high/medium/low 分布、`budgetRange`/`estate`/`source` 有值（`source` 用既有渠道词表，与 `Project.source` 同源），`lastFollowAt` 落在 `createdAt` 之后且不晚于今天。
+- **两条已签线索配套建项目**（让漏斗有顶格 + 让「本月签单额」的环比有真值可比）：
+  - `LEAD-2026-007`（**本月**签）→ 项目 `RP-2026-005`，`contractAmount = 218000`；
+  - `LEAD-2026-008`（**上月**签）→ 项目 `RP-2026-006`，`contractAmount = 176000`；
+  - 两条都走 `core/domain/projects.createProject`（**不直写 `prisma.project.create`**）——与真实签约行为一致：自动建草稿 `BudgetQuote`、Client 按手机号归并；再回写 `Lead.projectId` + `stage = "signed"` + `lastFollowAt`。`createdAt` 分别落在本月与上月（用 `new Date(y, m, d)` 本地构造，避开月末 UTC 漂移）。
+  - **不建**付款计划段、**不建**收支台账、**不建**变更单 → `verify-finance-flow` 初态守卫（15/11/2）与 `seedFinance` 自检（收支 11）**不受影响**。
+- 最终自检块：线索计数打印改取 `prisma.lead.count()` 真值 + 断言「五阶段各 ≥2 条」+「`signed` 线索的 `projectId` 非空」（漏回写会被这条抓到）。
+
+### 7-3 驾驶舱漏斗块（替换 §6-5 三块灰占位之一）
+
+`/dashboard` 的「商务漏斗」占位卡改真内容：五阶段**横向存量条**（每行：阶段中文名 + `num` 计数 + 条宽按 `pct`），条色**只用 accent 与灰阶**（`bg-accent` 填充 / `bg-sunken` 轨道，**禁五阶段五色**）；下方一行 `text-xs text-secondary` 显「签约率 {formatPercent(rate)}」，`null` 显「—」；副标题必须写「阶段存量分布（非累计流量）」，避免读者按真漏斗读。整块零写入、零新表。
+
+### 7-4 门禁与验收（2a）
+
+`verify-dashboard.mjs` 扩 `funnelCounts` / `leadConversion` 断言（空集、单阶段、五阶段全覆盖、`pct` 合 1 容差、分母 0 → null、禁 emoji），目标 **43 → 55±**；**动 seed ⇒ 四个隔离库集成门禁全量重跑**（sign 12 / schedule-gen 27 / quality-flow 94 / finance-flow 76，各自先 `migrate reset --force` 重灌 seed）；`pnpm build` 绿 + tsc 0 + qa-shots 33 页全 200 + 目检（漏斗五阶段条 / 签约率真值 / 环比不再显「不可比」）+ 375 探针 `/dashboard` + 实值巡检扩（`_scratch/m9b_dash_check.mts` 加漏斗计数与签约率两条独立复算）。
+
+### 7-5 已登记影响（2a 合入后须同步的基线）
+
+新增 2 个项目 → `STATUS.md` §1 数据基线（项目数、`/finance` 汇总合同额与回款率分母）、`/projects` 与 `/budget` 列表截图基线、驾驶舱 KPI 目检数字全部要更新；`verify-quote.mjs` 的「逐单循环检查」随库中报价单数浮动（新增 2 张草稿单 → 计数上涨属预期，不是回退）。
+
+### 7-6 M9-b-2b 预告（下轮展开）
+
+台账增补走 **`income/change`（变更款收款）** 类目——已核 `getPlanView` 的对照条只统计 `category = "contract"` 切片（`ledgerContractIncome`），加 `change` 类收入**不破坏两本账一致对照**；配合把既有 7 笔 expense 的日期重排到近 6 个月（**金额不动 → 毛利与毛利率断言零变化**），让月度折线有真实形态。折线两条线（当月收款 accent / 当月支出 灰阶），净现金用下方小表 + `success`/`warning` 语义色文字，**不画第三条线**；毛利率排行条形单色 accent、`marginRate` 为 null 的项目灰态「不可算」排末位。口径函数 `monthKeysDescending` / `cashSeries` 追加到 `core/domain/dashboard.ts`。
