@@ -105,6 +105,11 @@ export async function advanceStage(leadId: string, stage: LeadStage): Promise<vo
   if (!LEAD_STAGE_ORDER.includes(stage)) {
     throw new LeadValidationError(`未知阶段：${stage}`);
   }
+  // §4-14 收紧：signed 只能经「签约建项」（signLead：建项目 + 按手机号归并 Client + 回写 projectId）
+  // 落定，通用推进不得直达——否则会出现「线索已签约却无项目」的悬空态（双路径语义重叠）。
+  if (stage === "signed") {
+    throw new LeadValidationError("已签约须经「签约建项」完成（会同时建项目并归并客户），不支持直接推进");
+  }
   const lead = await prisma.lead.findUnique({ where: { id: leadId } });
   if (!lead) throw new LeadValidationError("线索不存在");
   const next = nextStage(lead.stage as LeadStage);

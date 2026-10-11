@@ -9,7 +9,7 @@ import type {
 /** 输入框：surface 底、1px 描边、6px 圆角；聚焦描边换 accent，不加外发光。 */
 const fieldClass =
   "block w-full rounded-inner border border-line bg-surface text-sm text-primary " +
-  "placeholder:text-muted transition-colors duration-150 " +
+  "placeholder:text-muted transition-colors duration-[120ms] " +
   "focus:outline-none focus:border-accent disabled:opacity-50 disabled:bg-sunken";
 
 // 两档尺寸写成互斥的完整类串，避免 px/py 同名工具类相互覆盖

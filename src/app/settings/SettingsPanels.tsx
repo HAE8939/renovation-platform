@@ -73,7 +73,7 @@ function ThemePicker({ initial }: { initial: ThemeKey }) {
             return (
               <label
                 key={key}
-                className={`flex cursor-pointer items-start gap-4 rounded-card border bg-surface p-4 transition-colors duration-150 ${
+                className={`flex cursor-pointer items-start gap-4 rounded-card border bg-surface p-4 transition-colors duration-[120ms] ${
                   checked ? "border-accent" : "border-line hover:border-accent-ink"
                 }`}
               >

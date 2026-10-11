@@ -43,7 +43,7 @@ export default async function BudgetStatsPage({ params }: PageProps) {
   const missingSop = items.filter((i) => !i.sop || !i.sop.trim()).length;
 
   return (
-    <main className="mx-auto max-w-4xl px-4 py-6 md:px-6 md:py-8">
+    <div className="mx-auto max-w-4xl px-4 py-6 md:px-6 md:py-8">
       <header className="mb-6">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h1 className="text-[20px] font-semibold text-primary">{detail.name}</h1>
@@ -129,7 +129,7 @@ export default async function BudgetStatsPage({ params }: PageProps) {
           材料说明与施工要求是装修报价最容易漏的两项，按行数提示比笼统进度条更实用。
         </p>
       </Card>
-    </main>
+    </div>
   );
 }
 

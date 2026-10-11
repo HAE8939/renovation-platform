@@ -12,6 +12,7 @@ import {
   LEAD_STAGE_ORDER,
   LEAD_STAGE_LABEL,
   nextStage,
+  canGenericAdvance,
   type LeadStage,
 } from "@/modules/crm/stages";
 import type { LeadListItem } from "@/modules/crm/server/leads";
@@ -289,8 +290,11 @@ export function LeadsTable({ leads }: { leads: LeadListItem[] }) {
                       {formatDate(l.lastFollowAt)}
                     </Td>
                     <Td align="right" onClick={(e) => e.stopPropagation()}>
-                      {next ? (
+                      {canGenericAdvance(l.stage) && next ? (
                         <AdvanceStageForm leadId={l.id} stage={next} />
+                      ) : l.stage === "quoted" ? (
+                        // §4-14：quoted→signed 只走右侧「签约建项」，不给通用推进
+                        <span className="text-[13px] text-muted">走「签约」→</span>
                       ) : (
                         <span className="text-[13px] text-secondary">已到末态</span>
                       )}

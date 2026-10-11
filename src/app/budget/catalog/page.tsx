@@ -16,7 +16,7 @@ export default async function CatalogPage() {
   return (
     <div className="space-y-8">
       <header className="border-b border-line pb-5">
-        <h1 className="text-[22px] font-semibold">科目库</h1>
+        <h1 className="text-[20px] font-semibold">科目库</h1>
         <p className="mt-2 max-w-prose text-sm leading-relaxed text-secondary">
           维护工程科目与科目项模板：编号、单位、默认单价、材料与施工要求在此定稿，报价时选入即快照。
           修改模板不会影响已生成的报价明细。

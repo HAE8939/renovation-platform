@@ -54,7 +54,7 @@ export default function HomePage() {
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-2 text-base font-semibold leading-snug">
                     {m.icon && <span className="num text-sm text-accent-ink">{m.icon}</span>}
-                    <span className="transition-colors duration-150 group-hover:text-accent-ink">
+                    <span className="transition-colors duration-[120ms] group-hover:text-accent-ink">
                       {m.name}
                     </span>
                   </span>
@@ -66,7 +66,7 @@ export default function HomePage() {
                 </span>
                 <span
                   aria-hidden
-                  className="num pt-0.5 text-sm text-muted transition-colors duration-150 group-hover:text-accent-ink"
+                  className="num pt-0.5 text-sm text-muted transition-colors duration-[120ms] group-hover:text-accent-ink"
                 >
                   →
                 </span>

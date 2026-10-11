@@ -31,7 +31,7 @@ export default async function BudgetListPage() {
   return (
     <div className="space-y-8">
       <header>
-        <h1 className="text-[22px] font-semibold">装修预算报价</h1>
+        <h1 className="text-[20px] font-semibold">装修预算报价</h1>
         <p className="mt-2 max-w-prose text-sm leading-relaxed text-secondary">
           按工程科目编制报价明细，实时汇总直接费、税金与单方造价。项目与报价挂在主数据
           Project 下，后续的设计与项目管理模块沿用同一套客户与项目。

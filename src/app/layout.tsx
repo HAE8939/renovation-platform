@@ -56,7 +56,7 @@ export default async function RootLayout({
                   Platform
                 </p>
               )}
-              <p className="mt-1.5 text-sm font-semibold leading-snug transition-colors duration-150 hover:text-accent-ink">
+              <p className="mt-1.5 text-sm font-semibold leading-snug transition-colors duration-[120ms] hover:text-accent-ink">
                 {PLATFORM.name}
               </p>
               <p className="mt-1 text-xs leading-relaxed text-secondary">{PLATFORM.tagline}</p>

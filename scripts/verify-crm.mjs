@@ -76,6 +76,39 @@ function check(name, ok, detail = "") {
     hit2 ? `命中 ${hit2.id}` : "未命中");
 }
 
+/* ── 阶段推进纯函数（stages.ts）：nextStage + §4-14 canGenericAdvance ── */
+{
+  const stages = await import(pathToFileURL(join(ROOT, "src/modules/crm/stages.ts")).href);
+  const { LEAD_STAGE_ORDER, nextStage, canGenericAdvance } = stages;
+  const J = (x) => JSON.stringify(x);
+
+  check("LEAD_STAGE_ORDER: 五阶段有序",
+    J([...LEAD_STAGE_ORDER]) === J(["leads", "contacted", "confirmed", "quoted", "signed"]),
+    J([...LEAD_STAGE_ORDER]));
+
+  check("nextStage: 逐级向前一格",
+    nextStage("leads") === "contacted" &&
+    nextStage("contacted") === "confirmed" &&
+    nextStage("confirmed") === "quoted" &&
+    nextStage("quoted") === "signed");
+  check("nextStage: 末态 signed → null", nextStage("signed") === null);
+  check("nextStage: 未知阶段 → null", nextStage("bogus") === null);
+
+  // §4-14 收紧核心：quoted→signed 不走通用推进（须经「签约建项」）；余三格可通用推进；末态不可。
+  check("canGenericAdvance: leads/contacted/confirmed 可通用推进",
+    canGenericAdvance("leads") === true &&
+    canGenericAdvance("contacted") === true &&
+    canGenericAdvance("confirmed") === true);
+  check("canGenericAdvance: quoted 不可（其下一阶段是 signed，须走签约建项）",
+    canGenericAdvance("quoted") === false);
+  check("canGenericAdvance: signed 末态不可", canGenericAdvance("signed") === false);
+  check("canGenericAdvance: 与 nextStage 一致——凡下一阶段为 signed 或 null 即不可通用推进",
+    LEAD_STAGE_ORDER.every((s) => {
+      const n = nextStage(s);
+      return canGenericAdvance(s) === (n !== null && n !== "signed");
+    }));
+}
+
 /* ── 输出禁 emoji 自检（与 verify-health 保持同一纪律）─────────── */
 const EMOJI_RE =
   /[\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{1F000}-\u{1FAFF}\u{FE00}-\u{FE0F}]/u;

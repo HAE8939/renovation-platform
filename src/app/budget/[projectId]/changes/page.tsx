@@ -33,7 +33,7 @@ export default async function ChangesPage({ params }: PageProps) {
   const afterChange = contractAmount + total;
 
   return (
-    <main className="mx-auto max-w-4xl px-4 py-6 md:px-6 md:py-8">
+    <div className="mx-auto max-w-4xl px-4 py-6 md:px-6 md:py-8">
       <header className="mb-6">
         <Link
           href={`/budget/${detail.id}`}
@@ -81,7 +81,7 @@ export default async function ChangesPage({ params }: PageProps) {
         changeTotal={total}
         changeWarn={warn}
       />
-    </main>
+    </div>
   );
 }
 

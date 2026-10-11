@@ -9,6 +9,7 @@ import {
   LEAD_STAGE_LABEL,
   LEAD_INTENT_LABEL,
   nextStage,
+  canGenericAdvance,
   type LeadStage,
 } from "@/modules/crm/stages";
 import type { LeadListItem } from "@/modules/crm/server/leads";
@@ -41,7 +42,9 @@ function LeadCard({
 }) {
   const next = nextStage(lead.stage);
   const stale = isStale(lead);
-  const draggable = next !== null;
+  // §4-14：quoted→signed 不走通用推进（须经抽屉里的「签约建项」），故 quoted 卡不可拖、不显推进按钮。
+  const canAdvance = canGenericAdvance(lead.stage);
+  const draggable = canAdvance;
 
   return (
     <Card
@@ -92,7 +95,12 @@ function LeadCard({
         </div>
       </div>
 
-      {next && <AdvanceStageForm leadId={lead.id} stage={next} variant="card" />}
+      {canAdvance && next && <AdvanceStageForm leadId={lead.id} stage={next} variant="card" />}
+      {lead.stage === "quoted" && (
+        <p className="mt-3 text-[12px] leading-relaxed text-muted">
+          已报价 · 点卡片打开抽屉，走「签约建项」落定签约
+        </p>
+      )}
     </Card>
   );
 }

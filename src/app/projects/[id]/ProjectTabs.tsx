@@ -30,7 +30,7 @@ export function ProjectTabs({ hub, initialTab }: { hub: ProjectHub; initialTab?:
             key={t.key}
             type="button"
             onClick={() => setTab(t.key)}
-            className={`whitespace-nowrap border-b-2 pb-2 text-[15px] transition-colors duration-150 ${
+            className={`whitespace-nowrap border-b-2 pb-2 text-[15px] transition-colors duration-[120ms] ${
               tab === t.key
                 ? "border-accent font-medium text-primary"
                 : "border-transparent text-secondary hover:text-primary"
@@ -189,14 +189,20 @@ function MarginDot({ light }: { light: "green" | "yellow" | "red" | "neutral" })
  * 毛利依赖台账支出入账、不依赖报价，故置于 BudgetTab 顶部、q.exists 判断之外，
  * 无报价单也显示。marginRate==null（合同额未录入）→ 毛利率「—」+ 灰态提示，
  * 不造 0%。色点用语义色（success/warning/danger），neutral→bg-sunken。
+ *
+ * §4-16 收口（M9-e）：有合同额但**零支出**的项目，按公式毛利率恰得 100%——与驾驶舱决策 15
+ * 「剔除无成本数据的 100%」同判定，这里也降级：毛利率显「—」、色点转灰、提示「未录入支出，
+ * 毛利率不可算」。毛利额仍如实显示（它是台账真值，只是尚无支出可抵）。仅改显示层，
+ * 不动 grossProfit/marginRate 口径函数（§4-17 负变更口径维持现状）。
  */
 function GrossProfitCard({ hub }: { hub: ProjectHub }) {
   const f = hub.finance;
+  const noExpenseData = f.marginRate !== null && f.expenseTotal === 0;
   return (
     <div className="rounded-card border border-line bg-surface p-5">
       <div className="flex items-center gap-2">
         <SectionTitle>毛利</SectionTitle>
-        <MarginDot light={f.marginLight} />
+        <MarginDot light={noExpenseData ? "neutral" : f.marginLight} />
       </div>
       <div className="mt-3 flex flex-wrap items-baseline gap-x-8 gap-y-2">
         <div>
@@ -208,15 +214,19 @@ function GrossProfitCard({ hub }: { hub: ProjectHub }) {
         <div>
           <p className="text-xs text-secondary">毛利率</p>
           <p className="num mt-1.5 text-[17px] font-medium whitespace-nowrap">
-            {f.marginRate === null ? "—" : formatPercent(f.marginRate)}
+            {f.marginRate === null || noExpenseData ? "—" : formatPercent(f.marginRate)}
           </p>
         </div>
       </div>
-      {f.marginRate === null && (
+      {f.marginRate === null ? (
         <p className="mt-2 text-xs leading-relaxed text-secondary">
           未录入合同额，不可算毛利率
         </p>
-      )}
+      ) : noExpenseData ? (
+        <p className="mt-2 text-xs leading-relaxed text-secondary">
+          未录入支出，毛利率不可算
+        </p>
+      ) : null}
       <Link
         href={`/finance?projectId=${hub.id}`}
         className="mt-4 inline-block whitespace-nowrap text-[13px] text-accent-ink hover:underline underline-offset-4"

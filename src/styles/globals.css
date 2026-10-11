@@ -49,3 +49,17 @@ textarea,
 button {
   font-family: inherit;
 }
+
+/* 尊重系统「减少动态效果」偏好（V0.3 §5.1/§5.2/§6.9 硬要求 · M9-e §4-3）。
+   本仓动效仅 hover/过渡（无自动播放动画、无视差），故收敛为把过渡/动画时长压到近零，
+   保留状态可辨（颜色/描边变化仍在，只是瞬时完成），不牺牲信息。 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

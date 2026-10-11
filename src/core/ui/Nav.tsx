@@ -30,7 +30,7 @@ export function Nav({ modules, compact = false }: NavProps) {
             <Link
               key={m.id}
               href={m.entryPath}
-              className={`shrink-0 whitespace-nowrap px-3 py-2 text-sm transition-colors duration-150 ${
+              className={`shrink-0 whitespace-nowrap px-3 py-2 text-sm transition-colors duration-[120ms] ${
                 active
                   ? "border-b-2 border-accent font-semibold text-accent-ink"
                   : "border-b-2 border-transparent text-secondary hover:text-primary"
@@ -53,7 +53,7 @@ export function Nav({ modules, compact = false }: NavProps) {
           <div key={m.id}>
             <Link
               href={m.entryPath}
-              className={`group relative flex items-baseline gap-3 px-4 py-2.5 text-sm transition-colors duration-150 ${
+              className={`group relative flex items-baseline gap-3 px-4 py-2.5 text-sm transition-colors duration-[120ms] ${
                 active
                   ? "bg-accent-tint font-semibold text-accent-ink"
                   : "text-secondary hover:bg-surface hover:text-primary"
@@ -83,7 +83,7 @@ export function Nav({ modules, compact = false }: NavProps) {
                     <li key={n.href}>
                       <Link
                         href={n.href}
-                        className={`flex items-center pl-12 pr-4 py-2 text-[13px] transition-colors duration-150 ${
+                        className={`flex items-center pl-12 pr-4 py-2 text-[13px] transition-colors duration-[120ms] ${
                           subActive
                             ? "bg-accent-tint font-medium text-accent-ink"
                             : "text-secondary hover:bg-surface hover:text-primary"

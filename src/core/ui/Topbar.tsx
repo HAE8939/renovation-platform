@@ -26,7 +26,7 @@ export function Topbar({ modules }: TopbarProps) {
           <>
             <Link
               href="/"
-              className="text-sm font-semibold transition-colors duration-150 hover:text-accent-ink"
+              className="text-sm font-semibold transition-colors duration-[120ms] hover:text-accent-ink"
             >
               {PLATFORM.name}
             </Link>
@@ -44,7 +44,7 @@ export function Topbar({ modules }: TopbarProps) {
         {/* 平台设置入口（M9-d）：主题 + Logo，属平台工具，不进业务模块导航，故放顶栏。 */}
         <Link
           href="/settings"
-          className={`text-xs transition-colors duration-150 hover:text-accent-ink ${
+          className={`text-xs transition-colors duration-[120ms] hover:text-accent-ink ${
             pathname === "/settings" || pathname.startsWith("/settings/")
               ? "font-medium text-accent-ink"
               : "text-secondary"

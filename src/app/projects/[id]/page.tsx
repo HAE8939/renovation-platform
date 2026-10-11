@@ -23,7 +23,7 @@ export default async function ProjectDetailPage({
       <div className="mb-6">
         <Link
           href="/projects"
-          className="whitespace-nowrap text-[13px] text-secondary transition-colors duration-150 hover:text-accent-ink"
+          className="whitespace-nowrap text-[13px] text-secondary transition-colors duration-[120ms] hover:text-accent-ink"
         >
           ← 返回项目列表
         </Link>
