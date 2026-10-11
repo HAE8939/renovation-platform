@@ -617,3 +617,63 @@ export function describeFilter(def: { label: string; type: string }, f: FilterIn
   **执行通道（本轮实况）**：opencode 讯飞池跑通 **R1a（schema 两表）** 与 **R1b1（常量+键校验+选项解析，84 行）** 两轮；把 9 个函数塞一张卡的 **R1b 与 M9-b-2b 轮 A 同族跑飞**（`reason:"length"`、reasoning 31,931 tok、零落盘、exit 0），且实测 **`--variant low` 与 `--variant minimal` 都压不住**（该网关疑不理 `reasoning_effort`）→ **HAE 指示：opencode 修好前由集成者自己写**，其余文件全部集成者实现并按同一纪律独立验收。
   **集成者自纠五处（含我自己写错的规格）**：① **项目契约 AGENTS §1「JSON 用 `Json`」在本栈不成立**——Prisma 5.22 + SQLite `prisma validate` 直接报 `The current connector does not support the Json type` → 单选选项改存「每行一个」纯文本（`parseOptions` 同时吃字符串与数组），比 JSON 更可读可手改、迁 PG 照用；② 我写的 `parseFilterParam` 规格自相矛盾（既要求「按前两个冒号切、第三段归 raw2」又要求「值含冒号不误切」）——冒烟测试当场撞破 → 改**双参数名** `?cfv=<key>:<值或下界>` / `?cfvto=<key>:<上界>`，每段只切第一个冒号；③ 深链令牌由 cuid 改 **`key`**（unique 且创建后不可改，链接可读可长期分享）；④ `buildFiltersFromParams` 首版只遍历 `cfv`，**只填上界的条件（保修年限 ≤ 2）会静默失效** → 补两端并集；⑤ 我写的 seed 自检用了 `CustomFieldValue` 上**不存在的 `project` 关系**并用 `as never` 把类型错误压掉（Prisma 运行时会直接拒）→ 改为先取 `projectId` 再按 `entityId` 数。**教训**：`as never` / `as any` 是类型系统的消音器，多态外键（无 relation 的 `entityId`）尤其容易写出编译过、运行时炸的查询——写侧与自检都只能按真实形状来。
   **范围红线执行情况**：`Project`/`Client` 主脊**零改列**；`core/domain` 既有文件**零改动**（全部新增）；无新跨模块写入点；未做金额类型 / 模块作用域 / Client 界面 / 条件"或" / 字段值历史流水（均 §8-7 明列不做）。
+- **M9-d 主题切换 + Logo 最简版（d-1 + d-2 · 2026-10-11 合入 · 执行通道＝集成者自己写）**：交付 12 文件——**新** `core/domain/theme.ts`（四键/DEFAULT/LABEL/NOTE/isThemeKey/normalizeThemeKey，零依赖、不含色值）、`core/domain/platformSettings.ts`（get-or-create 单例 + setThemeKey 键名闸门 + setLogoFile/clearLogoFileRef）、`core/domain/branding.ts`（MIME 白名单 + 512KB 上限 + 服务端命名防穿越 + best-effort 清理 + URL 净化）、`app/settings/{page,SettingsPanels,actions}`、`scripts/verify-theme.mjs`（**26 项**）；**改** `prisma/schema.prisma`（`PlatformSetting` 单例表 + 迁移 `20261011151431_m9d_platform_setting`）、`tokens.css`（accent 一族 3→4 值 + 四套 `data-theme` 插槽）、`Button.tsx`（主按钮 `text-white`→`text-[color:var(--accent-fg)]`）、`layout.tsx`（转 async 打 `data-theme` + 侧栏品牌区渲 Logo）、`Topbar.tsx`（加「设置」入口）、`page.tsx`（首页转 `force-dynamic`）、`.gitignore`（`/public/uploads/`）、`qa-shots.mjs`（35→**36** 页 +`25-settings`）。**验收**：build 绿 + tsc 0 + **十纯门禁**零回退（quote 79 / crm 11 / health 20 / design 28 / schedule 55 / quality 108 / finance 135 / dashboard 86 / fields 89 / **theme 26**）+ **四隔离库集成门禁全量重跑**（sign 12 / schedgen 27 / quality-flow 94 / finance-flow 76；新表不改既有 seed 形状，reset 重灌初态守卫 15/13/2 仍成立）+ qa-shots 36 页全 200 + **运行时四套真切换目检**（`_scratch/m9d_theme_shot.mjs`：逐套改 dev.db themeKey 起生产服务截三页，md5 各异证明确变、teal 主按钮浅青底深墨字＝`--accent-fg` 生效、四 swatch 各自显色＝`data-theme` 作用域取变量成功，跑完复位 cobalt）+ **Logo 核心逻辑验收 `_scratch/m9d_logo_check.mts` 16 项全过**（PNG/webp 落盘 + 服务端命名 / 替换回报旧名 / svg·空·超限·无文件四类拒绝 / `brandingUrl` 拒 `../` 与 `/` / 脏名删除安全无抛 / 清理归零）+ 375 探针三页（`/settings`·`/`·`/budget` 均 `scrollWidth=360 · trueOffenders=0`）+ 构建产物 CSS 核验（四套 `[data-theme]` 插槽 + `--accent-fg` 工具类 + teal `#0a7680` 深墨均正确发出）。**决策 7「上传链路明显复杂化即停下回报」执行情况**：实测未复杂化（无 next/image 优化端点坑、无全局清扫需求），按最简版落地，未降级。**集成者自纠两处**：① 首版 `layout.tsx` 用 `next/image` 渲 Logo——`/public` 下运行时用户文件走优化端点是已知坑（需额外配置、易 500），改回原生 `<img>`；② 首页 `/` 构建输出显 `○ 静态`——外壳转 async 读库后若首页仍预渲染会把构建当时插槽色烘死、切主题落地页不变（违反「全站生效」），补 `force-dynamic` 转 `ƒ`。**门禁设计撞破一次**：`verify-theme` 的漂移锁正则 `:root\[data-theme="([^"]+)"\]` 把我 tokens.css 注释里写的占位示例 `:root[data-theme="X"]` 当成第五套插槽判 FAIL——正是漂移锁该拦的形状，改注释措辞（不用可被选择器正则命中的字面量）。**范围红线执行情况**：`Project`/`Client`/所有业务表零改动；`core/domain` 既有文件零改动（全新增）；无新跨模块写入点；未做取色器/白标换肤/多图 Logo/全局清扫（均 §9-6 明列不做）。浏览器点击上传与切主题写回候 HAE 手测。
+
+## 9. M9-d 详细范围（主题切换 + Logo 最简版 · 权威规格）
+
+> 口径来源：§1 决策 7 + STATUS §3 决策 R1（方案 B：只存插槽键名）。设计真源：`docs/preview/theme-picker.html`（已评审的四套 accent × 无障碍实测）。拆两小单元：**d-1 = 主题切换**（`PlatformSetting` 表 + 迁移 + `/settings` 页 + 顶栏入口 + 全站换 `--accent` 一族）｜ **d-2 = Logo 最简版**（决策 7 明写「上传链路明显复杂化即停下回报、可降级缓做」——本轮实测未复杂化，按最简版落地）。执行通道＝集成者自己写（承 M9-c「opencode 修好前集成者写」；本轮无大卡派工需求）。
+
+### 9-0 本轮落地裁定（把决策 7 的抽象钉成可实现形状）
+
+| # | 议题 | 裁定 | 理由 |
+|---|---|---|---|
+| 21 | accent 一族由 **3 值扩到 4 值** | 新增 `--accent-fg`（主按钮前景字色）。cobalt/rust/emerald = `#fff`；**teal = 该套 `--accent-ink`（深墨）**。 | theme-picker 明写「浅强调色上白字会发飘、规范禁用」，teal 的 `#81D8D0` 上白字 ≈1.6:1 必塌。`--accent-fg` 是「换一族变量」最忠实的第 4 个值，非过度设计——单一落点在 `Button` 主按钮前景。 |
+| 22 | 主题应用机制 = `<html data-theme>` + CSS 插槽 | 外壳（唯一读 `PlatformSetting` 处）把 `themeKey` 打到 `<html data-theme>`；`tokens.css` 的 `:root[data-theme="X"]` 各覆盖一族四值；Tailwind 全走 CSS 变量故全站随动。**不引 next-themes、不注入 inline style、不装依赖**。 | 零 JS、零新依赖、静态可验证；`normalizeThemeKey` 保证永远落四套之一，脏值/无记录回落 cobalt。 |
+| 23 | `/settings` 是**平台工具页、不进 registry** | 独立路由 `src/app/settings/*`，**唯一入口 = 顶栏「设置」链**；不出现在侧栏导航与首页模块卡片。 | 决策 7「顶栏入口」；「可插拔业务模块」与「平台自身配置」两条线不混——侧栏只列功能区（fields 已占 order 9，settings 不抢）。 |
+| 24 | Logo 存**文件名**、目录固定、名服务端生成 | `PlatformSetting.logoFile` 只存文件名（非路径/URL）；文件落 `public/uploads/branding`（gitignore）；上传名一律 `logo-<ts>-<rand>.<ext>`（扩展名只从校验过的 MIME 映射）。 | 客户端文件名永不参与落盘 → 路径穿越/任意扩展名无从下手；渲染拼固定前缀；`brandingUrl` 再拒任何含分隔符的脏名（双保险）。 |
+| 25 | Logo 类型白名单 png/jpeg/webp、≤512KB、不收 svg | 拒 svg（内联矢量可携带脚本＝XSS 面）与 gif；超限/空/非白名单中文直达 UI。 | 最简版够用；替换=先写新、写库成功后 best-effort 删旧（删失败留孤儿不影响正确性，不做全局清扫，守不过度设计）。 |
+
+### 9-1 数据模型（`prisma/schema.prisma`）
+
+```prisma
+// M9-d 平台设置：单用户免登录 → 全平台一行（id 固定 "platform"，服务层 get-or-create）。
+model PlatformSetting {
+  id       String  @id @default("platform") // 固定字面量主键，免 cuid 漂移
+  themeKey String  @default("cobalt")        // 只存插槽键名（R1）；脏值读取时 normalizeThemeKey 回落
+  logoFile String?                            // 品牌 Logo 文件名；null=未上传（品牌区回落文字标识）
+  updatedAt DateTime @updatedAt
+  @@map("platform_settings")
+}
+```
+迁移 `20261011151431_m9d_platform_setting`。**不 seed 该行**——`getPlatformSettings()` 缺行即 upsert 建默认，老库/净库都自洽。
+
+### 9-2 共享口径（新建 `src/core/domain/theme.ts`，纯函数、零依赖、plain-node 可直跑）
+
+`THEME_KEYS`（四键，展示序 cobalt/rust/emerald/teal）· `DEFAULT_THEME="cobalt"` · `THEME_LABEL`（钴蓝/铁锈红/祖母绿/蒂芙尼青）· `THEME_NOTE`（每套取舍说明，取自 theme-picker 结论，让客户睁眼选）· `isThemeKey(v)` 类型谓词 · `normalizeThemeKey(v)`（脏值回落默认）。**本文件不含任何色值**——四套实际色值只在 `tokens.css`，两处键集合由 `verify-theme.mjs` 交叉锁死（漂移护栏，同 FUNNEL≡LEAD 先例）。
+
+### 9-3 服务（新建 `src/core/domain/platformSettings.ts` prisma + `branding.ts` 文件层）
+
+- `platformSettings.ts`：`getPlatformSettings()`（get-or-create 单例，themeKey 已归一）/ `setThemeKey(key)`（`isThemeKey` 闸门，非法键中文拒——「不在设置页开取色器」的服务端体现）/ `setLogoFile(name)` / `clearLogoFileRef()`（返回被清文件名供删盘）。
+- `branding.ts`：`BRANDING_PUBLIC_DIR` / `LOGO_MAX_BYTES=512KB` / `saveLogoFile(file, current)`（校验+落盘，返回 `{filename,replaced}` 或 `{error}`）/ `removeLogoFile(name)`（best-effort，脏名不动盘）/ `brandingUrl(name)`（净化拼 URL）。
+
+### 9-4 页面与接线
+
+- `tokens.css`：`:root` 存 cobalt 作回落 + `--accent-fg:#fff`；`:root[data-theme="cobalt|rust|emerald|teal"]` 各覆盖一族四值（teal 的 `--accent-fg` = 其 `--accent-ink`）。色值逐字取 theme-picker.html，未调色。
+- `Button.tsx`：主按钮 `text-white` → `text-[color:var(--accent-fg)]`（唯一改动点；danger 的 `hover:text-white` 不动，红底白字达标）。
+- `layout.tsx`：转 async，`getPlatformSettings()` → `<html data-theme={themeKey}>`；侧栏品牌区有 `logoFile` 则渲 `<img>`（原生 img，非 next/image——用户运行时文件走优化端点是坑），无则回落「Platform」eyebrow。
+- `Topbar.tsx`：右侧加「设置」链（`pathname` 命中 `/settings` 显 accent-ink 选中态）。
+- `page.tsx`（首页）：加 `export const dynamic="force-dynamic"`——外壳现读库，静态预渲染会把构建当时的插槽色烘死、切主题后落地页不变（违反「全站生效」）。
+- `src/app/settings/{page,SettingsPanels,actions}`：server 取数 + client 面板（主题四选一单选，色块预览用 `data-theme` 作用域吃 `var(--accent)` 不写死 hex；Logo 上传/移除）+ 三 action（保存后 `revalidatePath("/","layout")` + `/settings` 即时全站生效）。
+
+### 9-5 门禁与验收
+
+- 新建 `scripts/verify-theme.mjs`（**26 项**）：四键常量与顺序 / DEFAULT / label·note 键集合恰等且非空互异 / `isThemeKey` 正反例（大小写·未知·空·null·非串）/ `normalizeThemeKey` 回落 / **漂移锁**：解析 `tokens.css` 的 `:root[data-theme="X"]` 键集合 ≡ `THEME_KEYS`、每套重写整族四值、cobalt 三元组 == V0.3 落地值、**teal `--accent-fg` 非白且等于其 `--accent-ink`** / 输出禁 emoji。
+- `qa-shots.mjs` 加 `{ name: "25-settings", path: "/settings" }`（35 → **36** 页）。
+- **动 schema ⇒ 四隔离库集成门禁全量重跑**（sign 12 / schedgen 27 / quality-flow 94 / finance-flow 76；新表不改既有 seed 形状，reset 重灌后初态守卫 15/13/2 仍成立）。
+- 集成者验收：build 绿 + tsc 0 + 十纯门禁零回退 + 四集成门禁 + qa 36 页 + **运行时四套真切换目检**（`_scratch/m9d_theme_shot.mjs`：逐套改 dev.db themeKey 起服务截 `/settings`+`/dashboard`+报价页，验整站 accent 随动 + teal 主按钮深墨，跑完复位 cobalt）+ **Logo 核心逻辑验收**（`_scratch/m9d_logo_check.mts` 16 项：落盘/服务端命名防穿越/替换回报/四类拒绝/URL 净化/清理归零）+ 375 探针（`/settings`·`/`·`/budget`）。浏览器点击上传/切主题写回候 HAE 手测（§4-7）。
+- 同步基线（集成者）：`STATUS.md` §1 路由（+/`/settings`）、§2 门禁表（+verify-theme）、§3 决策（M9-d 落地裁定 21~25）、§8 交接 M9-e。
+
+### 9-6 范围红线（越界即返工）
+
+不做：自由取色器 / 多品牌白标换肤（DEFERRED）、Logo 多图或按模块分标、图片内容深度校验（仅 MIME+大小+尺寸上限，不做像素/魔数嗅探）、上传目录全局清扫、`--accent-fg` 之外的第五个 accent 变量、登录/权限（`/settings` 本期免登录可改，P4 归管理员）。**不新增跨模块写入点**；`Project`/`Client` 及所有业务表**零改动**；`core/domain` 既有文件零改动（全新增）。
+
