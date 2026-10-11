@@ -246,3 +246,13 @@ codebuddy 自报 5 处偏离，集成者逐条裁定；另自修 2 处。
 - 删除已付段对应台账记录时的**对照条表现**；`unlocksAt` 的"12 个月"月算术跨年边界（`new Date` 月份加法用 UTC，别引 dayjs）。
 - 付款段是否要给「应收金额行内改」的口子——**本卡默认不给**（§1-4），若判定要给，先报集成者再定，别顺手加编辑功能。
 - 任何"为了页面上好看"而新增的汇总/趋势/占比图形。
+
+## 10. M8-b 执行记录与集成者裁定（2026-10-11 合入）
+
+codebuddy 实现台账写入，集成者独立验收。自报 3 处不确定点，逐条裁定：
+
+1. **`RecordDrawer` 按 `projectName` 反查 `projectId` 填编辑态项目下拉**：**这是真缺陷，非可接受偏离**。根因＝编辑抽屉放了可改的「项目」`<Select name="projectId">`，但 `updateRecord` 的 update data **不写 `projectId`**（只写 type/category/amount/date/description）——用户改项目保存后静默不生效；反查 `projects.find(p=>p.name===record.projectName)?.id` 又对重名/归档项目脆弱。**集成者裁断**：`updateRecord` 既然不写 projectId，就把编辑态「项目」改**只读**（文案「归属项目：X（不可改；如需更正请删除后重建）」），删掉反查与 `projects`→`RecordDrawer`→`FinanceLedger`→`page.tsx` 的整条依赖链。理由：可改归属需同时补服务端写 projectId + 新 projectId 存在性守卫 + 处理归档项目不在下拉的边界——那是 §0 未要求的扩范围（红线三），删除重建已足够承接"记错项目"的现场纠正。**教训入 STATUS §5**：与 M8-a「marginText 算了没渲染」同族——UI 控件与服务写侧语义必须一致，否则"改了不生效"，build/tsc/断言全拦不住。
+2. **`verify-finance-flow.mts` 26 断言（超卡文"约 18~24"）**：**准**。多出的 2 项是 `updateRecord`/`deleteRecord` 不存在记录的拒绝用例，属 §4-M8-b 校验清单的自然覆盖，非灌水。台账部分 26 条已含建/改/删即时复算（cent 整数分预言机对 DB 聚合交叉比对）+ 七类中文拒绝，覆盖到位。
+3. **`.mts` 是否被 `tsc --noEmit` 检查**：**已实测无碍**。`npx tsc --noEmit` exit 0；`npx tsx` 跑 flow 门禁 26/26 通过，脚本与既有 `verify-quality-flow.mts`/`verify-schedule-gen.mts` 同范式（`import { prisma } from "@/core/db"` 命名导出可用）。
+
+集成者独立验收：`pnpm build` 绿 + tsc 0 + **`verify-finance-flow.mts` 26/26**（隔离库 `_scratch/finance-flow.db` 三步）+ 七纯函数门禁零回退（quote37/crm11/health20/design28/schedule55/quality108/finance115）+ qa-shots 30 页全 200 + `/finance` 目检无回归 + **375 DOM 探针 scrollWidth=360≤375**（补 M8-a 欠的随页复核）。**未改 core/domain 或 seed.ts → 三既有集成门禁按 STATUS §8 规则无需重跑**。交互写回（浏览器点新建/编辑/删除看汇总即时变化）候 HAE 手测。

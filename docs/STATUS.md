@@ -1,8 +1,8 @@
 # 项目状态 — renovation-platform
 
-> 更新：**2026-10-10 深夜** · 维护：QwenWork（集成者）
-> 本轮：**M8 财务基础开工**——架构四决策与 HAE 定案（派生解锁 / 两本账分离 / health 不改毛利率另置 / 四单元不做打印）→ 起草并 commit `docs/TASK_M8.md`（`cc8afe2`）→ **M8-a 基座由 codebuddy 实现并经集成者独立验收合入工作区**（`finance` 模块 + `FinanceRecord`/`PaymentNode` 两表 + `core/domain/ledger.ts` 共享口径 + 五段付款纯函数 + **`verify-finance.mjs` 115 断言** + seed 15 段/11 笔 + `/finance` 只读台账页）+ **补 M2-A 遗留缺口：合同额录入入口**（`updateProject` 此前不含该列、项目设置表单无此项，M8 全模块吃这个数）。
-> 下一步 **M8-b 台账写入**（提示词待写）。M7 五单元已于本日全部合入（见 §1 与 git log）。
+> 更新：**2026-10-11** · 维护：QwenWork（集成者）
+> 本轮：**M8-b 台账写入合入**——codebuddy 实现、集成者独立验收（`records.ts` 扩 `createRecord`/`updateRecord`/`deleteRecord` + `FinanceRecordError` 中文校验 + `finance/actions.ts` 三个 Server Action + `NewRecordModal`（**类型↔科目联动**做防错账第一道闸）+ `RecordDrawer`（编辑 + 删除两步确认 danger 描边）+ `page.tsx` 表格抽成客户端 `FinanceLedger` 行点开抽屉 + **新 `verify-finance-flow.mts` 26 断言**隔离库端到端）。**集成者修一处真缺陷**：编辑抽屉放了个可改的「项目」下拉但 `updateRecord` 根本不写 `projectId`（改了静默不生效）+ 用项目名反查 id 脆弱 → 裁断改为**归属项目只读**（更正走删除重建），删掉反查与 `projects` 依赖链。
+> 下一步 **M8-c 付款计划页**（`/finance/payments` 去占位 + 五段生成/清空守卫/标记已付硬门控 + **M7 节点 passed→段解锁派生联动**断言；提示词待写）。M8-a 基座与合同额录入入口见下轮记录与 git log（`95f0bc6`/`a16bb69`）。
 > 本文件是**唯一**状态真源。`docs/SURVEY_2026-10-09.md`（16:48 快照）已并入此处并删除；
 > 10-08 深夜版 STATUS 中「M1b 暂停、两条 wip 分支待续」已作废——那两条废弃分支弃用未参考，M1b 由新轨道重做完成。
 > **2026-10-09 下午**：吸收 `Full-Service Project Management/` 三份妙搭资料，全案重排为 `docs/PLAN_FULL_SERVICE_V1.md` v1.2（路线 B）；M2-A 主脊 schema 已合入。
@@ -10,7 +10,7 @@
 
 ## 0. 一句话
 
-**M1a 平台壳 + M1b 预算模块 + M2-A 主脊 schema + M3 商务线索 + M4 项目中心 + M5 设计管理 + M6 时间管控 + M7 质量管控 + M8-a 财务基座（`finance` 模块 / 两表 / 共享财务口径 / 只读收支台账 / 合同额录入入口）均已合入并通过门禁；schema 6 条迁移、旧数据零破坏。全案按 `PLAN_FULL_SERVICE_V1.md` v1.2 路线 B 推进；余 M3-e 漏斗（延至 M9 驾驶舱），下一步 **M8-b 台账写入 → M8-c 付款计划（接 M7 验收通过→段解锁派生）→ M8-d 项目中心接线**。**
+**M1a 平台壳 + M1b 预算模块 + M2-A 主脊 schema + M3 商务线索 + M4 项目中心 + M5 设计管理 + M6 时间管控 + M7 质量管控 + M8-a 财务基座 + M8-b 台账写入（收支 CRUD + 新建/编辑/删除界面 + 毛利即时复算，端到端门禁 26）均已合入并通过门禁；schema 6 条迁移、旧数据零破坏。全案按 `PLAN_FULL_SERVICE_V1.md` v1.2 路线 B 推进；余 M3-e 漏斗（延至 M9 驾驶舱），下一步 **M8-c 付款计划（接 M7 验收通过→段解锁派生回环）→ M8-d 项目中心接线**。**
 
 ## 1. 已完成（截至 M8-a；清单外的演化用 `git log --oneline` 自查）
 
@@ -46,6 +46,7 @@
 | **M7-d** | 质量档案：`/quality/archive` 索引 + `[projectId]` 时间轴（`timeline.ts` 纯函数 + 语义色点 + 同刻节点优先排序）+ A4 打印三件套（PrintButton 平行复制）+ `print-pdf.mjs` 加 `--path`；**seed 演示回填**（节点 createdAt=工序实际完工日，保时间轴顺序自洽）；verify-quality **扩至 108** | build + 108 + 真 PDF 目检 1 页 + 375 探针双页 |
 | **M7-e** | 项目中心接线：「质量验收」Tab 真数据（摘要 + 节点清单链 + 未关闭问题 3 条 + 台账/质量链）+ 基础信息**质量灯接 `qualityLight` 真值**（无节点→灰「暂无验收」）+ 甘特任务抽屉「验收节点 →」入口（`/quality?taskId=` 解析跳转） | build + tsc 0 + 108 + 截图（001 待提交态 / 003 已通过·退回·待整改态）+ 375 探针 |
 | **M8-a** | 财务基座：新建 `finance` 模块（manifest `财务管控` order=8 + registry 接线 + 从 `deferredModules` 删 finance）；`FinanceRecord`（收支，录入即入账、无审批态）+ `PaymentNode`（五段，`amountDue` 生成时快照、`paid/paidAt/paidBy` 唯一落库执行事实）两表迁移；**共享口径 `core/domain/ledger.ts`**（`receivedTotal`/`expenseTotal`/`netCash`/`grossProfit`/`marginRate`（分母≤0 → **null 不造 0%**）/`marginLight`（0.25 与 0.15 均归黄））；模块私有 `payment.ts`（五段模板常量 + `buildPaymentPlan` 尾差归末段 + `paymentUnlockState` **派生解锁**（日期→stages→all 优先级）+ `canMarkPaid` 硬门控）；**新 `scripts/verify-finance.mjs` 115 断言**；seed（合同额回填 62k/160k/128k + 15 付款段 + 11 笔收支 + 三处标记已付 + 支出日期按开工日偏移保时间自洽）；`/finance` **只读台账页**（收/支双 Tab + 项目筛选 + 六格汇总条，「待收款」与「计划未付合计」分列不合并）+ `/finance/payments` 占位页；**补 M2-A 缺口：合同额录入入口**（`UpdateProjectInput.contractAmount?` + `updateProject` 同源校验「非负」+ 项目设置表单加一行 + `actions.ts` 透传） | build 绿 + tsc 0 + **verify-finance 115** + 六既有纯函数门禁零回退（quote37/crm11/health20/design28/schedule55/quality108）+ **三隔离库集成门禁零回退**（sign 12 / schedule-gen 27 / quality-flow 94，**动 core `updateProject` 与 seed 后必跑**）+ qa-shots 22-finance 目检（**目检抓出一处真缺陷：`marginText` 定义了没渲染，毛利卡只显「毛利率」三字不显数值 → 已修**） |
+| **M8-b** | 台账写入：`server/records.ts` 扩 `createRecord`/`updateRecord`/`deleteRecord` + 模块内 `FinanceRecordError`（中文直达 UI；纯输入校验在开事务前、存在性在事务内，仿 `createIssue`）——校验 `type∈{income,expense}` / `category∈categoriesFor(type)`（**收入不给材料、支出不给合同款**，防错账第一道闸）/ `amount` 有限且 >0（拒负/零/NaN，方向由 type 定不受负数）/ `date` 可解析 / `description` 去空白可空；`updateRecord` **不改 `recordedBy`**（保留创建者）、`deleteRecord` 硬删（单用户无回收站）；`finance/actions.ts` 三 Server Action（`revalidatePath("/finance")`，前端不自算汇总）；`NewRecordModal`（**类型↔科目联动**：切类型重置科目为该侧第一项，杜绝跨侧非法值）+ `RecordDrawer`（编辑同款联动 + 删除两步确认 `danger` 描边不铺红底）+ `page.tsx` 表格抽成客户端 `FinanceLedger`（行点开抽屉，六列不变）；**新 `scripts/verify-finance-flow.mts` 26 断言**（隔离库三步 + 初态守卫 15/11 + cent 整数分预言机：建支出→毛利即时−、建收入→已收+/待收−、改额→按新值复算、删→回到删前 + 七类拒绝逐条中文文案）。**集成者修真缺陷**：编辑抽屉原放可改「项目」下拉但 `updateRecord` 不写 `projectId`（改了静默不生效）+ 用项目名反查 id 脆弱 → 裁断**归属项目只读**（更正走删除重建），删反查与 `projects` 依赖链 | build 绿 + tsc 0 + **verify-finance-flow 26/26**（隔离库）+ 七纯函数门禁零回退（quote37/crm11/health20/design28/schedule55/quality108/**finance115**）+ qa-shots 30 页全 200 + `/finance` 目检无回归（毛利卡数值正常）+ **375 DOM 探针 scrollWidth=360≤375 无溢出**（补 M8-a 欠的随页复核） |
 
 **路由（M8-a 后共 23 条动态页）**：`/`、`/budget`、`/budget/[projectId]`、`/budget/[projectId]/{print,stats,settings}`、`/budget/catalog`、`/crm`、`/projects`、`/projects/[id]`、`/design`、`/design/[id]`、`/schedule`、`/schedule/[projectId]`、`/schedule/templates`、`/quality`、`/quality/nodes/[id]`、`/quality/issues`、`/quality/archive`、`/quality/archive/[projectId]`、`/quality/archive/[projectId]/print`、**`/finance`、`/finance/payments`（M8-c 才填真）**（深链：`?scope=`、`?view=`、`?month=`、`?tab=`、`?taskId=`、`?projectId=` 见各模块）。
 
@@ -67,6 +68,7 @@
 | `scripts/verify-quality.mjs` | **108 项断言**：节点 4 态谓词/转移/`nodeDisplayLabel` 派生文案/重提门控 + 问题 3 态谓词/转移 + 严重度 + `buildTimeline` 42 断言（排序/同刻节点优先/tone 映射/href 规则）+ 输出禁 emoji | M7-a 新增 66；M7-d 扩至 108 |
 | `scripts/verify-quality-flow.mts` | **质量端到端集成门禁（94 项）**：同步建/删/幂等 + 进度 100 同事务建节点 + 非 pending 永不自动删 + 提交守卫 + 审核退回建 Issue + 复验退回再锁全链 + 手工新建 | M7-b 新增 52；M7-c 扩至 94。**改库脚本不可直接重跑**：每次先 `migrate reset --force`（头注已写明 + 初态守卫拦截，避免残留状态误报） |
 | `scripts/verify-finance.mjs` | **115 项断言**：`core/domain/ledger.ts` 六函数（按 type 取数不看符号 / 脏值归 0 / 分母≤0 → null / **整数分预言机复算**）+ `marginLight` 五档含 **0.25、0.15 临界归黄** + `payment.ts`（五段模板常量、`buildPaymentPlan` 三例含 128,001 **尾差归末段且 Σ 恰等合同额**、`paymentUnlockState` 四路径 × {满足/未满足/无对应节点/空清单/`unlocksAt==today` 边界/日期优先}、`canMarkPaid` 真值表、触发文案）+ `categoriesFor` 收支互斥 + label/tone 全覆盖 + 禁 emoji | M8-a 新增；仿 verify-quote，plain-node 直 import 真源 `.ts`。**改财务口径时必跑** |
+| `scripts/verify-finance-flow.mts` | **财务台账写入端到端集成门禁（26 项，隔离库）**：初态守卫（付款段 15 · 收支记录 11）+ `createRecord`/`updateRecord`/`deleteRecord` 真跑生产服务层 → 建支出毛利即时−/建收入已收+待收−/改额按新值复算/删回到删前（**cent 整数分预言机对 DB 聚合交叉比对**）+ `recordedBy` 保留创建者 + `description` 去空白/空存空串 + 七类拒绝逐条断言中文文案（不存在项目/负/零/NaN 金额/非法 type/income+material 与 expense+contract 科目错配/非法日期/update·delete 不存在记录）| M8-b 新增；隔离库三步配方照 `verify-schedule-gen.mts`（⚠ 跑前先 `migrate reset --force`，头注已写明 + 初态守卫拦截）。**M8-c 将扩付款计划生成/清空守卫/标记已付门控/M7 节点 passed→段解锁派生联动断言** |
 
 **验收纪律**：`build` 绿 + 断言过 ≠ 页面正确。今天三个真缺陷全部由**截图 / PDF 目检**发现（科目库空壳、编辑器列宽挤压、打印 5 页），门禁一个都没拦住。
 
@@ -112,7 +114,7 @@
 | 10 | 模板库改动对「未排程项目生成预览」的刷新为下次请求生效（force-dynamic + ≤30s 客户端路由缓存） | 可接受，未修 |
 | 11 | M7 范围外留位（有意，见 `TASK_M7.md` §7）：现场影像（占位说明条）/ ~~验收通过→付款解锁~~ **M8-a 已建表并定派生口径，回环界面归 M8-c**（付款计划页读 `AcceptanceNode` 算解锁）/ CheckItem 编辑页（v5.1 无此页，改检查项走 seed）/ 复验退回不单独成时间轴事件（Issue 无独立退回时间戳） | 均为有意留位，非遗漏 |
 | 12 | **`/finance` 汇总条六格均分且同权重**（合同额/已收/待收/计划未付/总支出/毛利 一样大） | 违反 §7.4「慎用 50/50、尺寸要成阶梯」，毛利应明显重于其余；**与第 4 条同因同类，M8-d 视觉收口时一并处理** |
-| 13 | M8 余三单元：`b` 台账写入（Modal/抽屉/删改 + 新 `verify-finance-flow.mts` 台账部分）· `c` 付款计划页（生成五段/清空守卫/标记已付门控/**M7 节点 passed→段解锁派生联动**断言）· `d` 项目中心接线（毛利卡 + 预算灯接真 + M7 两处「M8 接入」文案改真链 + STATUS/截图收尾） | 未开始，提示词待写 |
+| 13 | M8 余两单元：~~`b` 台账写入~~ **已合入**（`records.ts` CRUD + `actions.ts` + `NewRecordModal`/`RecordDrawer`/`FinanceLedger` + `verify-finance-flow.mts` 26）· `c` 付款计划页（生成五段/清空守卫/标记已付门控/**M7 节点 passed→段解锁派生联动**断言 + flow 门禁扩付款部分）· `d` 项目中心接线（毛利卡 + 预算灯接真 + M7 两处「M8 接入」文案改真链 + STATUS/截图收尾） | b ✅；c/d 未开始，提示词待写 |
 
 ## 5. 踩过的坑（每条都有代价，防返工）
 
@@ -134,6 +136,7 @@
 - **演示数据的时间自洽要主动回填**：节点/问题 `createdAt` 若停留在 seed 运行时刻，档案时间轴会出现「生成晚于提交」的反序（M7-d 实见）。正解=seed 演示流统一回填（节点于工序实际完工日生成、问题于退回时刻生成）；**生产 `syncAcceptanceNodes` 用真实时刻、不回填**。M8-a 按同法：付款段 `paidAt` 取节点 `reviewedAt`+1d、7 笔支出按各自开工日 +12~+55 天落在施工期内（越过今天则钳回昨天），避免已竣工项目出现「完工后才买主材」的反序。
 - **纯函数算出来了、页面却没把它渲染**（M8-a 实见，靠截图抓到）：`/finance` 里 `marginText`（毛利率数值）定义了却没用，毛利卡只显「毛利率」三个字不显数值——`tsc` 不报（未开 `noUnusedLocals`）、build 绿、115 断言全过。**教训：口径类字段要在目检时逐个对"数值是否出现在页面上"，别只看版式。**
 - **主脊字段的写侧别等下游催**（M2-A→M8 的时差实见）：`contractAmount` 在 M2-A 只落了列与读侧显示，`updateProject` 与项目设置表单都不含它，导致 M8 开工时非签约项目根本无法录入合同额、生成守卫无从手测。**动主脊加"财务/状态锚点"列时，同一批就把写入入口一起补上**（或至少在任务卡里挂一条"写侧待补"）。
+- **编辑控件必须与服务层写侧语义一致，否则"改了静默不生效"**（M8-b 实见，代码审查抓到、非截图）：codebuddy 的编辑抽屉放了个可改的「项目」下拉（`<Select name="projectId">`），但 `updateRecord` 的 update data 根本不写 `projectId`——用户改项目保存后纹丝不动。它还用 `projects.find(p => p.name === record.projectName)?.id` 按名字反查 id 来填这个下拉，重名/归档项目即错位。**正解**：`updateRecord` 既然不写 projectId，就把编辑态的「项目」改**只读**（归属更正走删除重建），删掉反查与 `projects` 依赖链。教训与 M8-a「marginText 算了没渲染」同族——**纯函数/服务算了或收了字段，不等于界面把它接住了或写回了**；加编辑控件时逐个对"这个控件改了，服务写不写、写了 DB 变不变"，build/tsc/断言都拦不住这种"UI 与写侧脱节"。若确需可改归属，得同时补 `updateRecord` 写 projectId + 事务内新 projectId 存在性守卫 + 处理归档项目不在下拉的边界（那是扩范围，本卡不做）。
 
 ## 6. 并行执行规约（当前生效）
 
@@ -149,16 +152,17 @@
 - 设计真源：`E:\19 Python File\MT-Visual-Language\HAE Creator Design System V0.3.md`（一行指针，不在本仓复制）。
 - 决策与审计：`docs/PROPOSAL_M1.5.md`、`docs/REQUIREMENTS.md`、`docs/DESIGN_AUDIT_M1A.md`、`docs/BUILD_SPEC_M1.md`。
 - 全案计划真源：`docs/PLAN_FULL_SERVICE_V1.md`（v1.2，路线 B；整合 `Full-Service Project Management/` 三份妙搭资料）。
-- 任务卡：`docs/TASK_M1A.md`、`TASK_M1B_A.md`、`_A2`、`_A3`、`_A4_FIX`、`_B1`、`_B1_FIX`、`_B2`、`_B3`、`TASK_M2A.md`、`TASK_M3_CRM.md`、`TASK_M4.md`、`TASK_M5.md`、`TASK_M6.md`、`TASK_M7.md`、**`TASK_M8.md`（M8-a 已执行合入，b/c/d 待做；卡含 §5.1 文件所有权与禁区、§7 十三条偏差记录）**。
+- 任务卡：`docs/TASK_M1A.md`、`TASK_M1B_A.md`、`_A2`、`_A3`、`_A4_FIX`、`_B1`、`_B1_FIX`、`_B2`、`_B3`、`TASK_M2A.md`、`TASK_M3_CRM.md`、`TASK_M4.md`、`TASK_M5.md`、`TASK_M6.md`、`TASK_M7.md`、**`TASK_M8.md`（M8-a/b 已执行合入，c/d 待做；卡含 §5.1 文件所有权与禁区、§7 十三条偏差记录、§8 M8-a 执行记录）**。
 - 配色决策产物：`docs/preview/theme-picker.html`（四套 accent × 同一张报价单，含无障碍实测与撞色风险）。
 - 本地产物（不入库）：`_scratch/logs/`、`_scratch/qa/`（截图与 PDF）、`_scratch/backup/`（dev.db 备份）。
 - 废弃分支（仅存档，勿参考勿 checkout）：`wip/m1b-a`、`feat/presentation`、`pre-m1b-checkpoint`。
 
-## 8. 下次接续（2026-10-10 晚 handoff）
+## 8. 下次接续（2026-10-11 handoff）
 
-- **进度**：M2-A → **M7 五单元全部合入 master**（`aeafcbe`/`3225d2c`/`25270b8`/`ca52391`/`fe04718`）→ **M8 开工**：任务卡 `docs/TASK_M8.md` 已 commit（`cc8afe2`），**M8-a 财务基座已由 codebuddy 实现、经集成者独立验收合入工作区**（迁移 `20261010111352_add_m8_finance` 已应用、seed 已跑、全门禁绿、截图目检过）。M7 仍候用户手测。
-- **M8-a 验收记录**：`pnpm build` 绿 + `npx tsc --noEmit` 0 + **新 `verify-finance` 115** + 六既有纯函数门禁零回退（quote37/crm11/health20/design28/schedule55/quality108）+ **三隔离库集成门禁零回退**（sign 12 / schedule-gen 27 / quality-flow 94——因动了 core `updateProject` 与 `seed.ts`，这三个必须重跑确认）+ qa-shots 30 目标全 200 + `22-finance` 目检（抓出并修好"毛利率数值未渲染"一处）。**未做**：`/finance` 的 375 DOM 探针（归 M8-b 随页复核）、汇总条的 V0.3 阶梯权重（见 §4-12）。DB 备份在 `_scratch/backup/dev.db.2026-10-10-M8前`。
-- **下一步 = M8-b 台账写入**（提示词待写，照 `_scratch/logs/cb_m8a_prompt.md` 的格式与纪律）：`server/records.ts` 扩 `createRecord`/`updateRecord`/`deleteRecord`（模块内 `FinanceRecordError` 中文报错；项目必选存在、金额 > 0 不接受负数、`type`×`category` 必须经 `categoriesFor` 匹配、日期有效）+ `src/app/finance/actions.ts` + `NewRecordModal.tsx`（仿 `NewIssueModal`）+ `RecordDrawer.tsx`（复用 `core/ui/Drawer`，删除二次确认）+ **新 `scripts/verify-finance-flow.mts`**（隔离库三步 + 初态守卫；本单元只写台账部分：建/改/删后 `receivedTotal`/`expenseTotal`/`grossProfit`/`marginRate` 同请求内即时复算正确 + 非法类别/负数/不存在项目四类拒绝）。**M8-c 才是付款计划页与 M7 解锁回环联动断言**（那是 PLAN §5-M8 完成条件的另一半，别在 b 里顺手做）。
+- **进度**：M2-A → M7 五单元全部合入 → **M8-a 财务基座**（`95f0bc6`）→ **M8-b 台账写入合入**（本轮，见 §1 M8-b 行）。M7/M8-a 仍候用户手测。
+- **M8-a 验收记录**：`pnpm build` 绿 + `npx tsc --noEmit` 0 + **新 `verify-finance` 115** + 六既有纯函数门禁零回退（quote37/crm11/health20/design28/schedule55/quality108）+ **三隔离库集成门禁零回退**（sign 12 / schedule-gen 27 / quality-flow 94——因动了 core `updateProject` 与 `seed.ts`，这三个必须重跑确认）+ qa-shots 30 目标全 200 + `22-finance` 目检（抓出并修好"毛利率数值未渲染"一处）。DB 备份在 `_scratch/backup/dev.db.2026-10-10-M8前`。
+- **M8-b 验收记录**：`pnpm build` 绿 + `npx tsc --noEmit` 0 + **新 `verify-finance-flow.mts` 26/26**（隔离库 `_scratch/finance-flow.db` 三步：`migrate reset --force --skip-generate` 自动 seed → `npx tsx`）+ 七纯函数门禁零回退（含 finance115）+ qa-shots 30 页全 200 + `/finance` 目检无回归 + **375 DOM 探针 scrollWidth=360≤375**（补上 M8-a 欠的随页复核）。**未改 core/domain 或 seed.ts → 三个既有集成门禁按 §8 规则无需重跑**（reset 时 seed 链已全绿）。**集成者修真缺陷**：编辑抽屉「项目」下拉与 `updateRecord` 写侧脱节（改了不生效）→ 改归属项目只读（见 §5 新坑）。**交互写回（浏览器点新建/编辑/删除看汇总即时变化）仍候 HAE 手测**（§4-7）。
+- **下一步 = M8-c 付款计划页**（提示词待写，照 `_scratch/logs/cb_m8b_prompt.md` 的格式与纪律）：`/finance/payments` 去占位 → `PaymentPlanBoard.tsx` + `server/payments.ts`（生成五段含守卫：已存在任何段拒绝 / `contractAmount<=0` 拒绝并链 `/budget/[projectId]/settings` / 项目须存在 / 单事务 `createMany`；清空守卫：存在 `paid` 段拒绝；`markPaid`/`unmarkPaid` 走 `canMarkPaid` 硬门控）+ 垂直时间线段卡（触发文案 `paymentTriggerLabel` + 解锁态 `paymentUnlockState` + `missing` 工序清单 + 标记已付/撤销 + 顶部诚实对照条「计划已标记已付 ¥A · 台账已入账合同款 ¥B · 差额」）+ **`verify-finance-flow.mts` 扩付款部分**：生成与 `buildPaymentPlan` 逐段一致 / 重复生成拒 / 合同额 0 拒 / 清空含 paid 拒 / 标记已付+撤销 / **未解锁拒标记** / **M7 节点 passed→段派生解锁（把 002 水电 `AcceptanceNode.status` 置 passed、不写任何 finance 表、重读派生即由未解锁变可收款——这条就是 M7 欠的回环，必断言）** / 改 `contractAmount` 不回溯已生成 `amountDue` 快照 + qa-shots 加 `23-finance-payments`。**别顺手做 M8-d 的项目中心毛利卡/预算灯接线。**
 - **驱动 codebuddy 的命令（默认走 Provider 池 `custom-local:glm-5.2`）**：
   `codebuddy -p --model custom-local:glm-5.2 --session-id <id> --permission-mode bypassPermissions --disallowedTools "Bash(git:*),Bash(pnpm dev:*),Bash(pnpm prisma migrate:*),Bash(pnpm db:*)" < _scratch/logs/cb_<单元>_prompt.md > _scratch/logs/cb_<单元>_out.log 2>&1`（后台跑）。纪律：一轮一个界面单元；429 冷却可续、失败原卡重跑；改动留工作区由集成者 commit；**codebuddy 自述不作数，集成者必独立复跑门禁**；schema/seed 的**执行**（migrate/db seed）归集成者，codebuddy 只写文件。跑完 grep `~/.codebuddy/logs/<date>/renovation-platform__*.log` 的 `resolved model=`/`url=`，确认命中 `http://127.0.0.1:8787/…`（别落回 copilot.tencent.com 内置口）。
 - **门禁套件（合入前必跑）**：`pnpm build` + `npx tsc --noEmit` + `verify-quote`(37) + `verify-crm`(11) + `verify-health`(20) + `verify-design`(28) + `verify-schedule`(55) + `verify-quality`(108) + **`verify-finance`(115)** + `verify-quality-flow.mts`(94，隔离库；⚠ 跑前先 `migrate reset --force`，见 §5) + `verify-schedule-gen.mts`(27) + `verify-sign.mts`(12) + `node scripts/qa-shots.mjs`（截图目检——真缺陷历史上全靠它抓，断言过≠对；375 溢出争议用 §5 的 DOM 探针量 scrollWidth，别只信肉眼）。**改了 `core/domain` 或 `prisma/seed.ts` 时，三个隔离库集成门禁一律重跑**（它们的初态来自 seed，M8-a 实测三个都过才算零回退）。
