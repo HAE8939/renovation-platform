@@ -5,15 +5,22 @@
  * 跨模块读走 core/db prisma 直读，不 import 其他模块内部（AGENTS §2）。
  * 口径全走 core/domain/ledger.ts 与 finance/payment.ts 的纯函数 ——
  * 页面/服务里不得出现第二处算式（TASK_M8 §5）。
+ *
+ * 变更聚合（M9-a）：汇总条 grossProfit/marginRate 的 changeTotal 由留位 0 改为
+ * 真值（按筛选范围：单项目→该项目变更和；全量→全部变更）；pendingTotal 分母改
+ * max(0, contractAmount + changeTotal − received)（变更后应收含变更）。
+ * 直读 ChangeOrder（budget 私有表经 quote→project），不 import budget 模块内部。
  */
 
 import prisma from "@/core/db";
 import {
+  changeTotal,
   expenseTotal,
   grossProfit,
   marginLight,
   marginRate,
   receivedTotal,
+  type ChangeRow,
 } from "@/core/domain/ledger";
 import { round2 } from "@/core/domain/pricing";
 import { categoriesFor, type FinanceCategory, type FinanceType } from "../types";
@@ -86,7 +93,7 @@ export async function listRecords(
     ...(view ? { type: view as FinanceType } : {}),
   };
 
-  const [records, projectOptions, projects, paymentNodes] = await Promise.all([
+  const [records, projectOptions, projects, paymentNodes, changeOrders] = await Promise.all([
     prisma.financeRecord.findMany({
       where,
       orderBy: [{ date: "desc" }, { createdAt: "desc" }],
@@ -104,6 +111,11 @@ export async function listRecords(
     prisma.paymentNode.findMany({
       where: projectId ? { projectId } : {},
       select: { amountDue: true, paid: true },
+    }),
+    // 变更单按筛选范围读（projectId 给定 → 该项目变更；否则全量），口径走 ledger.changeTotal
+    prisma.changeOrder.findMany({
+      where: projectId ? { quote: { projectId } } : {},
+      select: { amount: true },
     }),
   ]);
 
@@ -149,24 +161,28 @@ export async function listRecords(
   );
   const received = receivedTotal(ledgerRecords);
   const expense = expenseTotal(ledgerRecords);
+  // 变更额按筛选范围聚合（ledger.changeTotal 单一真源，带符号）
+  const changeRows: ChangeRow[] = changeOrders.map((c) => ({ amount: c.amount }));
+  const changeTotalVal = changeTotal(changeRows);
   const unpaidPlanTotal = round2(
     paymentNodes.filter((n) => !n.paid).reduce((s, n) => s + (n.amountDue ?? 0), 0)
   );
   const profit = grossProfit({
     contractAmount,
-    changeTotal: 0, // 变更额留 M9（§0 红线 / §7-9）
+    changeTotal: changeTotalVal,
     expenseTotal: expense,
   });
   const rate = marginRate({
     contractAmount,
-    changeTotal: 0,
+    changeTotal: changeTotalVal,
     expenseTotal: expense,
   });
 
   const summary: FinanceSummary = {
     contractAmount,
     receivedTotal: round2(received),
-    pendingTotal: round2(Math.max(0, contractAmount - received)),
+    // 待收款 = max(0, 合同额 + 变更 − 已收)（变更后应收口径，M9-a）
+    pendingTotal: round2(Math.max(0, contractAmount + changeTotalVal - received)),
     unpaidPlanTotal,
     expenseTotal: round2(expense),
     grossProfit: profit,

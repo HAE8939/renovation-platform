@@ -14,11 +14,14 @@ import {
   type Light,
 } from "@/core/domain/health";
 import {
+  changeTotal,
+  changeWatch,
   expenseTotal,
   grossProfit,
   marginLight,
   marginRate,
   receivedTotal,
+  type ChangeRow,
   type LedgerRecord,
 } from "@/core/domain/ledger";
 import { syncAcceptanceNodes } from "@/core/domain/acceptance";
@@ -33,10 +36,11 @@ import { syncAcceptanceNodes } from "@/core/domain/acceptance";
  * 质量聚合：读前先 syncAcceptanceNodes 兜底（core 整合器，M7-e 调用点③），
  * 再 prisma 直读 AcceptanceNode/Issue 计数；灯复用 core/domain/health.qualityLight
  * （不改公式）；不 import quality 模块内部。
- * 财务聚合（M8-d）：prisma 直读 financeRecord，口径复用 core/domain/ledger
- * （receivedTotal/expenseTotal/grossProfit/marginRate/marginLight）与
- * core/domain/health.budgetLight（合同执行/收款进度灯，changeTotal 传 0 留 M9）；
- * 不 import finance 模块内部（records.ts/payments.ts 是禁区，TASK_M8 §5）。
+ * 财务聚合（M8-d / M9-a）：prisma 直读 financeRecord 与 ChangeOrder，口径复用
+ * core/domain/ledger（receivedTotal/expenseTotal/grossProfit/marginRate/marginLight/
+ * changeTotal/changeWatch）与 core/domain/health.budgetLight（合同执行/收款进度灯，
+ * changeTotal 传真实变更累计）；不 import finance / budget 模块内部
+ * （records.ts/payments.ts/changes.ts 是禁区，TASK_M8 §5 / TASK_M9 §3-4）。
  */
 
 export interface HubCategory {
@@ -97,21 +101,28 @@ export interface HubQuality {
 
 /**
  * 财务聚合（M8-d）：prisma 直读 financeRecord，口径全走 core/domain/ledger.ts
- * 与 core/domain/health.ts。changeTotal 恒传 0 并注明「变更额留 M9」（§0 红线 / §7-9）。
- * budgetLight 为合同执行/收款进度（已收 vs 合同额），与 marginLight（毛利率色档）
- * 不同灯位（§1-3、§7-12）。
+ * 与 core/domain/health.ts。budgetLight 为合同执行/收款进度（已收 vs 合同额），
+ * 与 marginLight（毛利率色档）不同灯位（§1-3、§7-12）。
+ * 变更聚合（M9-a）：prisma 直读 ChangeOrder（budget 私有表，经 quoteId 挂报价单级），
+ * 口径复用 ledger.changeTotal / changeWatch —— 不 import budget 模块内部；
+ * budgetLight/grossProfit/marginRate 的 changeTotal 改真值；paidPct 分母改
+ * contractAmount + changeTotal（变更后应收口径）。
  */
 export interface HubFinance {
   hasRecords: boolean;
   /** 合同额（哨兵：0 = 未录入，毛利/计划/灯下游第一次用到它） */
   contractAmount: number;
+  /** 累计变更额（带符号：正=增加、负=减少；ledger.changeTotal 单一真源） */
+  changeTotal: number;
+  /** 变更超 5% 预警（ledger.changeWatch；合同额≤0 → false） */
+  changeWarn: boolean;
   receivedTotal: number;
   expenseTotal: number;
   grossProfit: number;
   /** 毛利率（合同额未录入 → null，UI 显「—」不造 0%） */
   marginRate: number | null;
   marginLight: "green" | "yellow" | "red" | "neutral";
-  /** 已收/合同额（contractAmount<=0 → null，UI 显「未录入合同额」不假绿） */
+  /** 已收/(合同额+变更)（分母≤0 → null，UI 显「未录入合同额」不假绿） */
   paidPct: number | null;
   /** 预算灯（health.budgetLight，合同执行/收款进度） */
   budgetLight: Light;
@@ -324,40 +335,54 @@ export async function getProjectHub(projectId: string): Promise<ProjectHub | nul
 
   // ── 财务聚合（prisma 直读 financeRecord，口径复用 core/domain/ledger.ts /
   //    health.ts；不 import finance 模块内部，AGENTS §2 / TASK_M8 §5）──
-  //    changeTotal 恒传 0（变更额留 M9，§0 红线 / §7-9）。
-  const financeRecords = await prisma.financeRecord.findMany({
-    where: { projectId },
-    select: { type: true, amount: true },
-  });
+  //    变更聚合（M9-a）：prisma 直读 ChangeOrder（budget 私有表经 quoteId 挂报价单级），
+  //    口径走 ledger.changeTotal / changeWatch —— 不 import budget 模块内部。
+  const [financeRecords, changeOrders] = await Promise.all([
+    prisma.financeRecord.findMany({
+      where: { projectId },
+      select: { type: true, amount: true },
+    }),
+    prisma.changeOrder.findMany({
+      where: { quote: { projectId } },
+      select: { amount: true },
+    }),
+  ]);
   const ledgerRecords: LedgerRecord[] = financeRecords.map((r) => ({
     type: r.type,
     amount: r.amount,
   }));
+  const changeRows: ChangeRow[] = changeOrders.map((c) => ({ amount: c.amount }));
   const contractAmount = project.contractAmount;
   const received = receivedTotal(ledgerRecords);
   const expense = expenseTotal(ledgerRecords);
+  const changeTotalVal = changeTotal(changeRows);
+  const { warn: changeWarn } = changeWatch(contractAmount, changeTotalVal);
   const profit = grossProfit({
     contractAmount,
-    changeTotal: 0, // 变更额留 M9
+    changeTotal: changeTotalVal,
     expenseTotal: expense,
   });
   const rate = marginRate({
     contractAmount,
-    changeTotal: 0, // 变更额留 M9
+    changeTotal: changeTotalVal,
     expenseTotal: expense,
   });
+  // paidPct 分母 = 合同额 + 变更（变更后应收口径）；≤0 → null
+  const paidDenom = contractAmount + changeTotalVal;
   const finance: HubFinance = {
     hasRecords: financeRecords.length > 0,
     contractAmount,
+    changeTotal: changeTotalVal,
+    changeWarn,
     receivedTotal: round2(received),
     expenseTotal: round2(expense),
     grossProfit: profit,
     marginRate: rate,
     marginLight: marginLight(rate),
-    paidPct: contractAmount > 0 ? round2(received / contractAmount) : null,
+    paidPct: paidDenom > 0 ? round2(received / paidDenom) : null,
     budgetLight: budgetLight({
       contractAmount,
-      changeTotal: 0, // 变更额留 M9
+      changeTotal: changeTotalVal,
       paidTotal: received,
     }),
   };

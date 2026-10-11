@@ -348,6 +348,12 @@ export function QuoteBoard({ data }: { data: QuoteBoardData }) {
                 科目分布
               </Link>
               <Link
+                href={`/budget/${project.id}/changes`}
+                className="text-xs text-accent-ink underline-offset-4 hover:underline"
+              >
+                变更单
+              </Link>
+              <Link
                 href={`/budget/${project.id}/print`}
                 target="_blank"
                 rel="noopener noreferrer"

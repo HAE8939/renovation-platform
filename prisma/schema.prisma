@@ -141,6 +141,7 @@ model BudgetQuote {
 
   project Project    @relation(fields: [projectId], references: [id])
   items   QuoteItem[]
+  changes ChangeOrder[]                // 反向：变更单（M9-a，挂报价单级）
 
   @@map("budget_quotes")
 }
@@ -463,4 +464,30 @@ model PaymentNode {
   @@unique([projectId, order])
   @@index([projectId])
   @@map("payment_nodes")
+}
+
+// ─────────────────────────────────────────────────────────────
+// 预算模块自有实体（M9-a 变更单）— ChangeOrder
+// 变更单挂报价单级（PLAN §7-2：禁挂 QuoteItem——报价整表替换会孤儿化）。
+// 金额带符号：正=增加、负=减少（v5.1 §6.7.2「金额变化（正数=增加，负数=减少）」）。
+// v5.1 的四段确认流（待审批→客户确认）本期不做：单用户无角色/无客户端，
+// 录入即生效（TASK_M9 §1-2）；变更单号/附件本期不做。
+// kind 枚举用 string + 常量（见 src/modules/budget/changes.ts），保持可移植。
+// ─────────────────────────────────────────────────────────────
+model ChangeOrder {
+  id        String   @id @default(cuid())
+  quoteId   String
+  kind      String   // add | deduct | upgrade | process（增项/减项/材料升级/工艺变更）
+  title     String   // 变更描述（必填）
+  amount    Float    // 金额变化：正=增加、负=减少；拒 0
+  date      DateTime // 变更日期
+  note      String   @default("") // 原因说明
+  createdBy String?  // ★ userId 占位（P4 接登录）
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  quote BudgetQuote @relation(fields: [quoteId], references: [id])
+
+  @@index([quoteId])
+  @@map("change_orders")
 }

@@ -116,3 +116,23 @@ export function formatQty(n: number): string {
 export function formatPercent(n: number): string {
   return `${(n * 100).toFixed(1).replace(/\.0$/, "")}%`;
 }
+
+/**
+ * 带符号金额展示（M9-a 变更单专用）。
+ * - null → 「—」（不可算/未录入）
+ * - 正数 → 「+¥1,234.00」
+ * - 负数 → 「−¥1,234.00」（U+2212 减号，在 ¥ 前；不混 ASCII 连字符）
+ * - 零 → 「¥0.00」（不带正号，避免误导为零增加）
+ * 千分位与两位小数同 formatCny。变更页与项目中心共用。
+ */
+export function formatSignedCny(n: number | null): string {
+  if (n === null) return "—";
+  const abs = Math.abs(n);
+  const body = `¥${abs.toLocaleString("zh-CN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+  if (n > 0) return `+${body}`;
+  if (n < 0) return `\u2212${body}`;
+  return body;
+}

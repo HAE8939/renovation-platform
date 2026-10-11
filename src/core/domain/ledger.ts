@@ -116,3 +116,52 @@ export function marginLight(rate: number | null | undefined): MarginLight {
   if (rate >= 0.15) return "yellow";
   return "red";
 }
+
+// ── M9-a 变更单口径 ──────────────────────────────────────────────
+// 与 receivedTotal/expenseTotal 的 safeAmount 不同：变更金额带符号
+// （正=增加、负=减少，v5.1 §6.7.2 原文），负数/减项合法保留，仅非有限值按 0。
+// 落在此文件是为了让 budget 模块与 finance/projects 读侧共用同一口径而不产生
+// 跨模块 import（AGENTS §2），与 grossProfit/marginRate 同源。
+
+/** 变更累计超合同额比例的预警阈值（v5.1 §6.7.2：5%）。 */
+export const CHANGE_WATCH_RATIO = 0.05;
+
+/** 变更单行最小形状（只取 amount，不碰整行）。 */
+export interface ChangeRow {
+  amount: number;
+}
+
+/**
+ * 变更额合计 = round2(Σ amount)。带符号：正=增加、负=减少。
+ * 与 safeAmount 口径不同——负数（减项）合法保留，仅非有限值按 0。
+ * 与 grossProfit(input) 的 changeTotal 字段同源，前者给读侧聚合（projects/finance），
+ * 后者给毛利计算消费。本函数为单一真源，读侧只调用它，不再各写算式。
+ */
+export function changeTotal(changes: ChangeRow[] | null | undefined): number {
+  if (!changes || changes.length === 0) return 0;
+  return round2(
+    changes.reduce(
+      (sum, c) => (c && Number.isFinite(c.amount) ? sum + c.amount : sum),
+      0
+    )
+  );
+}
+
+/**
+ * 变更额超合同额 5% 预警（v5.1 §6.7.2）。
+ * - 合同额 ≤ 0 → 不预警（{warn:false, ratio:null}）
+ * - ratio = round4(change/contract)；warn = change > contract × CHANGE_WATCH_RATIO
+ *   （**严格大于**——恰好 == 5% 不预警，留缓冲位给临界单据）
+ * - 不输出 emoji，UI 自行决定横幅形态。
+ * ratio 四位小数（与 marginRate 同舍入口径，便于 UI 百分比展示）。
+ */
+export function changeWatch(
+  contractAmount: number,
+  changeTotal: number
+): { warn: boolean; ratio: number | null } {
+  const contract = Number.isFinite(contractAmount) ? contractAmount : 0;
+  const change = Number.isFinite(changeTotal) ? changeTotal : 0;
+  if (contract <= 0) return { warn: false, ratio: null };
+  const ratio = Math.round((change / contract) * 10000) / 10000;
+  return { warn: change > contract * CHANGE_WATCH_RATIO, ratio };
+}

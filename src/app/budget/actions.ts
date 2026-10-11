@@ -15,6 +15,13 @@ import {
   updateItem,
   type CatalogItemInput,
 } from "@/modules/budget/server/catalog";
+import {
+  ChangeOrderError,
+  createChange,
+  deleteChange,
+  updateChange,
+  type ChangeInput,
+} from "@/modules/budget/server/changes";
 
 /** Server Action 表单状态：客户端用 useFormState 读回。 */
 export interface ProjectFormState {
@@ -252,5 +259,86 @@ export async function saveQuoteItemsAction(
     if (e instanceof ValidationError) return { ok: false, error: e.message };
     console.error("[saveQuoteItemsAction]", e);
     return { ok: false, error: "保存失败，请稍后重试" };
+  }
+}
+
+/* ── 变更单（M9-a，useFormState 模式）──────────────────────────
+   projectId / changeId 经 bind 传入；FormData 取 kind/title/amount/date/note。
+   revalidatePath 三处：变更单页 + 报价单页 + 项目中心（毛利/预算灯读 changeTotal）。
+   ── */
+
+export interface ChangeFormState {
+  error?: string;
+  ok?: boolean;
+}
+
+/** 从 FormData 构造 ChangeInput（amount 用 Number(...) 让服务层做 isFinite 校验）。 */
+function readChangeInput(formData: FormData): ChangeInput {
+  const text = (key: string) => String(formData.get(key) ?? "").trim();
+  return {
+    kind: text("kind"),
+    title: text("title"),
+    amount: Number(formData.get("amount")),
+    dateIso: text("date"),
+    note: text("note"),
+  };
+}
+
+/** 新建变更单：createChange(projectId, input)。 */
+export async function createChangeAction(
+  projectId: string,
+  _prev: ChangeFormState,
+  formData: FormData
+): Promise<ChangeFormState> {
+  try {
+    await createChange(projectId, readChangeInput(formData));
+    revalidatePath(`/budget/${projectId}/changes`);
+    revalidatePath(`/budget/${projectId}`);
+    revalidatePath(`/projects/${projectId}`);
+    return { ok: true };
+  } catch (e) {
+    if (e instanceof ChangeOrderError) return { error: e.message };
+    console.error("[createChangeAction]", e);
+    return { error: "操作失败，请稍后重试" };
+  }
+}
+
+/** 编辑变更单：updateChange(changeId, projectId, input)。 */
+export async function updateChangeAction(
+  projectId: string,
+  changeId: string,
+  _prev: ChangeFormState,
+  formData: FormData
+): Promise<ChangeFormState> {
+  try {
+    await updateChange(changeId, projectId, readChangeInput(formData));
+    revalidatePath(`/budget/${projectId}/changes`);
+    revalidatePath(`/budget/${projectId}`);
+    revalidatePath(`/projects/${projectId}`);
+    return { ok: true };
+  } catch (e) {
+    if (e instanceof ChangeOrderError) return { error: e.message };
+    console.error("[updateChangeAction]", e);
+    return { error: "操作失败，请稍后重试" };
+  }
+}
+
+/** 删除变更单：deleteChange(changeId)。 */
+export async function deleteChangeAction(
+  projectId: string,
+  changeId: string,
+  _prev: ChangeFormState,
+  _formData: FormData
+): Promise<ChangeFormState> {
+  try {
+    await deleteChange(changeId);
+    revalidatePath(`/budget/${projectId}/changes`);
+    revalidatePath(`/budget/${projectId}`);
+    revalidatePath(`/projects/${projectId}`);
+    return { ok: true };
+  } catch (e) {
+    if (e instanceof ChangeOrderError) return { error: e.message };
+    console.error("[deleteChangeAction]", e);
+    return { error: "操作失败，请稍后重试" };
   }
 }

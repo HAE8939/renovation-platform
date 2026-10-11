@@ -4,8 +4,9 @@ import { USER_ROLE, DEPARTMENT } from "../src/core/domain/types";
 import { buildSchedule, chainEdges } from "../src/modules/schedule/plan";
 import { syncAcceptanceNodes } from "../src/core/domain/acceptance";
 import { buildPaymentPlan } from "../src/modules/finance/payment";
-import { marginRate } from "../src/core/domain/ledger";
+import { changeTotal, changeWatch, marginRate } from "../src/core/domain/ledger";
 import { getFinanceUser } from "../src/modules/finance/currentUser";
+import { getBudgetUser } from "../src/modules/budget/currentUser";
 
 const prisma = new PrismaClient();
 
@@ -281,6 +282,8 @@ async function main() {
   await seedQuality();
   // M8-a：财务管控 seed（合同额回填 + 三项目五段计划 + 演示收支撑账 + 已付标记，幂等）。
   await seedFinance();
+  // M9-a：变更单 seed（演示项目 001/002 各一条，幂等）。
+  await seedChanges();
 }
 
 /** M1a/M2-A 基础数据：组织 + 用户 + 客户 + 项目 + 报价 + 科目模板 + 线索。 */
@@ -1687,7 +1690,7 @@ async function seedFinance() {
 
   const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
   const p3Expense = round2(p3ExpenseRecords.reduce((s, r) => s + r.amount, 0));
-  const p3Margin = marginRate({ contractAmount: p3Contract?.contractAmount ?? 0, changeTotal: 0, expenseTotal: p3Expense });
+  const p3Margin = marginRate({ contractAmount: p3Contract?.contractAmount ?? 0, changeTotal: 0 /* RP-2026-003 无变更单，M9-a seed 只灌 001/002 */, expenseTotal: p3Expense });
 
   console.log(
     `M8-a seed 完成：付款段 ${pnTotal} · 收支记录 ${frTotal}（003 毛利率 ${p3Margin !== null ? (p3Margin * 100).toFixed(1) + "%" : "—"}）`
@@ -1719,5 +1722,167 @@ async function seedFinance() {
   }
   if (p3Margin === null || p3Margin < 0.15 || p3Margin > 0.25) {
     throw new Error(`finance seed 自检失败：003 毛利率应落在 [0.15,0.25]，实际 ${p3Margin}`);
+  }
+}
+
+// ── M9-a 变更单 seed ───────────────────────────────────────────
+// 两条变更单（幂等：count===0 才建），照 seedQuality/seedFinance 范式：
+// ① 001（RP-2026-001）upgrade / +3200 / 「主卧衣柜升级为定制柜体」——
+//    3200 > 62000×5%=3100 → 001 预警演示位（changeWatch.warn=true）；
+// ② 002（RP-2026-002）process / +2800 / 「厨房橱柜工艺变更」——
+//    2800 < 160000×5%=8000 → 不预警（与 001 互补，验证 false 分支）。
+// 日期落在各项目施工期内（承 STATUS §5 演示数据时间自洽教训）。
+// createdBy 取 getBudgetUser()（预算员占位；P4 接登录后替换）。
+async function seedChanges() {
+  const existing = await prisma.changeOrder.count();
+  if (existing > 0) {
+    console.log(`已存在 ${existing} 条变更单，M9-a 变更单 seed 跳过。`);
+    return;
+  }
+
+  // 取演示项目（startDate 用于把变更日期落在施工期内）
+  const [p1, p2] = await Promise.all([
+    prisma.project.findUnique({
+      where: { code: "RP-2026-001" },
+      select: { id: true, startDate: true, contractAmount: true },
+    }),
+    prisma.project.findUnique({
+      where: { code: "RP-2026-002" },
+      select: { id: true, startDate: true, contractAmount: true },
+    }),
+  ]);
+  if (!p1 || !p2) {
+    throw new Error("changes seed 自检失败：未找到演示项目 001/002，请先运行基础 seed");
+  }
+
+  const budgetUser = await getBudgetUser();
+  const uid = budgetUser?.id ?? null;
+  // 无占位用户也允许建（createdBy 留 null）—— 单用户无角色的语义，不阻断 seed。
+  // 但变更单服务层 createChange 会拒 null（要录入人）；seed 直写绕过服务层故可 null。
+
+  // 取报价单 id —— 变更单挂报价单级（PLAN §7-2），一项目一报价（M1a 约束）。
+  // 001 由基础 seed 建单；002/003/004 是排程演示「直接 create」的项目、没有报价单，
+  // 故此处对目标项目做 ensure：缺则补一张草稿报价单（与 createProject「建项目即建
+  // 草稿报价单」的产品行为一致；只补 001/002 两个目标，不扩范围）。
+  const ensureQuote = async (projectId: string): Promise<{ id: string }> => {
+    const existing = await prisma.budgetQuote.findUnique({
+      where: { projectId },
+      select: { id: true },
+    });
+    if (existing) return existing;
+    return prisma.budgetQuote.create({
+      data: { projectId, taxRate: 0.03, status: "draft" },
+      select: { id: true },
+    });
+  };
+  const [q1, q2] = await Promise.all([ensureQuote(p1.id), ensureQuote(p2.id)]);
+
+  const DAY = 24 * 60 * 60 * 1000;
+  const addDays = (base: Date, n: number) => new Date(base.getTime() + n * DAY);
+  const now = new Date();
+
+  const CHANGES: {
+    quoteId: string;
+    kind: string;
+    title: string;
+    amount: number;
+    note: string;
+    dayOffset: number;
+  }[] = [
+    {
+      quoteId: q1.id,
+      kind: "upgrade",
+      title: "主卧衣柜升级为定制柜体",
+      amount: 3200,
+      note: "原方案为成品衣柜，业主升级为全屋定制柜体，含五金与安装。",
+      // 001 startDate=2026-09-01，+39d = 2026-10-10 落在施工期内
+      dayOffset: 39,
+    },
+    {
+      quoteId: q2.id,
+      kind: "process",
+      title: "厨房橱柜工艺变更",
+      amount: 2800,
+      note: "橱柜饰面由双饰面板调整为 PET 肤光板，工艺与辅料相应变更。",
+      // 002 startDate=T-69d，+30d 落在施工期内（钳到今天之前防未来日）
+      dayOffset: 30,
+    },
+  ];
+
+  await prisma.$transaction(
+    CHANGES.map((c) => {
+      const base = c.quoteId === q1.id ? p1.startDate : p2.startDate;
+      const start = base ?? now;
+      const raw = addDays(start, c.dayOffset);
+      // 防御：若落在未来则钳到今天之前（承 seedFinance 的时间自洽教训）
+      const date = raw.getTime() > now.getTime() ? addDays(now, -1) : raw;
+      return prisma.changeOrder.create({
+        data: {
+          quoteId: c.quoteId,
+          kind: c.kind,
+          title: c.title,
+          amount: c.amount,
+          date,
+          note: c.note,
+          createdBy: uid,
+        },
+      });
+    })
+  );
+
+  // ── 自检断言（报数取 DB 真值）──
+  const [total, p1Changes, p2Changes, p1ContractRow, p2ContractRow] = await Promise.all([
+    prisma.changeOrder.count(),
+    prisma.changeOrder.findMany({
+      where: { quote: { projectId: p1.id } },
+      select: { amount: true, kind: true, title: true },
+    }),
+    prisma.changeOrder.findMany({
+      where: { quote: { projectId: p2.id } },
+      select: { amount: true, kind: true, title: true },
+    }),
+    prisma.project.findUnique({ where: { code: "RP-2026-001" }, select: { contractAmount: true } }),
+    prisma.project.findUnique({ where: { code: "RP-2026-002" }, select: { contractAmount: true } }),
+  ]);
+
+  const p1Total = changeTotal(p1Changes);
+  const p2Total = changeTotal(p2Changes);
+  const p1Warn = changeWatch(p1ContractRow?.contractAmount ?? 0, p1Total);
+  const p2Warn = changeWatch(p2ContractRow?.contractAmount ?? 0, p2Total);
+
+  console.log(
+    `M9-a seed 完成：变更单 ${total}（001 累计 ${p1Total} warn=${p1Warn.warn} · 002 累计 ${p2Total} warn=${p2Warn.warn}）`
+  );
+
+  if (total !== 2) {
+    throw new Error(`changes seed 自检失败：变更单应 2 条，实际 ${total}`);
+  }
+  if (p1Changes.length !== 1 || p2Changes.length !== 1) {
+    throw new Error(
+      `changes seed 自检失败：001/002 各 1 条（实际 001=${p1Changes.length} 002=${p2Changes.length}）`
+    );
+  }
+  // 001 预警演示位：3200 > 62000×5%=3100
+  if (!p1Warn.warn) {
+    throw new Error(
+      `changes seed 自检失败：001 应触发 5% 预警（累计 ${p1Total} / 合同 ${p1ContractRow?.contractAmount}）`
+    );
+  }
+  // 002 不预警：2800 < 160000×5%=8000
+  if (p2Warn.warn) {
+    throw new Error(
+      `changes seed 自检失败：002 不应触发预警（累计 ${p2Total} / 合同 ${p2ContractRow?.contractAmount}）`
+    );
+  }
+  // 001 kind=upgrade / title / amount 锁定
+  if (p1Changes[0].kind !== "upgrade" || p1Changes[0].title !== "主卧衣柜升级为定制柜体" || p1Changes[0].amount !== 3200) {
+    throw new Error(
+      `changes seed 自检失败：001 应 upgrade/+3200/主卧衣柜升级为定制柜体（实际 ${JSON.stringify(p1Changes[0])}）`
+    );
+  }
+  if (p2Changes[0].kind !== "process" || p2Changes[0].title !== "厨房橱柜工艺变更" || p2Changes[0].amount !== 2800) {
+    throw new Error(
+      `changes seed 自检失败：002 应 process/+2800/厨房橱柜工艺变更（实际 ${JSON.stringify(p2Changes[0])}）`
+    );
   }
 }

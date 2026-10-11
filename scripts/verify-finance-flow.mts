@@ -32,12 +32,21 @@ import {
   unmarkPaid,
   getPlanView,
 } from "@/modules/finance/server/payments";
+import {
+  ChangeOrderError,
+  createChange,
+  updateChange,
+  deleteChange,
+} from "@/modules/budget/server/changes";
+import { getProjectHub } from "@/modules/projects/server/projectDetail";
 import { buildPaymentPlan, PAYMENT_STAGE_DEFS } from "@/modules/finance/payment";
 import {
+  changeTotal,
   expenseTotal,
   grossProfit,
   marginRate,
   receivedTotal,
+  type ChangeRow,
 } from "@/core/domain/ledger";
 import { getFinanceUser } from "@/modules/finance/currentUser";
 
@@ -53,21 +62,26 @@ const centEq = (a: number, b: number): boolean => cent(a) === cent(b);
 
 async function main() {
   // ── 库初态守卫 ──────────────────────────────────────────────
-  // fresh seed = paymentNode 15 · financeRecord 11（M8-a seed 自检基线）。
+  // fresh seed = paymentNode 15 · financeRecord 11（M8-a seed 自检基线）
+  //   · changeOrder 2（M9-a seed：001 +3200 / 002 +2800）。
   // 不符即视为上次运行残留 → 明确提示先重置，避免一串误导性级联失败。
-  const [baselineNodes, baselineRecords] = await Promise.all([
+  const [baselineNodes, baselineRecords, baselineChanges] = await Promise.all([
     prisma.paymentNode.count(),
     prisma.financeRecord.count(),
+    prisma.changeOrder.count(),
   ]);
-  if (baselineNodes !== 15 || baselineRecords !== 11) {
+  if (baselineNodes !== 15 || baselineRecords !== 11 || baselineChanges !== 2) {
     console.error(
-      `✗ 库非初始态（付款段 ${baselineNodes}/15 · 收支记录 ${baselineRecords}/11，疑为上次运行残留）。\n` +
+      `✗ 库非初始态（付款段 ${baselineNodes}/15 · 收支记录 ${baselineRecords}/11 · 变更单 ${baselineChanges}/2，疑为上次运行残留）。\n` +
         `  请先重置临时库再跑：\n` +
         `  DATABASE_URL="file:../_scratch/finance-flow.db" npx prisma migrate reset --force --skip-generate`
     );
     process.exit(1);
   }
-  chk("初态守卫：付款段 15 · 收支记录 11", baselineNodes === 15 && baselineRecords === 11);
+  chk(
+    "初态守卫：付款段 15 · 收支记录 11 · 变更单 2",
+    baselineNodes === 15 && baselineRecords === 11 && baselineChanges === 2
+  );
 
   // 护栏（M8.5）：付款模板 triggerStages 必须都能在工序模板库找到对应工序——
   // 防「按名字匹配」链路在改名后静默失配。工序名是三处同字面契约：
@@ -114,11 +128,26 @@ async function main() {
     };
   }
 
+  /**
+   * 变更额独立预言机：直接从 DB 读 change_orders（按 quote→project 聚合），
+   * 再经 ledger.changeTotal 复算。供 baseline 与联动断言交叉比对（不抄被测算式）。
+   */
+  async function dbChangeTotal(projectId: string): Promise<number> {
+    const rows = await prisma.changeOrder.findMany({
+      where: { quote: { projectId } },
+      select: { amount: true },
+    });
+    const changeRows: ChangeRow[] = rows.map((r) => ({ amount: r.amount }));
+    return changeTotal(changeRows);
+  }
+
   // ── 1) 基线汇总（p1 = RP-2026-001）──────────────────────────
-  // seed: income 18600 · expense 40300 · contract 62000
-  // 期望：received 18600 · expense 40300 · grossProfit 21700 · margin 0.35
+  // seed: income 18600 · expense 40300 · contract 62000 · change +3200（M9-a）
+  // 期望：received 18600 · expense 40300 · change 3200
+  //       · grossProfit 24900 · margin 0.3819（24900/65200）
   const baseline = await dbSums(p1.id);
   const baselineContract = p1.contractAmount ?? 0;
+  const baselineChange = await dbChangeTotal(p1.id);
   const baselineRecords1 = await prisma.financeRecord.findMany({
     where: { projectId: p1.id },
     select: { type: true, amount: true },
@@ -126,14 +155,15 @@ async function main() {
   const baselineLedger = {
     received: receivedTotal(baselineRecords1),
     expense: expenseTotal(baselineRecords1),
+    change: baselineChange,
     grossProfit: grossProfit({
       contractAmount: baselineContract,
-      changeTotal: 0,
+      changeTotal: baselineChange,
       expenseTotal: expenseTotal(baselineRecords1),
     }),
     margin: marginRate({
       contractAmount: baselineContract,
-      changeTotal: 0,
+      changeTotal: baselineChange,
       expenseTotal: expenseTotal(baselineRecords1),
     }),
   };
@@ -148,13 +178,23 @@ async function main() {
     `${baselineLedger.expense} vs ${baseline.expense}`
   );
   chk(
-    "基线：grossProfit = 合同额 − 支出",
-    centEq(baselineLedger.grossProfit, baselineContract - baseline.expense),
-    `${baselineLedger.grossProfit} vs ${baselineContract - baseline.expense}`
+    "基线：changeTotal === DB 聚合（+3200）",
+    centEq(baselineLedger.change, 3200),
+    `${baselineLedger.change}`
   );
   chk(
-    "基线：marginRate = 0.35（21700/62000）",
-    baselineLedger.margin !== null && centEq(baselineLedger.margin!, 0.35),
+    "基线：grossProfit = 合同额 + 变更 − 支出",
+    centEq(baselineLedger.grossProfit, baselineContract + baselineChange - baseline.expense),
+    `${baselineLedger.grossProfit} vs ${baselineContract + baselineChange - baseline.expense}`
+  );
+  chk(
+    "基线：grossProfit = 24900（62000+3200−40300）",
+    centEq(baselineLedger.grossProfit, 24900),
+    `${baselineLedger.grossProfit}`
+  );
+  chk(
+    "基线：marginRate = 0.3819（24900/65200）",
+    baselineLedger.margin !== null && centEq(baselineLedger.margin!, 0.3819),
     `${baselineLedger.margin}`
   );
 
@@ -175,7 +215,7 @@ async function main() {
   });
   const afterExpGross = grossProfit({
     contractAmount: baselineContract,
-    changeTotal: 0,
+    changeTotal: baselineChange,
     expenseTotal: expenseTotal(afterExpRecords),
   });
   chk(
@@ -462,6 +502,238 @@ async function main() {
     chk(
       "拒绝：deleteRecord 不存在 → 「记录不存在」",
       e instanceof FinanceRecordError && e.message === "记录不存在",
+      e instanceof Error ? e.message : "非 Error"
+    );
+  }
+
+  // ── 变更单部分（M9-a）──────────────────────────────────────────
+  // 覆盖：create/update/delete 真跑 + 六类拒绝 + getProjectHub 联动
+  //   （changeTotal/changeWarn 在增删后即时重算）。
+  // 001 seed 基线：合同额 62000 · 变更 +3200（warn=true，3200>3100）。
+
+  // 基线：getProjectHub(p1).finance.changeTotal/changeWarn === seed 值
+  const hubBaseline = await getProjectHub(p1.id);
+  chk(
+    "变更基线：getProjectHub(p1).finance.changeTotal === 3200",
+    hubBaseline !== null && centEq(hubBaseline.finance.changeTotal, 3200),
+    `${hubBaseline?.finance.changeTotal}`
+  );
+  chk(
+    "变更基线：getProjectHub(p1).finance.changeWarn === true（3200>3100）",
+    hubBaseline !== null && hubBaseline.finance.changeWarn === true,
+    `${hubBaseline?.finance.changeWarn}`
+  );
+
+  // ── 7) createChange → changeTotal 增加 / getProjectHub 联动 ─────
+  const changeAdd = 1000;
+  const { id: changeId } = await createChange(p1.id, {
+    kind: "add",
+    title: "测试增项",
+    amount: changeAdd,
+    dateIso: "2026-10-15",
+    note: "  flow 测试增项  ",
+  });
+  const afterCreateChange = await dbChangeTotal(p1.id);
+  chk(
+    "createChange add → changeTotal +1000（3200→4200）",
+    centEq(afterCreateChange, 3200 + changeAdd),
+    `${afterCreateChange}`
+  );
+  // 联动：getProjectHub(p1).finance.changeTotal 反映新值
+  const hubAfterCreate = await getProjectHub(p1.id);
+  chk(
+    "联动：createChange → getProjectHub.finance.changeTotal === 4200",
+    hubAfterCreate !== null && centEq(hubAfterCreate.finance.changeTotal, 4200),
+    `${hubAfterCreate?.finance.changeTotal}`
+  );
+  // 仍 warn（4200 > 3100）
+  chk(
+    "联动：createChange → changeWarn 仍 true",
+    hubAfterCreate !== null && hubAfterCreate.finance.changeWarn === true,
+    `${hubAfterCreate?.finance.changeWarn}`
+  );
+  // note 去空白 + createdBy = 占位用户
+  const changeRow = await prisma.changeOrder.findUnique({
+    where: { id: changeId },
+    select: { note: true, createdBy: true, amount: true },
+  });
+  chk(
+    "createChange → note 去空白",
+    changeRow?.note === "flow 测试增项",
+    changeRow?.note ?? "空"
+  );
+
+  // ── 8) updateChange → amount 变更联动 ────────────────────────
+  // 1000 → 2000（仍 add 正数）；changeTotal 4200 → 5200
+  await updateChange(changeId, p1.id, {
+    kind: "add",
+    title: "测试增项改后",
+    amount: 2000,
+    dateIso: "2026-10-15",
+    note: "改后",
+  });
+  const afterUpdateChange = await dbChangeTotal(p1.id);
+  chk(
+    "updateChange add 1000→2000 → changeTotal 4200→5200",
+    centEq(afterUpdateChange, 3200 + 2000),
+    `${afterUpdateChange}`
+  );
+  const hubAfterUpdate = await getProjectHub(p1.id);
+  chk(
+    "联动：updateChange → getProjectHub.finance.changeTotal === 5200",
+    hubAfterUpdate !== null && centEq(hubAfterUpdate.finance.changeTotal, 5200),
+    `${hubAfterUpdate?.finance.changeTotal}`
+  );
+
+  // ── 9) deleteChange → changeTotal 回落 ───────────────────────
+  await deleteChange(changeId);
+  const afterDeleteChange = await dbChangeTotal(p1.id);
+  chk(
+    "deleteChange → changeTotal 回到 3200（基线）",
+    centEq(afterDeleteChange, 3200),
+    `${afterDeleteChange}`
+  );
+  const hubAfterDelete = await getProjectHub(p1.id);
+  chk(
+    "联动：deleteChange → getProjectHub.finance.changeTotal === 3200",
+    hubAfterDelete !== null && centEq(hubAfterDelete.finance.changeTotal, 3200),
+    `${hubAfterDelete?.finance.changeTotal}`
+  );
+  chk(
+    "联动：deleteChange → changeWarn 回到 true（3200>3100）",
+    hubAfterDelete !== null && hubAfterDelete.finance.changeWarn === true,
+    `${hubAfterDelete?.finance.changeWarn}`
+  );
+
+  // ── 10) 六类拒绝（title 空 / kind 未知 / amount 0 /
+  //            deduct 正数 / add 负数 / 日期非法）──────────────
+  // title 空
+  try {
+    await createChange(p1.id, {
+      kind: "add",
+      title: "   ",
+      amount: 100,
+      dateIso: "2026-10-15",
+    });
+    chk("拒绝：变更 title 空 → 抛错", false, "未抛错");
+  } catch (e) {
+    chk(
+      "拒绝：变更 title 空 → 「变更描述不能为空」",
+      e instanceof ChangeOrderError && e.message === "变更描述不能为空",
+      e instanceof Error ? e.message : "非 Error"
+    );
+  }
+
+  // kind 未知
+  try {
+    await createChange(p1.id, {
+      kind: "refund",
+      title: "测试",
+      amount: 100,
+      dateIso: "2026-10-15",
+    });
+    chk("拒绝：变更 kind 未知 → 抛错", false, "未抛错");
+  } catch (e) {
+    chk(
+      "拒绝：变更 kind 未知 → 「未知变更类型：refund」",
+      e instanceof ChangeOrderError && e.message === "未知变更类型：refund",
+      e instanceof Error ? e.message : "非 Error"
+    );
+  }
+
+  // amount 0
+  try {
+    await createChange(p1.id, {
+      kind: "add",
+      title: "测试零金额",
+      amount: 0,
+      dateIso: "2026-10-15",
+    });
+    chk("拒绝：变更 amount 0 → 抛错", false, "未抛错");
+  } catch (e) {
+    chk(
+      "拒绝：变更 amount 0 → 「变更金额不能为 0」",
+      e instanceof ChangeOrderError && e.message === "变更金额不能为 0",
+      e instanceof Error ? e.message : "非 Error"
+    );
+  }
+
+  // deduct 正数（方向错误）
+  try {
+    await createChange(p1.id, {
+      kind: "deduct",
+      title: "测试减项方向",
+      amount: 500,
+      dateIso: "2026-10-15",
+    });
+    chk("拒绝：deduct 正数 → 抛错", false, "未抛错");
+  } catch (e) {
+    chk(
+      "拒绝：deduct 正数 → 「减项金额应为负数」",
+      e instanceof ChangeOrderError && e.message === "减项金额应为负数",
+      e instanceof Error ? e.message : "非 Error"
+    );
+  }
+
+  // add 负数（方向错误）
+  try {
+    await createChange(p1.id, {
+      kind: "add",
+      title: "测试增项方向",
+      amount: -500,
+      dateIso: "2026-10-15",
+    });
+    chk("拒绝：add 负数 → 抛错", false, "未抛错");
+  } catch (e) {
+    chk(
+      "拒绝：add 负数 → 「增项金额应为正数」",
+      e instanceof ChangeOrderError && e.message === "增项金额应为正数",
+      e instanceof Error ? e.message : "非 Error"
+    );
+  }
+
+  // 日期非法
+  try {
+    await createChange(p1.id, {
+      kind: "add",
+      title: "测试日期",
+      amount: 100,
+      dateIso: "不是日期",
+    });
+    chk("拒绝：变更日期非法 → 抛错", false, "未抛错");
+  } catch (e) {
+    chk(
+      "拒绝：变更日期非法 → 「日期格式非法」",
+      e instanceof ChangeOrderError && e.message === "日期格式非法",
+      e instanceof Error ? e.message : "非 Error"
+    );
+  }
+
+  // updateChange 不存在
+  try {
+    await updateChange("nonexistent-id", p1.id, {
+      kind: "add",
+      title: "测试",
+      amount: 100,
+      dateIso: "2026-10-15",
+    });
+    chk("拒绝：updateChange 不存在 → 抛错", false, "未抛错");
+  } catch (e) {
+    chk(
+      "拒绝：updateChange 不存在 → 「变更单不存在」",
+      e instanceof ChangeOrderError && e.message === "变更单不存在",
+      e instanceof Error ? e.message : "非 Error"
+    );
+  }
+
+  // deleteChange 不存在
+  try {
+    await deleteChange("nonexistent-id");
+    chk("拒绝：deleteChange 不存在 → 抛错", false, "未抛错");
+  } catch (e) {
+    chk(
+      "拒绝：deleteChange 不存在 → 「变更单不存在」",
+      e instanceof ChangeOrderError && e.message === "变更单不存在",
       e instanceof Error ? e.message : "非 Error"
     );
   }

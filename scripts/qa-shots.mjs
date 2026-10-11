@@ -169,6 +169,9 @@ const targets = [
   project
     ? { name: "03-quote-detail", path: `/budget/${project.id}` }
     : { name: "03-quote-detail", path: "/budget/__none__" },
+  project
+    ? { name: "03b-budget-changes", path: `/budget/${project.id}/changes` }
+    : { name: "03b-budget-changes", path: "/budget/__none__/changes" },
   { name: "04-catalog", path: "/budget/catalog" },
   { name: "05-crm", path: "/crm" },
   { name: "06-crm-list", path: "/crm?view=list" },

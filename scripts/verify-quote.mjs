@@ -21,6 +21,11 @@ const { PrismaClient } = await import("@prisma/client");
 const quote = await import(
   pathToFileURL(join(ROOT, "src/core/domain/pricing.ts")).href
 );
+const changes = await import(
+  pathToFileURL(join(ROOT, "src/modules/budget/changes.ts")).href
+);
+const { CHANGE_KIND, CHANGE_KIND_LABEL, isChangeKind, isValidAmountForKind } =
+  changes;
 
 const prisma = new PrismaClient();
 
@@ -218,6 +223,55 @@ if (seedQuote) {
       ? `与 2026-10-08 手算基线一致（${cny(BASELINE.grand)} / 单方 ${cny(BASELINE.unitCost)}）`
       : `已偏离 2026-10-08 手算基线（${cny(BASELINE.grand)} → ${cny(t.grand)}）。数据被编辑过则属正常，仅作提醒。`,
   });
+}
+
+/* 10. M9-a 变更单：纯常量与守卫（budget/changes.ts）
+   - CHANGE_KIND 四值字面固定（落库值，不可漂）
+   - CHANGE_KIND_LABEL 四值非空
+   - isChangeKind 正反例
+   - isValidAmountForKind 六例（add 正/负、deduct 负/正、upgrade 非零/零） */
+{
+  check(
+    "hard",
+    "CHANGE_KIND: 四值 add/deduct/upgrade/process",
+    CHANGE_KIND.add === "add" &&
+      CHANGE_KIND.deduct === "deduct" &&
+      CHANGE_KIND.upgrade === "upgrade" &&
+      CHANGE_KIND.process === "process",
+    `add=${CHANGE_KIND.add} deduct=${CHANGE_KIND.deduct} upgrade=${CHANGE_KIND.upgrade} process=${CHANGE_KIND.process}`
+  );
+
+  const labels = Object.values(CHANGE_KIND_LABEL);
+  check(
+    "hard",
+    "CHANGE_KIND_LABEL: 四值非空中文",
+    labels.length === 4 && labels.every((s) => typeof s === "string" && s.length > 0),
+    labels.join("/")
+  );
+  check("hard", "CHANGE_KIND_LABEL: add=增项", CHANGE_KIND_LABEL.add === "增项");
+  check("hard", "CHANGE_KIND_LABEL: deduct=减项", CHANGE_KIND_LABEL.deduct === "减项");
+  check("hard", "CHANGE_KIND_LABEL: upgrade=材料升级", CHANGE_KIND_LABEL.upgrade === "材料升级");
+  check("hard", "CHANGE_KIND_LABEL: process=工艺变更", CHANGE_KIND_LABEL.process === "工艺变更");
+
+  // isChangeKind 正反例
+  check("hard", "isChangeKind: add → true", isChangeKind("add") === true);
+  check("hard", "isChangeKind: deduct → true", isChangeKind("deduct") === true);
+  check("hard", "isChangeKind: upgrade → true", isChangeKind("upgrade") === true);
+  check("hard", "isChangeKind: process → true", isChangeKind("process") === true);
+  check("hard", "isChangeKind: refund → false（非四类）", isChangeKind("refund") === false);
+  check("hard", "isChangeKind: 空串 → false", isChangeKind("") === false);
+  check("hard", "isChangeKind: undefined → false", isChangeKind(undefined) === false);
+
+  // isValidAmountForKind 六例
+  check("hard", "isValidAmountForKind: add +3200 → true", isValidAmountForKind("add", 3200) === true);
+  check("hard", "isValidAmountForKind: add -100 → false（增项须正）", isValidAmountForKind("add", -100) === false);
+  check("hard", "isValidAmountForKind: deduct -1500 → true", isValidAmountForKind("deduct", -1500) === true);
+  check("hard", "isValidAmountForKind: deduct +100 → false（减项须负）", isValidAmountForKind("deduct", 100) === false);
+  check("hard", "isValidAmountForKind: upgrade +800 → true", isValidAmountForKind("upgrade", 800) === true);
+  check("hard", "isValidAmountForKind: upgrade -800 → true（材料升级方向不限）", isValidAmountForKind("upgrade", -800) === true);
+  check("hard", "isValidAmountForKind: process 0 → false（不可为零）", isValidAmountForKind("process", 0) === false);
+  check("hard", "isValidAmountForKind: process NaN → false", isValidAmountForKind("process", NaN) === false);
+  check("hard", "isValidAmountForKind: 未知 kind +100 → false", isValidAmountForKind("refund", 100) === false);
 }
 
 await prisma.$disconnect();

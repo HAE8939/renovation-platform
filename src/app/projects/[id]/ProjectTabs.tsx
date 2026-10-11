@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Badge, SectionTitle, type BadgeVariant } from "@/core/ui";
-import { formatCny, formatPercent } from "@/core/domain/pricing";
+import { formatCny, formatPercent, formatSignedCny } from "@/core/domain/pricing";
 import type { Light } from "@/core/domain/health";
 import type { ProjectHub } from "@/modules/projects/server/projectDetail";
 
@@ -219,6 +219,27 @@ function GrossProfitCard({ hub }: { hub: ProjectHub }) {
       >
         打开收支台账 →
       </Link>
+
+      {/* 累计变更行（M9-a）：毛利口径已含变更额，此处只展示。 */}
+      <div className="mt-4 border-t border-line pt-3">
+        <div className="flex items-baseline justify-between gap-4">
+          <span className="text-[13px] text-secondary">累计变更</span>
+          <span className="num whitespace-nowrap text-[15px] font-medium text-primary">
+            {formatSignedCny(f.changeTotal)}
+          </span>
+        </div>
+        {f.changeWarn && (
+          <p className="mt-2 text-[13px] leading-relaxed text-warning">
+            累计变更额已超合同额 5%，请关注
+          </p>
+        )}
+        <Link
+          href={`/budget/${hub.id}/changes`}
+          className="mt-2 inline-block whitespace-nowrap text-[13px] text-accent-ink hover:underline underline-offset-4"
+        >
+          变更单 →
+        </Link>
+      </div>
     </div>
   );
 }

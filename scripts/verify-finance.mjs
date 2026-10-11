@@ -26,6 +26,9 @@ const {
   grossProfit,
   marginRate,
   marginLight,
+  changeTotal,
+  changeWatch,
+  CHANGE_WATCH_RATIO,
 } = ledger;
 
 const payment = await import(
@@ -429,6 +432,73 @@ const past = new Date("2025-01-01T00:00:00.000Z");
     ...Object.values(PAYMENT_TRIGGER_LABEL),
   ];
   check("status: 所有 label 非空字符串", allLabels.every((s) => typeof s === "string" && s.length > 0));
+}
+
+// ── ledger: changeTotal（带符号，与 receivedTotal 的 safeAmount 口径不同）──────────
+{
+  // 空 / null → 0
+  check("changeTotal: 空数组 → 0", changeTotal([]) === 0);
+  check("changeTotal: null → 0", changeTotal(null) === 0);
+
+  // 单正：+3200
+  check("changeTotal: [3200] → 3200", changeTotal([{ amount: 3200 }]) === 3200);
+
+  // 正负混合：3200 + (-1500) + 800 = 2500
+  const mixed = [{ amount: 3200 }, { amount: -1500 }, { amount: 800 }];
+  check("changeTotal: 正负混合 → 2500", changeTotal(mixed) === 2500, `= ${changeTotal(mixed)}`);
+
+  // 含非有限值按 0：3200 + NaN + 800 = 4000（NaN 不破坏累加，按 0）
+  const withNaN = [{ amount: 3200 }, { amount: NaN }, { amount: 800 }];
+  check("changeTotal: NaN 按 0 → 4000", changeTotal(withNaN) === 4000, `= ${changeTotal(withNaN)}`);
+
+  // 负净额：-1500 + -800 = -2300（带符号保留，不归零）
+  const neg = [{ amount: -1500 }, { amount: -800 }];
+  check("changeTotal: 负净额 → -2300", changeTotal(neg) === -2300, `= ${changeTotal(neg)}`);
+
+  // 尾差 cent 预言机：0.1+0.2 = 0.3（浮点）
+  const fp = [{ amount: 0.1 }, { amount: 0.2 }];
+  check("changeTotal: 0.1+0.2 → 0.3（round2）", changeTotal(fp) === 0.3, `= ${changeTotal(fp)}`);
+}
+
+// ── ledger: changeWatch（5% 预警，严格大于）──────────────────
+{
+  // 阈值常量
+  check("CHANGE_WATCH_RATIO: = 0.05", CHANGE_WATCH_RATIO === 0.05);
+
+  // 恰好 == 5% → 不预警（严格大于）
+  const exact5 = changeWatch(100000, 5000);
+  check("changeWatch: == 5% → 不预警", exact5.warn === false, `warn=${exact5.warn} ratio=${exact5.ratio}`);
+  check("changeWatch: == 5% → ratio=0.05", exact5.ratio === 0.05);
+
+  // > 5% → 预警
+  const over5 = changeWatch(100000, 5001);
+  check("changeWatch: > 5% → 预警", over5.warn === true, `warn=${over5.warn}`);
+
+  // 负变更不预警（减项即便绝对值大，也不触发）
+  const negChange = changeWatch(100000, -8000);
+  check("changeWatch: 负变更 → 不预警", negChange.warn === false, `warn=${negChange.warn}`);
+
+  // 合同额 0 → 不预警、ratio null
+  const zero = changeWatch(0, 1000);
+  check("changeWatch: 合同额 0 → 不预警", zero.warn === false);
+  check("changeWatch: 合同额 0 → ratio null", zero.ratio === null);
+
+  // 合同额负 → 不预警、ratio null
+  const negContract = changeWatch(-100, 1000);
+  check("changeWatch: 合同额负 → 不预警", negContract.warn === false);
+  check("changeWatch: 合同额负 → ratio null", negContract.ratio === null);
+
+  // ratio 四位小数：3200/62000 = 0.0516129032... → 0.0516
+  const p1 = changeWatch(62000, 3200);
+  check("changeWatch: 3200/62000 → ratio 0.0516", p1.ratio === 0.0516, `= ${p1.ratio}`);
+
+  // 超阈值实战（seed 001 62000 +3200）：3200 > 3100 → 预警
+  check("changeWatch: seed 001 62000+3200 → 预警", p1.warn === true, `warn=${p1.warn}`);
+
+  // 不超阈值实战（seed 002 160000 +2800）：2800 < 8000 → 不预警
+  const p2 = changeWatch(160000, 2800);
+  check("changeWatch: seed 002 160000+2800 → 不预警", p2.warn === false, `warn=${p2.warn}`);
+  check("changeWatch: 2800/160000 → ratio 0.0175", p2.ratio === 0.0175, `= ${p2.ratio}`);
 }
 
 // ── 输出禁 emoji 自检（与 verify-quality 同一纪律）──
