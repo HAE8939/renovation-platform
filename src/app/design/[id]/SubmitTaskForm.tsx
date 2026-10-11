@@ -36,7 +36,7 @@ export function SubmitTaskForm({
         <Textarea name="note" rows={3} placeholder="本次交付的内容要点、相对上一版的调整…" required />
       </Field>
       <Field label="交付物链接" hint="本期占位，文件上传待后续版本">
-        <Input name="assetRef" placeholder="粘贴成果链接（可留空）" />
+        <Input name="assetRef" placeholder="粘贴成果链接（https:// 开头，可留空）" />
       </Field>
 
       {state.error && <p className="text-[13px] text-danger">{state.error}</p>}

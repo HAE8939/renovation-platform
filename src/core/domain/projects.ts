@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client";
 import prisma from "@/core/db";
-import { PROJECT_STATUS } from "@/core/domain/types";
+import { PROJECT_STATUS, isProjectStatus } from "@/core/domain/types";
 
 /**
  * 核心域 · 项目主数据服务（core/domain）。
@@ -226,6 +226,9 @@ export async function createProject(
   const exists = await prisma.project.findUnique({ where: { code } });
   if (exists) throw new ValidationError(`项目编号 ${code} 已存在，请更换`);
 
+  const status = input.status ?? PROJECT_STATUS.draft;
+  if (!isProjectStatus(status)) throw new ValidationError(`未知项目状态：${status}`);
+
   const orgId = await getDefaultOrgId();
 
   const run = async (tx: Prisma.TransactionClient): Promise<CreateProjectResult> => {
@@ -259,7 +262,7 @@ export async function createProject(
         clientId: client.id,
         designer: input.designer?.trim() || null,
         pm: input.pm?.trim() || null,
-        status: input.status ?? PROJECT_STATUS.draft,
+        status,
         style: input.style?.trim() || null,
         source: input.source?.trim() || null,
         contractAmount: Number.isFinite(Number(input.contractAmount))
@@ -301,6 +304,7 @@ export async function updateProject(
   if (!code) throw new ValidationError("请填写项目编号");
 
   const status = input.status ?? PROJECT_STATUS.draft;
+  if (!isProjectStatus(status)) throw new ValidationError(`未知项目状态：${status}`);
 
   // 合同额：undefined = 不改此列；0 = 未录入哨兵（合法）；负数 → 抛中文校验错。
   // 同源 createProject 的写法，但 update 需区分"未传"与"传 0"。

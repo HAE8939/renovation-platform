@@ -97,13 +97,23 @@ export async function createLead(input: CreateLeadInput): Promise<{ id: string; 
   return { id: lead.id, code: lead.code };
 }
 
-/** 推进线索阶段。非法/末态直接抛错，由调用方（Server Action）捕获回文案。 */
+/**
+ * 推进线索阶段。非法/末态直接抛错，由调用方（Server Action）捕获回文案。
+ * 非相邻目标（回退/跳阶）直接抛错——与 UI 的『仅向前相邻推进』对齐（M8.5）。
+ */
 export async function advanceStage(leadId: string, stage: LeadStage): Promise<void> {
   if (!LEAD_STAGE_ORDER.includes(stage)) {
     throw new LeadValidationError(`未知阶段：${stage}`);
   }
   const lead = await prisma.lead.findUnique({ where: { id: leadId } });
   if (!lead) throw new LeadValidationError("线索不存在");
+  const next = nextStage(lead.stage as LeadStage);
+  if (next === null) {
+    throw new LeadValidationError("该线索已到末态（已签约），无法继续推进");
+  }
+  if (stage !== next) {
+    throw new LeadValidationError(`仅支持推进到下一阶段（下一阶段应为「${LEAD_STAGE_LABEL[next]}」）`);
+  }
   await prisma.lead.update({
     where: { id: leadId },
     data: { stage, lastFollowAt: new Date() },

@@ -89,7 +89,7 @@ export default async function QualityListPage({
             <h1 className="text-[28px] font-semibold">质量管控</h1>
             <p className="mt-2 max-w-prose text-[15px] leading-relaxed text-secondary">
               工序完工后自动生成验收节点，巡检按 SOP 检查项逐项验收，退回自动建问题，
-              整改复验闭环。节点详情、问题台账与质量档案将在后续单元上线。
+              整改复验闭环。节点详情、问题台账与质量档案均已上线。
             </p>
           </div>
           <ProjectFilter projects={data.projects} selectedId={projectId} />

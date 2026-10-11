@@ -54,16 +54,29 @@ export async function createLeadAction(
   }
 }
 
-/** 推进线索阶段（表单 action，返回 void）。 */
+export interface AdvanceStageState {
+  error?: string;
+}
+
+/**
+ * 推进线索阶段（useFormState 模式；leadId/stage 经 bind 传入，M8.5）。
+ * 失败：中文文案回传 UI + 仍 revalidate /crm（stale 视图自愈到真值）。
+ */
 export async function advanceStageAction(
   leadId: string,
-  stage: LeadStage
-): Promise<void> {
+  stage: LeadStage,
+  _prev: AdvanceStageState,
+  _formData: FormData
+): Promise<AdvanceStageState> {
   try {
     await advanceStage(leadId, stage);
     revalidatePath("/crm");
+    return {};
   } catch (e) {
+    revalidatePath("/crm");
+    if (e instanceof LeadValidationError) return { error: e.message };
     console.error("[advanceStageAction]", e);
+    return { error: "推进失败，请稍后重试" };
   }
 }
 

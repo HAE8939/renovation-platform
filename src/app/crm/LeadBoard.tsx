@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
+import { useFormState } from "react-dom";
 import { Badge, Card } from "@/core/ui";
-import { advanceStageAction } from "@/modules/crm/actions";
+import { advanceStageAction, type AdvanceStageState } from "@/modules/crm/actions";
 import {
   LEAD_STAGE_ORDER,
   LEAD_STAGE_LABEL,
@@ -12,6 +13,7 @@ import {
 } from "@/modules/crm/stages";
 import type { LeadListItem } from "@/modules/crm/server/leads";
 import { LeadDrawer, isStale, STAGE_BADGE } from "./LeadDrawer";
+import { AdvanceStageForm } from "./AdvanceStageForm";
 
 function formatDate(d: Date | null): string {
   if (!d) return "—";
@@ -90,20 +92,7 @@ function LeadCard({
         </div>
       </div>
 
-      {next && (
-        <form
-          action={advanceStageAction.bind(null, lead.id, next)}
-          onClick={(e) => e.stopPropagation()}
-          className="mt-3 border-t border-line pt-3"
-        >
-          <button
-            type="submit"
-            className="inline-flex h-8 w-full items-center justify-center rounded-inner border border-line bg-surface px-3 text-[13px] font-medium text-accent-ink whitespace-nowrap transition-colors hover:bg-accent-tint"
-          >
-            → 下一阶段「{LEAD_STAGE_LABEL[next]}」
-          </button>
-        </form>
-      )}
+      {next && <AdvanceStageForm leadId={lead.id} stage={next} variant="card" />}
     </Card>
   );
 }
@@ -128,9 +117,12 @@ export function LeadBoard({ leads }: { leads: LeadListItem[] }) {
   const open = useCallback((id: string) => setOpenId(id), []);
   const openLead = openId ? leads.find((l) => l.id === openId) : null;
 
+  const [advanceError, setAdvanceError] = useState<string | null>(null);
+
   const onDragStart = useCallback((id: string, stage: LeadStage) => {
     setDragId(id);
     setDragFrom(stage);
+    setAdvanceError(null);
   }, []);
   const onDragEnd = useCallback(() => {
     setDragId(null);
@@ -147,6 +139,7 @@ export function LeadBoard({ leads }: { leads: LeadListItem[] }) {
     const fromIdx = LEAD_STAGE_ORDER.indexOf(from);
     const toIdx = LEAD_STAGE_ORDER.indexOf(target);
     if (toIdx !== fromIdx + 1) return; // 仅向前推进到相邻列
+    setAdvanceError(null);
     setAdvance({ leadId: id, stage: target });
   }
 
@@ -154,11 +147,12 @@ export function LeadBoard({ leads }: { leads: LeadListItem[] }) {
 
   // 渲染一个隐藏的推进表单（拖拽落点触发），挂载后自动提交一次。
   const advanceForm = advance ? (
-    <DragAdvanceForm key={`${advance.leadId}-${advance.stage}`} leadId={advance.leadId} stage={advance.stage} />
+    <DragAdvanceForm key={`${advance.leadId}-${advance.stage}`} leadId={advance.leadId} stage={advance.stage} onError={setAdvanceError} />
   ) : null;
 
   return (
     <>
+      {advanceError && <p className="mb-3 text-[13px] text-danger">推进失败：{advanceError}</p>}
       <div className="-mx-4 overflow-x-auto px-4 pb-2">
         <div className="flex min-w-max gap-4">
           {LEAD_STAGE_ORDER.map((stage) => {
@@ -225,14 +219,29 @@ export function LeadBoard({ leads }: { leads: LeadListItem[] }) {
   );
 }
 
-/** 拖拽落点后挂载的隐藏推进表单，自动提交一次后即卸载（由父级 setAdvance(null) 清理）。 */
-function DragAdvanceForm({ leadId, stage }: { leadId: string; stage: LeadStage }) {
+/** 拖拽落点后挂载的隐藏推进表单，自动提交一次；失败经 onError 上报集成到看板顶部提示（M8.5）。 */
+function DragAdvanceForm({
+  leadId,
+  stage,
+  onError,
+}: {
+  leadId: string;
+  stage: LeadStage;
+  onError: (msg: string) => void;
+}) {
   const ref = useRef<HTMLFormElement>(null);
+  const [state, formAction] = useFormState<AdvanceStageState, FormData>(
+    advanceStageAction.bind(null, leadId, stage),
+    {}
+  );
   useEffect(() => {
     ref.current?.requestSubmit();
   }, []);
+  useEffect(() => {
+    if (state.error) onError(state.error);
+  }, [state.error, onError]);
   return (
-    <form ref={ref} action={advanceStageAction.bind(null, leadId, stage)} className="hidden">
+    <form ref={ref} action={formAction} className="hidden">
       <button type="submit" />
     </form>
   );

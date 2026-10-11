@@ -13,6 +13,11 @@ export const PROJECT_STATUS = {
 } as const;
 export type ProjectStatus = (typeof PROJECT_STATUS)[keyof typeof PROJECT_STATUS];
 
+/** 运行时守卫：字符串是否合法项目状态（Server Action 防脏值，M8.5）。 */
+export function isProjectStatus(v: string): v is ProjectStatus {
+  return (Object.values(PROJECT_STATUS) as string[]).includes(v);
+}
+
 export const PROJECT_STATUS_LABEL: Record<ProjectStatus, string> = {
   draft: "筹备中",
   design: "设计中",

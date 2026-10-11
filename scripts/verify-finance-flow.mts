@@ -32,7 +32,7 @@ import {
   unmarkPaid,
   getPlanView,
 } from "@/modules/finance/server/payments";
-import { buildPaymentPlan } from "@/modules/finance/payment";
+import { buildPaymentPlan, PAYMENT_STAGE_DEFS } from "@/modules/finance/payment";
 import {
   expenseTotal,
   grossProfit,
@@ -68,6 +68,20 @@ async function main() {
     process.exit(1);
   }
   chk("初态守卫：付款段 15 · 收支记录 11", baselineNodes === 15 && baselineRecords === 11);
+
+  // 护栏（M8.5）：付款模板 triggerStages 必须都能在工序模板库找到对应工序——
+  // 防「按名字匹配」链路在改名后静默失配。工序名是三处同字面契约：
+  // ProcessTemplate.name → ScheduleTask.name → AcceptanceNode.name。
+  const tplNames = new Set(
+    (await prisma.processTemplate.findMany({ select: { name: true } })).map((t) => t.name)
+  );
+  const stageNames = PAYMENT_STAGE_DEFS.flatMap((d) => d.triggerStages);
+  const unmatched = stageNames.filter((n) => !tplNames.has(n));
+  chk(
+    `付款模板 triggerStages 全部命中工序模板（${stageNames.length} 项）`,
+    unmatched.length === 0,
+    unmatched.length > 0 ? `未命中：${unmatched.join("、")}` : ""
+  );
 
   // ── 前置：占位录入人 + 演示项目 ──────────────────────────────
   const me = await getFinanceUser();

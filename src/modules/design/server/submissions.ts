@@ -145,6 +145,11 @@ export async function createSubmission(
   const note = (input.note ?? "").trim();
   if (!note) throw new DesignSubmissionError("请填写提交说明");
 
+  const assetRef = input.assetRef?.trim() || null;
+  if (assetRef && !/^https?:\/\//i.test(assetRef)) {
+    throw new DesignSubmissionError("交付物链接需以 http:// 或 https:// 开头");
+  }
+
   const me = await getPlaceholderUser();
   if (!me) {
     throw new DesignSubmissionError(
@@ -176,7 +181,7 @@ export async function createSubmission(
         taskId,
         version,
         note,
-        assetRef: input.assetRef?.trim() || null,
+        assetRef,
         submittedBy: me.id,
         result: "pending",
       },

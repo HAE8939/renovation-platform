@@ -5,7 +5,6 @@ import { useFormState, useFormStatus } from "react-dom";
 import { Badge, Button, Card, Drawer, Field, Input, Table, Td, Textarea, Th } from "@/core/ui";
 import {
   addFollowUpAction,
-  advanceStageAction,
   getLeadDetailAction,
   type FollowUpFormState,
 } from "@/modules/crm/actions";
@@ -17,6 +16,7 @@ import {
 } from "@/modules/crm/stages";
 import type { LeadListItem } from "@/modules/crm/server/leads";
 import { SignLeadButton } from "./SignLeadModal";
+import { AdvanceStageForm } from "./AdvanceStageForm";
 
 export { isStale, canSign, STAGE_BADGE };
 
@@ -290,14 +290,7 @@ export function LeadsTable({ leads }: { leads: LeadListItem[] }) {
                     </Td>
                     <Td align="right" onClick={(e) => e.stopPropagation()}>
                       {next ? (
-                        <form action={advanceStageAction.bind(null, l.id, next)}>
-                          <button
-                            type="submit"
-                            className="inline-flex h-8 items-center justify-center rounded-inner border border-line bg-surface px-3 text-[13px] font-medium text-accent-ink whitespace-nowrap transition-colors hover:bg-accent-tint"
-                          >
-                            推进到「{LEAD_STAGE_LABEL[next]}」
-                          </button>
-                        </form>
+                        <AdvanceStageForm leadId={l.id} stage={next} />
                       ) : (
                         <span className="text-[13px] text-secondary">已到末态</span>
                       )}
