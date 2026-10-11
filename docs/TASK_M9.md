@@ -36,6 +36,8 @@
 | 12 | **月度毛利的口径归属**（M9-b 利润折线） | 折线走**现金收付口径**（当月 `Σincome` 与当月 `Σ(income−expense)`），标题与副标题**必须明写「现金收付口径」**——项目毛利率口径（合同额+变更−支出）没有时间维度，二者并存但不混用；真项目毛利率只在**项目毛利率排行条形图**出现（复用 `ledger.marginRate`）。不引入第三套"按签约月分摊"的毛利口径（需新分摊规则，属扩范围）。 |
 | 13 | **M9-b 补 seed 演示数据**（HAE 确认） | 为让漏斗与折线有真实形态：seed 补线索至 5 阶段各 ≥2 条、收支记录铺近 6 个月。**归入 M9-b-2**（与漏斗/两图同轮），因动 `seed.ts` ⇒ 四个隔离库集成门禁全量重跑；M9-b-1 不动 seed 也不动 schema。 |
 | 14 | **待办中心不收「超期未跟进线索」**（M9-b） | 「3 天未跟进」的真源在 `src/app/crm/LeadDrawer.tsx`（模块私有客户端组件，禁 import）。驾驶舱要用只能复制阈值 → 造第二口径，违反 §4 口径单点。**本单元不做该类待办**；若将来该规则上收 `core/domain` 再接入。付款段类待办只数 `paid=false`，**不算派生解锁态**（`finance/payment.ts` 属模块私有禁区），可收/未解锁的判定留在财务页。 |
+| 15 | **毛利率排行剔除「无成本数据的 100%」**（M9-b-2b，集成者裁定待 HAE 复核） | `marginRate` 口径本身不动，但 `expenseTotal === 0` 的项目（筹备期只录了合同额）按口径恰得 1.0、摆在榜首必误导 → **不入榜**：灰态置末、率显「—」、文案「未录入支出」；`rate === null` 另给「未录入合同额，不可算」。与「未排程」「未录入合同额」两处既有诚实降级同族（详见 §7-7-1②）。 |
+| 16 | **不为「铺满六个月」重排演示支出行**（M9-b-2b，集成者裁定待 HAE 复核） | §7-6 预告原写「把 7 笔 expense 重排到近 6 个月」，但三演示项目最早开工日 2026-08-02 → 挪到 5~7 月即造出「开工前采购」反序，违反 `STATUS.md` §5 时间自洽。**改为不重排**，5~7 月如实为 0；台账增补只做 2 笔 `income/change` 变更款收款（不进毛利、不破两本账对照）。详见 §7-7-1①。 |
 
 ## 2. 单元拆分
 
@@ -153,11 +155,16 @@ _（M9-a 起，每单元合入后在此追加「执行记录与裁定」，规�
   **集成者裁定 Loomy 四处自报偏离**：① `fmtDate` 服务层本地实现（`month:"long"` → 「2026年10月11日」）——**改**，对齐 `projectDetail.fmtDate` 的数字三位样式，跨页日期不许两种写法；② 待办组级 `href` 取既有路由（卡只规定 item 级）——**可接受**，六条链均为已验证可达页；③ 矩阵进度直接渲 `{n}%`——**可接受**，`overallProgress` 本就是 0–100 标量；④ `registry.ts` 里 `deferredModules` 顺序注释仍提「驾驶舱」——**改**（按"只改必要行"未动，属陈旧文案）。
   **集成者另修 2 处**：页根用 `<main>` 与外壳 `<main>` 嵌套（HTML 只允许一个 `main`）+ 自设 `max-w-[1200px]` 破外壳 `max-w-6xl` 节奏 → 改 `<div className="space-y-12">`（同 `/finance`、`/projects` 惯例）；进度条宽度 `Math.min(1,rate)*100` 出 `15.620000000000001%` 浮点尾差 → 服务层舍到两位小数（换算仍唯一一处）。
   **登记债**：`budget/[projectId]/changes/page.tsx` 与 `stats/page.tsx` 同样以 `<main>` 为根（M9-a / M1b 既有），与外壳嵌套——本单元不牵动，入 `STATUS.md` §4-15 候收口批。
-- **M9-b-2 候开卡**：商务漏斗（M3-e 清账）+ 月度现金折线 + 项目毛利率排行条形 + seed 补演示（§6-9）；**动 seed ⇒ 四隔离库集成门禁全量重跑**。
+- **M9-b-2 候开卡**：商务漏斗（M3-e 清账）+ 月度现金折线 + 项目毛利率排行条形 + seed 补演示（§6-9）；**动 seed ⇒ 四隔离库集成门禁全量重跑**。→ 已拆 2a（下条，已合入）/ 2b（§7-7 权威规格已入册）。
 - **M9-b-2a 商务漏斗 + seed 补线索（2026-10-11 合入 · codebuddy `custom-local:glm-5.2`）**：交付 5 文件（`core/domain/dashboard.ts` 追加 `FUNNEL_STAGE_ORDER`/`funnelCounts`/`leadConversion` / `prisma/seed.ts` 新增 `seedLeads()` / `dashboard/server/overview.ts` 加 `DashboardFunnel` / `dashboard/page.tsx` 漏斗块 / `scripts/verify-dashboard.mjs` 扩断言）。**验收**：build 绿 + tsc 0 + 八纯门禁零回退（quote **79**（新增 1 张草稿报价单，逐单循环计数上浮，属 §7-5 预期）/ crm 11 / health 20 / design 28 / schedule 55 / quality 108 / finance 135 / dashboard **58**）+ **四隔离库集成门禁全量重跑**（sign 12 / schedgen 27 / quality-flow 94 / finance-flow 76，各自 `migrate reset --force` 重灌 seed 后全过）+ qa-shots 33 页全 200 + 目检（漏斗五阶段条 2/2/2/2/3、签约率 27.3%、副标题「阶段存量分布（非累计流量）」、本月签单额环比首次显「较上月 +172.7%」）+ 375 探针三页（`/dashboard`·`/projects`·`/crm`）零真实溢出 + **实值巡检 33 项全过**（新增漏斗计数/签约率/条宽三条独立复算断言）+ **seed 幂等双跑验证**（连跑两次：线索 11、项目 7 不变）。
   **集成者修真缺陷 1 处（codebuddy 未自报、seed 首跑即崩）**：`seedLeads` 的已签循环「按 code 复用已有项目」在真实 dev.db 上必撞 `Lead.projectId @unique`（`P2002`）——手测早已把 `RP-2026-005/006` 建成签约项目并被 `LEAD-2026-001` 占用。正解三件：**①** 复用条件加 `lead: { is: null }`（只复用未被任何线索占用的项目）；**②** 签约位改**按月判定**——该月已有「带线索的项目」就跳过补建（净库照建、脏库不重复占位）；**③** code 被占则走 `nextFreeProjectCode()` 递增取空闲号（实得 `RP-2026-007`＝上月签约位）。自检同步从「按固定 code 断言合同额 218000/176000」改为**按签约月断言本月/上月各 ≥1 条**（脏库净库都成立）。承 M9-a `ensureQuote` 的同族教训：**seed 假定数据形状前必须先对真实 dev.db（含手测数据）验证**，已补进 `STATUS.md` §5。
   **集成者另修 3 处**：① 未签线索改**按 DB 真值逐阶段补到 2 条**（固定 code 清单保证不了「五阶段各 ≥2」——dev.db 里 `LEAD-2026-001` 已被手测推进成 signed，`contacted` 只剩 1 条）；② `FUNNEL_STAGE_ORDER` 从 `overview.ts` 局部常量**上收 `core/domain/dashboard.ts`**，并在 `verify-dashboard.mjs` 加**漂移护栏**断言它与 `crm/stages.ts` 的 `LEAD_STAGE_ORDER` 同序同值（应用层仍不跨模块 import，靠门禁锁）；③ 漏斗与两块占位同排时 `grid` 会把占位卡拉成整列空白 → 加 `items-start`（V0.3 §7.4 节奏）；另把 codebuddy 的 `UNSIGED`/`unsiged*` 拼写改为 `UNSIGNED_LEADS`/`unsigned*`、修一条 `1e-9` 陈旧注释（实际容差 1e-3）。
   **codebuddy 四处自报偏离裁定**：① 未签线索用 009/010 避开与已签 007/008 撞号——**可接受**（卡面确有号段重叠）；② 新建项目 `status="draft"`——**可接受且正确**（核实 `signLead` 建的项目同为 `PROJECT_STATUS.draft`，与真实签约一致）；③ `pct` 合 1 容差取 1e-3——**可接受**（各值独立 `round4`，1e-9 数学上不可能成立）；④ 本月签约项目不回填 `createdAt`（`createProject` 默认 `now` 已在当月）——**可接受**。
+- **M9-b-2b 月度现金折线 + 项目毛利率排行（2026-10-11 合入 · 执行通道 = opencode standalone 讯飞池 `imodel/GLM-5.3-Flash`）**：交付 6 文件（`core/domain/dashboard.ts` 追加 `monthKeysDescending`/`cashSeries`/`cashPeak`/`cashTone` +99 行 / `verify-dashboard.mjs` 58→**86** 项 +245 行零删改 / `dashboard/server/overview.ts` 加 `DashboardCash`+`DashboardMargins` +199 行 / `app/dashboard/page.tsx` 两图 +142 行 / `prisma/seed.ts` 新增 `seedChangeIncome()` / `verify-finance-flow.mts` 初态守卫 11→13）。**规格与派工**：§7-6 预告展开为 §7-7（含 §7-7-1 两处偏离裁定＝决策 15~16），拆 **A1/A2/B1/B2/C 五小轮**、每轮 1~2 文件自包含卡（`_scratch/logs/oc_m9b2b_*_prompt.md`）。**验收**：build 绿 + tsc 0 + 八纯门禁零回退（quote 79 / crm 11 / health 20 / design 28 / schedule 55 / quality 108 / finance 135 / dashboard **86**）+ **四隔离库集成门禁全量重跑**（sign 12 / schedgen 27 / quality-flow 94 / finance-flow **76**，净库 seed 首跑路径同时被验证）+ qa-shots 33 页全 200 + 375 探针四页（`/dashboard`·`/finance`·`/projects`·`/`）`scrollWidth=360 · trueOffenders=0` + **实值巡检 33→77 项全过**（逐月现金三点独立复算 · x/y 几何复算 · 毛利率三档与顺序复算）+ **seed 连跑三次幂等**（收支 13、变更款 2 条、本次自建 0）。目检：折线 5~7 月贴基线且表内显 `¥0.00`（不显「—」）/ 8 月峰 收款 112,000 vs 支出 120,000 / 净现金 `−¥8,000.00` U+2212 + warning 字色 / 合计 136,600·239,300·−102,700 / **毛利率榜首是 002 的 38.6% 而非某 100% 项**、005~007 灰态「未录入支出」置末、004「未录入合同额，不可算」最后 / 漏斗与人效占位两卡未破 / `/finance` 已收 ¥130,600→**¥136,600**、待收 ¥875,400（含变更）、收入记录 6 条含 2 笔「变更款」。
+  **执行通道首次踩坑与对策（入工作手册）**：轮 A 首跑（`core` + 门禁 2 文件、卡面完整）**静默零产出**——`step_finish` 的 `reason:"length"`、`reasoning` 31,923 tok 而 `output` 仅 77 tok，模型把预算全花在推理上、一个文件都没落、进程 exit 0。对策＝**每轮再拆到 1~2 文件 + `--variant low` 压推理档**；改法后五轮全部 `reason:"stop"` 正常落盘。纪律审计（grep 五轮 `tool_use` 的 `command`）：只有 `npx tsc --noEmit` / `node scripts/verify-dashboard.mjs` / `wc -l`，**无 git、无 prisma、未读 `docs/**`**。
+  **集成者修真缺陷 2 处**：① **净现金符号规约**——B2 按卡面用 `formatCny(p.net)` 会渲成 `¥-8,000.00`（ASCII 连字符、号在 `¥` 后），破本仓「负金额用 U+2212 且在 `¥` 前」的既有规约（`formatSignedCny` 就是为此而生）→ 净额列与合计行改 `formatSignedCny`；② **seed 断言 2 的脏库脆弱性**——C 首轮写成「全表 `change` 收入合计 == 两项目净额之和」，我改成「只对本次自建行」时又引入**第二次跑 `created` 为空 → 等式 6000 vs 0 必抛**（被"连跑两次"这道既有纪律当场抓到）→ 最终改为**按项目**判等式：凡该项目存在带 `SEED_DESC` 的行，其合计必等于该项目变更净额；首跑与复跑同一条式子成立，手测自录的变更款（`description` 不同）不参与等式。教训与 M9-b-2a 撞 `@unique` 同族且更深一层：**幂等复跑不是"计数不变"就行，断言的"比对口径"必须在首跑与复跑两种路径下同真**。
+  **五轮自报偏离裁定（全可接受）**：A1 ① amount 脏值直接跳过累加（等价"按 0 参与"）② `cashPeak` 对点内非有限按 0；A2 首跑 2 FAIL 系其手算把 5,000,000+123,456 分误加为 6,123,456，**按纪律只修期望字面量、未动生产码、未删断言**——纪律正例；B1 ① 三条既有 import 行扩符号（卡 §1 明示直接 import，属隐含必需）② 新增未导出内部 `MarginTierRow`（排序后 rest 剥掉）③ 头注释补一行；B2 ① 两卡 `Card` 上加 `min-w-0` 防溢出 ② 嵌套三元改等价表达式 ③ 表头四列补 `text-right` 对齐；C ① 多读 seed.ts 尾 17 行与 1530–1540、`ledger.changeTotal` 签名 12 行（最小必要）② 报错文案加「排除 change」四字 ③ 点名 `seedLeads` 头注释「初态守卫 15/11/2」已陈旧（卡禁改它）→ **集成者已补一行更正** ④ 自报"全表等式遇手录变更款会红"→ 即上述真缺陷 ②。
+  **登记债（不在本单元白名单，未动）**：项目中心「预算收支」毛利卡对**零支出项目**仍显 `毛利率 100%` + 绿点（M8-d 既有行为，见 `09-project-budget` 截图 RP-2026-007），与本页决策 15 的判定不一致 → 入 `STATUS.md` §4-16 候收口批。
 
 ## 6. M9-b 详细范围（数据驾驶舱 · 权威规格）
 
@@ -316,7 +323,7 @@ export interface TodoGroup {
 ## 7. M9-b-2 详细范围（图表批 · 权威规格）
 
 > 拆两轮：**M9-b-2a = seed 补线索 + 商务漏斗（M3-e 清账）**｜ **M9-b-2b = 月度现金折线 + 项目毛利率排行条形（含台账增补）**。
-> 拆由：`seedFinance()` 的自检把「收支 11 笔」与三项目毛利率锁死（`prisma/seed.ts` 末尾自检块），而 `verify-finance-flow.mts` 的**库初态守卫**同样硬编码「付款段 15 · 收支记录 11 · 变更单 2」——**动收支＝牵动毛利断言 + 守卫常量 + 目检基线三处**，与漏斗不是一回事，故分轮隔离风险。执行通道：**codebuddy（`custom-local:glm-5.2` → 8787 三号池）**（Loomy 暂停，见工作手册 §8.2）。
+> 拆由：`seedFinance()` 的自检把「收支 11 笔」与三项目毛利率锁死（`prisma/seed.ts` 末尾自检块），而 `verify-finance-flow.mts` 的**库初态守卫**同样硬编码「付款段 15 · 收支记录 11 · 变更单 2」——**动收支＝牵动毛利断言 + 守卫常量 + 目检基线三处**，与漏斗不是一回事，故分轮隔离风险。执行通道：2a = codebuddy 三号池（已随卸载作废，见 §5 记录）；**2b = opencode standalone 讯飞池 `imodel/GLM-5.3-Flash`（工作手册 §8.3）**。
 
 ### 7-1 商务漏斗口径（本轮集成者裁定，替代 v5.1 §6.2.4 的"转化率漏斗"画法）
 
@@ -349,6 +356,107 @@ export interface TodoGroup {
 
 新增 2 个项目 → `STATUS.md` §1 数据基线（项目数、`/finance` 汇总合同额与回款率分母）、`/projects` 与 `/budget` 列表截图基线、驾驶舱 KPI 目检数字全部要更新；`verify-quote.mjs` 的「逐单循环检查」随库中报价单数浮动（新增 2 张草稿单 → 计数上涨属预期，不是回退）。
 
-### 7-6 M9-b-2b 预告（下轮展开）
+### 7-6 M9-b-2b 预告（已由 §7-7 展开为权威规格；两处与 §5「演示数据时间自洽」冲突处见 §7-7-1）
 
 台账增补走 **`income/change`（变更款收款）** 类目——已核 `getPlanView` 的对照条只统计 `category = "contract"` 切片（`ledgerContractIncome`），加 `change` 类收入**不破坏两本账一致对照**；配合把既有 7 笔 expense 的日期重排到近 6 个月（**金额不动 → 毛利与毛利率断言零变化**），让月度折线有真实形态。折线两条线（当月收款 accent / 当月支出 灰阶），净现金用下方小表 + `success`/`warning` 语义色文字，**不画第三条线**；毛利率排行条形单色 accent、`marginRate` 为 null 的项目灰态「不可算」排末位。口径函数 `monthKeysDescending` / `cashSeries` 追加到 `core/domain/dashboard.ts`。
+
+### 7-7 M9-b-2b 权威规格（月度现金收付折线 + 项目毛利率排行条形）
+
+> 执行通道（本轮起变更）：**opencode standalone 讯飞池**——`node "E:\19 Python File\opencode\oc.mjs" -m imodel/GLM-5.3-Flash --dir "<仓绝对路径>" "$(cat 派工卡.md)"`（codebuddy 已卸载、Loomy `attach` 暂停，见工作手册 §8.1/§8.2/§8.3）。三小轮串行、每轮 2 文件、派工卡事实自包含（承 §5「长批断流」与「seed 按不变量写」两条教训）。schema/seed 的**执行**归集成者。
+
+#### 7-7-1 与预告的两处偏离（集成者裁定 · 2026-10-11 · 待 HAE 复核）
+
+**① 不重排既有 7 笔 expense 的日期**（§7-6 原句作废）。实测 dev.db：三演示项目最早开工日 `RP-2026-002 = 2026-08-02`（003=08-06 / 001=09-01），现有 7 笔支出已全部落在各自施工期内（08-17 ~ 10-06）。把任何一笔挪到 5~7 月＝造出「开工前采购主材 / 竣工后付人工」的反序，直接违反 `STATUS.md` §5「演示数据的时间自洽要主动回填」。**本单元改为**：现金窗口仍固定**近 6 个月**（决策 13），5~7 月**如实为 0**——那三个月这套演示数据里确实没有现金动作，属真实空白而非缺数据；台账增补只做 §7-6 的另一半＝**2 笔 `income/change` 变更款收款**（001 +3200 / 002 +2800，收款日 ≥ 各自变更单日期且 ≤ 今天）。金额与日期都不动既有行 ⇒ **毛利、毛利率、付款计划、两本账对照四组断言零变化**（income 不进 `grossProfit`/`marginRate`）。
+
+**② 毛利率排行不展示「无成本数据」的 100%**（登记为 §1 决策 15）。`marginRate` 口径＝(合同额+变更−支出)/(合同额+变更)，未录任何支出的项目（`RP-2026-005/006/007` 三个签约筹备项）按口径恰得 `1.0`。数字算得出、但没有成本数据支撑，摆在榜首会误导读者（同 §0「禁 mock 兜底数字」精神）。**改为**：`rate !== null && expenseTotal > 0` 才入榜；`expenseTotal === 0` → 灰态置末、文案「未录入支出」、率显「—」；`rate === null` → 灰态置末、文案「未录入合同额，不可算」。与「未排程」「未录入合同额」两处既有诚实降级同族。**口径本身零改动**（仍只消费 `ledger.marginRate`），改的是"要不要把这个数摆出来"。
+
+#### 7-7-2 数据模型
+
+零新表、零迁移。**只新增一个 seed 步骤** ⇒ 按 §4 规则**四个隔离库集成门禁全量重跑**。
+
+#### 7-7-3 共享口径（`src/core/domain/dashboard.ts` 追加，既有函数一律不改）
+
+自包含纪律不变（plain-node 直 import、内联 `round2`/`round4`、不 import 任何东西）。取数口径与 `ledger.receivedTotal`/`expenseTotal` 一致（按 `type` 取数不看符号、脏值/负数按 0）——同源公式内联，由门禁交叉断言锁死，不跨文件 import。
+
+```ts
+/** 近 n 个日历月键，**由近到远**（首元素＝当月）。n<=0 / 非有限 → []；跨年正确。 */
+export function monthKeysDescending(n: number, now: Date): string[];
+
+/** 月度现金序列输入（date 用于落本地日历月桶；形状与 prisma FinanceRecord 投影一致）。 */
+export interface CashRow { type: string; amount: number; date: Date }
+export interface CashPoint { key: string; income: number; expense: number; net: number }
+/** 按传入 keys **给定顺序**逐键输出月度现金收付点（§1-12 现金收付口径）。
+ *  keys 里没有的现金行直接忽略；某 key 当月无现金 → 三点全 0（真实空白，不许显「—」也不许造数）。
+ *  net = round2(income − expense)，可为负。落月用 monthKey（本地，禁 toISOString）。 */
+export function cashSeries(rows: CashRow[], keys: readonly string[]): CashPoint[];
+
+/** 折线纵轴峰值 = max(所有 income 与 expense)，round2；空序列 → 0。 */
+export function cashPeak(points: readonly CashPoint[]): number;
+
+/** 净现金色档：net < 0 → "warning"；否则 "success"（非有限按 0 → success）。不输出 emoji。 */
+export function cashTone(net: number): "success" | "warning";
+```
+
+#### 7-7-4 读模型服务（`src/modules/dashboard/server/overview.ts` 追加）
+
+主查询 `financeRecords` 的 `select` **加 `date: true`（本轮唯一必要的既有行改动）**，其余零改动；新增两块视图模型，**几何与排序算式只在此文件出现一次**（沿 `barWidth`/`collectionBar` 先例：页面不做算式、不出现阈值字面量）。
+
+```ts
+export interface CashMonthPoint {
+  key: string;                 // "2026-08"
+  label: string;               // "8月"（跨年由 rangeLabel 交代，格内不显年份）
+  income: number; expense: number; net: number;
+  cashTone: "success" | "warning";
+  xPct: number;                // 中心等分 (i+0.5)/n*100，一位小数 ⇒ 与月份轴 grid-cols-6 对齐
+  incomeY: number; expenseY: number;  // 0＝峰顶、100＝基线；peak<=0 时两点均 100
+}
+export interface DashboardCash {
+  points: CashMonthPoint[];    // 近 6 个月，**左→右时间升序**
+  peak: number;                // 纵轴峰值（0 → 图内两点贴基线，如实显「暂无现金」）
+  totalIncome: number; totalExpense: number; totalNet: number;
+  rangeLabel: string;          // "2026-05 ~ 2026-10"
+  hasAnyCash: boolean;         // 六个月内是否出现过任何一笔现金
+}
+export interface MarginRankRow {
+  id: string; code: string; name: string;
+  rate: number | null;         // ledger.marginRate 原值
+  light: MarginLight;
+  barWidth: string | null;     // rankable 才给（一位小数百分比串），否则 null ⇒ 页面不渲条
+  rankable: boolean;
+  note: string | null;         // 灰态文案（rankable 时 null）
+}
+export interface DashboardMargins { rows: MarginRankRow[] }
+```
+
+- 范围＝与 KPI/矩阵同一批（主查询的非 archived 项目），不另发查询（**零 N+1、零写入**）。
+- 排序：`rankable` 按 `rate` 降序、同值按 `code` 升序；其后接「未录入支出」组（`code` 升序）；最后接「未录入合同额，不可算」组（`code` 升序）。
+- `barWidth` = `rate>0 ? round1(rate*100)% : "0%"`（率可为负：支出超合同+变更时如实为负 → 条宽 `"0%"`，数值照显负率）。
+- `marginRate`/`marginLight` 一律调 `core/domain/ledger`，**本文件不写 0.25/0.15 等阈值**。
+
+#### 7-7-5 页面（`src/app/dashboard/page.tsx`，仍 server component、零 `"use client"`）
+
+版式改为：新增第五 section 放两图（`grid items-start gap-8 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]`，与「矩阵 + 待办」同构）；原 §6-5-5 那行三块占位改为**只留 商务漏斗 + 人效排行**（`sm:grid-cols-2 items-start`），漏斗块一行不动。
+
+- **月度现金收付折线**（左卡）：标题 `月度现金收付`，副标题**必须明写**「现金收付口径 · {rangeLabel}」（§1-12 硬要求，防读者按项目毛利率读）。图例两行 `text-xs`：收款＝accent、支出＝`--text-disabled` 灰阶，**禁五色、禁渐变、禁阴影**。图形用手绘 SVG：`viewBox="0 0 100 100"` + `preserveAspectRatio="none"` + `vectorEffect="non-scaling-stroke"`（描边不随非等比缩放变形），两条 `<polyline>` 直接用服务层 `xPct/incomeY/expenseY` 拼 `points`，基线一条 `stroke="var(--border)"`；**SVG 内不放文字**（避免非等比缩放拉伸字形），月份轴用下方 `grid grid-cols-6` 的 HTML 文本、与 `xPct` 中心等分对齐。`hasAnyCash === false` → 不画线，显「近 6 个月暂无现金记录」。图下净现金小表：六行 `月份 / 收款 / 支出 / 净额`（`formatCny`，净额 `text-success|text-warning` 只换字色不铺底），表下一行合计。
+- **项目毛利率排行**（右卡）：标题 `项目毛利率排行`，副标题「口径：合同额+变更−支出（项目维度）」（与折线口径明示不同）。每行＝项目名截断 + `code`（`num text-xs text-muted`）+ 条（`h-2 bg-sunken` 轨道 / `bg-accent` 填充，**单点 accent 只给入榜条**）+ 率（`formatPercent`）+ `marginLight` 色点。灰态行不渲条、率显「—」、`text-muted` 文案给原因。**空态**：「暂无项目」。
+
+刻度仍守 12/13/15/17/20/28 与 4/8/12/16/24/32/48；页面不得出现 `(n*100).toFixed(1)` 之类就地算式。
+
+#### 7-7-6 seed（`prisma/seed.ts`）
+
+新增 `seedChangeIncome()`，在 `main()` 里**排在 `seedLeads()` 之后**（金额取自 `seedChanges()` 建的变更单，顺序不可提前）。幂等按**不变量**写、不按条数写：
+
+- 逐项目（`RP-2026-001`/`002`）：先查该项目是否已有 `category="change"` 的 income 行，**有则跳过该项目**（手测已自录变更款时不重复建、也不报错）。
+- 金额＝该项目 `changeTotal`（走 `core/domain/ledger`，与页面同一口径），`<= 0` 跳过；`type:"income"`、`category:"change"`、`description:"变更款收款（seed 演示）"`、`recordedBy: getFinanceUser()`。
+- 日期＝`min(该项目最晚变更日期 + 5 天, 今天)`，保证 ≥ 变更日且不晚于今天（承 §5 时间自洽）。
+- **关键连带修**：`seedFinance()` 末尾自检的 `frTotal !== 11` 原式统计**全表**行数——本函数在其后追加 2 行，第二次跑 seed 时 `seedFinance` 会读到 13 而**自己抛错**（首轮不报、重跑才炸＝典型幂等陷阱）。故该断言改为**只数自己建的那批**：`count({ where: { category: { not: "change" } } }) !== 11`，头注释同步说明。
+- 自检：报数取 DB 真值，断言「有正变更额且有报价单的演示项目，至少各有一条 `income/change`」+「`category="change"` 行合计 == `Σ changeTotal(001,002)`」。
+
+#### 7-7-7 门禁与验收
+
+- `scripts/verify-dashboard.mjs` 扩：`monthKeysDescending`（n=6 常规 / 跨年 / n=0 / n=负 / n=1）、`cashSeries`（空 rows 全 0 / 同月合并 / 跨月边界本地不漂移 / type 非收支不计 / 负与 NaN 按 0 / keys 外忽略 / 输出顺序＝keys 顺序 / net 可为负 / 独立整数分预言机）、`cashPeak`（空 0 / 取两列最大）、`cashTone`（0 success / 负 warning / NaN success）、与 `ledger.receivedTotal`/`expenseTotal` 的**同源交叉断言**（同一组 rows，`cashSeries` 合计 == `receivedTotal+expenseTotal`）。目标 **58 → ≥75**；输出禁 emoji 条继续覆盖新函数。
+- `scripts/verify-finance-flow.mts`：**初态守卫 收支记录 11 → 13**（三处：判定 / 提示串 / 断言名）。其余基线（`grossProfit 24900`、`marginRate 0.3819`、付款段 15、变更单 2）**零变化**（income 不进毛利）。
+- 既有八纯门禁零回退：quote 79（随报价单数）/ crm 11 / health 20 / design 28 / schedule 55 / quality 108 / finance 135 / dashboard 新计数。
+- **动 seed ⇒ 四隔离库集成门禁全量重跑**（sign 12 / schedgen 27 / quality-flow 94 / finance-flow 76，各自 `migrate reset --force` 重灌 seed）。
+- `pnpm build` 绿 + `npx tsc --noEmit` 0 + qa-shots 33 页全 200 + 目检（折线两条线形状 / 5~7 月贴基线为 0 且表内显 ¥0.00 不显「—」/ 月份轴与点位对齐 / 毛利率榜首是 002 38.6% 而非某 100% 项 / 005~007 灰态「未录入支出」置末 / 004「未录入合同额，不可算」最后 / `/finance` 已收款随 2 笔变更款上浮）+ 375 探针 `/dashboard`（`scrollWidth ≤ 375`，别肉眼判溢出）+ 实值巡检扩（`_scratch/m9b_dash_check.mts` 加六个月分桶逐月笨算与排行顺序复核）+ **seed 连跑两次幂等**（收支 13、变更款 2 条不变）。
+- 同步基线（集成者）：`STATUS.md` §1 数据基线（收支 11 → 13、已收 ¥130,600 → ¥136,600、全司回款率与 001/002 预算灯/`paidPct` 数字）、§2 门禁表 dashboard 计数、§8 交接。
