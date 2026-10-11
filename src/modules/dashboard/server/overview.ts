@@ -11,7 +11,10 @@ import { formatSignedCny } from "@/core/domain/pricing";
 import {
   collectionLight,
   collectionRate,
+  funnelCounts,
+  FUNNEL_STAGE_ORDER,
   isInProgress,
+  leadConversion,
   riskItemCount,
   signedAmountAt,
   type CollectionLight,
@@ -103,8 +106,39 @@ export interface DashboardOverview {
   kpi: DashboardKpi;
   health: HealthRow[];
   todos: TodoGroup[];
+  funnel: DashboardFunnel;
   generatedAt: string;
 }
+
+/**
+ * 商务漏斗视图模型（M9-b-2a）。
+ *
+ * 只画当前 stage 存量分布，不画相邻阶段转化率——见 core/domain/dashboard.ts
+ * 的 funnelCounts 注释。`stages` 按 LEAD_STAGE_ORDER 顺序输出，stage 为串、
+ * 中文映射在页面本地（不 import crm/stages.ts 模块内部）。`barWidth` 为预
+ * 计算的 CSS 宽度串（口径换算收敛在服务层，页面不做算式）。
+ */
+export interface FunnelStageRow {
+  stage: string;
+  count: number;
+  /** 0–1 小数，四位舍入（与 collectionRate 同式）；total 0 → 0 */
+  pct: number;
+  /** 存量条 CSS 宽度（两位小数消浮点尾差，如 "20%" / "33.33%"）；total 0 → "0%" */
+  barWidth: string;
+}
+export interface DashboardFunnel {
+  stages: FunnelStageRow[];
+  /** 全部线索数（含 order 外的，若手测脏数据） */
+  total: number;
+  /** 签约率 = signed / total；total 0 → null（UI 显「—」） */
+  conversionRate: number | null;
+}
+
+/**
+ * 线索阶段顺序取 `core/domain/dashboard.FUNNEL_STAGE_ORDER`（与 `crm/stages.ts`
+ * 的同序同值由 `verify-dashboard.mjs` 断言锁死）；中文标签在页面本地映射
+ * （不 import crm/stages.ts 模块内部，TASK_M9 §7-1）。
+ */
 
 /** 主查询单行的中间计算结果（KPI / 健康矩阵 / 待办共用，避免重复展开关系）。 */
 interface CalcRow {
@@ -137,6 +171,7 @@ export async function getDashboardOverview(
     designList,
     payCount,
     payList,
+    leads,
   ] = await Promise.all([
     // 主查询：全部非 archived 项目，一次带齐矩阵与 KPI 原料
     prisma.project.findMany({
@@ -189,6 +224,8 @@ export async function getDashboardOverview(
       orderBy: { createdAt: "asc" },
       take: 3,
     }),
+    // 商务漏斗：全部线索的 stage 分布（单条查询，不进 N+1；单 org 部署，不设 org 过滤）
+    prisma.lead.findMany({ select: { stage: true } }),
   ]);
 
   let receivedSum = 0;
@@ -268,6 +305,19 @@ export async function getDashboardOverview(
 
   const warnRows = rows.filter((r) => r.changeWarn);
   const redRows = rows.filter((r) => r.schedule === "red");
+
+  // 商务漏斗：funnelCounts + leadConversion（纯函数口径，stage 串回传，页面本地映射中文）
+  const leadStages = leads.map((l) => ({ stage: l.stage }));
+  const funnelStages = funnelCounts(leadStages, FUNNEL_STAGE_ORDER);
+  const funnel: DashboardFunnel = {
+    stages: funnelStages.map((s) => ({
+      ...s,
+      // 进度条宽度唯一一次换算：pct（0–1）→ 两位小数 CSS 百分比串，消浮点尾差
+      barWidth: `${Math.round(s.pct * 10000) / 100}%`,
+    })),
+    total: leads.length,
+    conversionRate: leadConversion(leadStages),
+  };
 
   // 七组待办，顺序与口径固定；第 7 组为灰占位（人员管控模块未上线）
   const todos: TodoGroup[] = [
@@ -361,6 +411,7 @@ export async function getDashboardOverview(
     },
     health,
     todos,
+    funnel,
     generatedAt: fmtStamp(now),
   };
 }

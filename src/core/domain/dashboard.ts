@@ -138,3 +138,72 @@ export function formatSignedPercent(n: number): string {
   const abs = Math.abs(n * 100).toFixed(1);
   return n > 0 ? `+${abs}%` : `\u2212${abs}%`;
 }
+
+/**
+ * 商务漏斗阶段顺序（M9-b-2a）。
+ *
+ * 与 `src/modules/crm/stages.ts` 的 `LEAD_STAGE_ORDER` 同序同值。两处不互相 import
+ * （驾驶舱不得引模块内部，AGENTS §2），改由 `scripts/verify-dashboard.mjs` 断言二者
+ * 一致——crm 若加阶段而忘了驾驶舱，门禁直接红，不会静默漏计线索。
+ */
+export const FUNNEL_STAGE_ORDER = [
+  "leads",
+  "contacted",
+  "confirmed",
+  "quoted",
+  "signed",
+] as const;
+
+/**
+ * 商务漏斗阶段存量计数（TASK_M9 §7-1）。
+ *
+ * 只画当前 `Lead.stage` 的存量分布，**不画相邻阶段转化率**——本平台没有阶段
+ * 流水表，`stage` 只有现值，「到达过某阶段」的累计数算不出来；用存量冒充转化率
+ * ＝造假日指标（违反 §0 禁 mock 完成准则）。唯一真指标是签约率（见 leadConversion）。
+ *
+ * 按传入 `order` 顺序输出；`pct = count / total`（total = rows.length，含 order 外
+ * 的行也计入分母，因为它们是真实存量；total 0 → 各 pct 0）。`order` 外的 stage 不
+ * 出现在结果里（不冒泡未知值）。pct 为 0–1 小数，四位舍入（与 collectionRate 同式）。
+ * count 为非负整数。
+ *
+ * 中文标签不进 core：调用方传 stage 串，页面用本地常量映射中文
+ * （站内 ProjectTabs/finance 各自本地映射是既有先例，crm/stages.ts 属模块私有禁区）。
+ */
+export interface FunnelRow {
+  stage: string;
+  count: number;
+  pct: number;
+}
+export function funnelCounts(
+  rows: { stage: string }[],
+  order: readonly string[],
+): FunnelRow[] {
+  const total = rows.length;
+  const counts = new Map<string, number>();
+  for (const r of rows) {
+    counts.set(r.stage, (counts.get(r.stage) ?? 0) + 1);
+  }
+  const out: FunnelRow[] = [];
+  for (const stage of order) {
+    const count = counts.get(stage) ?? 0;
+    const pct = total > 0 ? round4(count / total) : 0;
+    out.push({ stage, count, pct });
+  }
+  return out;
+}
+
+/**
+ * 签约率 = signed 线索数 / 全部线索数（TASK_M9 §7-1 唯一真指标）。
+ *
+ * 分母 0 → `null`（UI 显「—」）；分子按 `stage === "signed"` 计数；四位舍入。
+ * 与 `funnelCounts` 中 signed 阶段的 `pct` 同值，但语义独立（一个画存量条、
+ * 一个作真指标），口径单点收敛在此函数，页面不得各写算式。
+ */
+export function leadConversion(rows: { stage: string }[]): number | null {
+  if (rows.length === 0) return null;
+  let signed = 0;
+  for (const r of rows) {
+    if (r.stage === "signed") signed++;
+  }
+  return round4(signed / rows.length);
+}

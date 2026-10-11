@@ -7,6 +7,7 @@ import { buildPaymentPlan } from "../src/modules/finance/payment";
 import { changeTotal, changeWatch, marginRate } from "../src/core/domain/ledger";
 import { getFinanceUser } from "../src/modules/finance/currentUser";
 import { getBudgetUser } from "../src/modules/budget/currentUser";
+import { createProject } from "../src/core/domain/projects";
 
 const prisma = new PrismaClient();
 
@@ -284,6 +285,8 @@ async function main() {
   await seedFinance();
   // M9-a：变更单 seed（演示项目 001/002 各一条，幂等）。
   await seedChanges();
+  // M9-b-2a：线索 seed（未签四阶段补至≥2 + 两条已签线索配套建项目，幂等）。
+  await seedLeads();
 }
 
 /** M1a/M2-A 基础数据：组织 + 用户 + 客户 + 项目 + 报价 + 科目模板 + 线索。 */
@@ -1883,6 +1886,471 @@ async function seedChanges() {
   if (p2Changes[0].kind !== "process" || p2Changes[0].title !== "厨房橱柜工艺变更" || p2Changes[0].amount !== 2800) {
     throw new Error(
       `changes seed 自检失败：002 应 process/+2800/厨房橱柜工艺变更（实际 ${JSON.stringify(p2Changes[0])}）`
+    );
+  }
+}
+
+// ── M9-b-2a 线索 seed（幂等 + 自检 + 时间自洽）──────────────────────
+// 照 seedChanges 范式：按 code 存在性跳过，不靠总数判断。
+// 未签四阶段各补至≥2（现有 001 contacted / 002 quoted）：
+//   leads ×2（003/004）+ contacted ×1（005）+ confirmed ×2（006/009）+ quoted ×1（010）= 6 条
+//   ※ 卡面写「003~008」与「已签 007/008」撞号：007/008 由已签占用（卡点名且绑 RP-2026-005/006
+//     与合同额），故未签的 confirmed 第二条与 quoted 那条改用 009/010（自报偏离见交付报）。
+// 已签 2 条（配套建项目，让漏斗顶格 + 让「本月签单额」环比第一次有真值可比）：
+//   007（本月签）→ RP-2026-005 contractAmount 218000
+//   008（上月签）→ RP-2026-006 contractAmount 176000
+// 两条都走 core/domain/projects.createProject（自动建草稿 BudgetQuote、Client 按名归并+手机号回写），
+// 再回写 Lead.projectId + stage="signed"。不建付款计划段/收支台账/变更单
+// （verify-finance-flow 初态守卫 15/11/2 与 seedFinance 自检 11 不受影响）。
+// 日期一律本地构造 new Date(y,m,d)，避开月末 UTC 漂移；lastFollowAt ≥ createdAt 且不晚于今天。
+async function seedLeads() {
+  const org = await prisma.organization.findUnique({ where: { slug: "default" } });
+  if (!org) {
+    throw new Error("leads seed 自检失败：默认组织不存在，请先运行基础 seed");
+  }
+
+  const now = new Date();
+  const DAY = 24 * 60 * 60 * 1000;
+  const addDays = (base: Date, n: number) => new Date(base.getTime() + n * DAY);
+  // 本月 1 日（签约回填基准，always ≤ today、always 本月）& 上月 15 日（always 上月）
+  const thisMonth1 = new Date(now.getFullYear(), now.getMonth(), 1);
+  const lastMonth15 = new Date(now.getFullYear(), now.getMonth() - 1, 15);
+  // 未签线索的 createdAt/lastFollowAt：落在近期，不晚于今天
+  const unsignedCreated = addDays(now, -12);
+  const unsignedFollow = addDays(now, -3);
+  const unsignedNext = addDays(now, 4);
+  // 已签线索 006（上月签）的 lead.createdAt：上月早于 15 日
+  const lead008Created = new Date(now.getFullYear(), now.getMonth() - 1, 5);
+  // 已签线索 007（本月签）的 lead.createdAt：上月末（lead 早于签约，更真实）
+  const lead007Created = new Date(now.getFullYear(), now.getMonth() - 1, 25);
+
+  // "YYYY-MM-DD"（createProject 的 startDate 入参形状，本地零点解析）
+  const dateStr = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+  // ── 6 条未签线索（按 code 存在性跳过，幂等）──
+  const UNSIGNED_LEADS: {
+    code: string;
+    name: string;
+    phone: string;
+    estate: string;
+    area: number;
+    style: string;
+    budgetRange: string;
+    source: string;
+    stage: string;
+    intentLevel: string;
+    assignee: string;
+    followContent: string;
+  }[] = [
+    {
+      code: "LEAD-2026-003",
+      name: "孙女士",
+      phone: "139-0000-0011",
+      estate: "锦绣花园 3 栋 502",
+      area: 88,
+      style: "现代简约",
+      budgetRange: "15-20 万",
+      source: "老客户转介绍",
+      stage: "leads",
+      intentLevel: "high",
+      assignee: "林岚",
+      followContent: "首次咨询，了解装修流程与报价区间，约周末量房。",
+    },
+    {
+      code: "LEAD-2026-004",
+      name: "周先生",
+      phone: "139-0000-0012",
+      estate: "滨江公馆 5 栋 2003",
+      area: 132,
+      style: "新中式",
+      budgetRange: "25-30 万",
+      source: "小红书",
+      stage: "leads",
+      intentLevel: "medium",
+      assignee: "周工",
+      followContent: "线上咨询留资，对中式元素与新中式风格感兴趣。",
+    },
+    {
+      code: "LEAD-2026-005",
+      name: "吴女士",
+      phone: "139-0000-0013",
+      estate: "湖畔名庭 2 栋 803",
+      area: 95,
+      style: "日式",
+      budgetRange: "15-20 万",
+      source: "抖音",
+      stage: "contacted",
+      intentLevel: "low",
+      assignee: "林岚",
+      followContent: "已电话沟通，客户对预算较敏感，暂未定方案。",
+    },
+    {
+      code: "LEAD-2026-006",
+      name: "郑先生",
+      phone: "139-0000-0014",
+      estate: "云栖名邸 5 栋 1801",
+      area: 145,
+      style: "现代简约",
+      budgetRange: "30-40 万",
+      source: "老客户转介绍",
+      stage: "confirmed",
+      intentLevel: "high",
+      assignee: "周工",
+      followContent: "方案已确认，等待出具正式报价单后签约。",
+    },
+    {
+      code: "LEAD-2026-009",
+      name: "陈女士",
+      phone: "139-0000-0015",
+      estate: "金域蓝湾 6 栋 1202",
+      area: 108,
+      style: "北欧",
+      budgetRange: "20-25 万",
+      source: "大众点评",
+      stage: "confirmed",
+      intentLevel: "medium",
+      assignee: "林岚",
+      followContent: "量房完成，平面方案已确认，进入报价阶段。",
+    },
+    {
+      code: "LEAD-2026-010",
+      name: "王先生",
+      phone: "139-0000-0016",
+      estate: "老街 18 号院",
+      area: 76,
+      style: "工业风",
+      budgetRange: "10-15 万",
+      source: "门店自然客流",
+      stage: "quoted",
+      intentLevel: "low",
+      assignee: "周工",
+      followContent: "已出报价单，客户对比中，暂未决定。",
+    },
+  ];
+
+  for (const u of UNSIGNED_LEADS) {
+    const exists = await prisma.lead.findUnique({
+      where: { code: u.code },
+      select: { id: true },
+    });
+    if (exists) continue;
+    await prisma.lead.create({
+      data: {
+        orgId: org.id,
+        code: u.code,
+        name: u.name,
+        phone: u.phone,
+        estate: u.estate,
+        area: u.area,
+        style: u.style,
+        budgetRange: u.budgetRange,
+        source: u.source,
+        stage: u.stage,
+        intentLevel: u.intentLevel,
+        assignee: u.assignee,
+        createdAt: unsignedCreated,
+        lastFollowAt: unsignedFollow,
+        nextFollowAt: unsignedNext,
+        followUps: {
+          create: [{ content: u.followContent, date: unsignedFollow }],
+        },
+      },
+    });
+  }
+
+  // ── 阶段补足（脏库护栏，集成者加）───────────────────────────────
+  // 固定 code 清单**保证不了**「五阶段各 ≥2」：dev.db 里有手测数据，seed 的
+  // LEAD-2026-001 已被手测推进成 signed（实测如此），contacted 就只剩 1 条。
+  // 正解＝按 DB 真值逐阶段补到 2 条，而不是假定库是干净的（M9-a ensureQuote 同族教训）。
+  const codeMax = (() => {
+    let max = 0;
+    for (const l of UNSIGNED_LEADS) {
+      const m = /^LEAD-2026-(\d+)$/.exec(l.code);
+      if (m) max = Math.max(max, Number(m[1]));
+    }
+    return max;
+  })();
+  const existingCodes = new Set(
+    (await prisma.lead.findMany({ select: { code: true } })).map((l) => l.code)
+  );
+  let seq = codeMax;
+  const nextLeadCode = () => {
+    let c = "";
+    do {
+      c = `LEAD-2026-${String(++seq).padStart(3, "0")}`;
+    } while (existingCodes.has(c));
+    existingCodes.add(c);
+    return c;
+  };
+  const TOPUP_NAMES: Record<string, string[]> = {
+    leads: ["何女士", "邵先生"],
+    contacted: ["女士（待补）", "先生（待补）"],
+    confirmed: ["鲍女士", "卫先生"],
+    quoted: ["蒋女士", "沈先生"],
+  };
+  for (const stage of ["leads", "contacted", "confirmed", "quoted"] as const) {
+    let count = await prisma.lead.count({ where: { stage } });
+    let pick = 0;
+    while (count < 2) {
+      const code = nextLeadCode();
+      const name = TOPUP_NAMES[stage]?.[pick++] ?? `线索 ${code.slice(-3)}`;
+      await prisma.lead.create({
+        data: {
+          orgId: org.id,
+          code,
+          name,
+          phone: `139-0000-${code.slice(-3)}`,
+          estate: "香樟公馆 1 栋 302",
+          area: 106,
+          style: "现代简约",
+          budgetRange: "18-24 万",
+          source: "老客户转介绍",
+          stage,
+          intentLevel: "medium",
+          assignee: pick % 2 ? "周工" : "林岚",
+          createdAt: unsignedCreated,
+          lastFollowAt: unsignedFollow,
+          nextFollowAt: unsignedNext,
+          followUps: {
+            create: [
+              {
+                content: `阶段补足：使「${stage}」阶段线索不少于 2 条，漏斗各档都有真实存量。`,
+                date: unsignedFollow,
+              },
+            ],
+          },
+        },
+      });
+      count++;
+    }
+  }
+
+  // ── 2 条已签线索（配套建项目）──
+  // 007 本月签 → RP-2026-005 / 218000；008 上月签 → RP-2026-006 / 176000。
+  // 走 createProject：自动建草稿报价单、Client 按名归并+手机号回写。
+  // 不建付款计划/收支/变更；不建 ScheduleTask（让驾驶舱矩阵显「未排程」诚实灰态）。
+  const SIGNED: {
+    code: string;
+    name: string;
+    phone: string;
+    estate: string;
+    area: number;
+    style: string;
+    budgetRange: string;
+    source: string;
+    intentLevel: string;
+    assignee: string;
+    projectCode: string;
+    projectName: string;
+    projectAddress: string;
+    contractAmount: number;
+    // 项目 createdAt 回填目标（决定 signedAmountAt 落在哪个日历月）
+    projectCreatedAt: Date;
+    // lead 的 createdAt 与 lastFollowAt（签约日）
+    leadCreatedAt: Date;
+    signedAt: Date;
+    followContent: string;
+  }[] = [
+    {
+      code: "LEAD-2026-007",
+      name: "赵女士",
+      phone: "139-0000-0105",
+      estate: "溪上和园 6 栋 1201",
+      area: 118,
+      style: "现代简约",
+      budgetRange: "20-25 万",
+      source: "老客户转介绍",
+      intentLevel: "high",
+      assignee: "林岚",
+      projectCode: "RP-2026-005",
+      projectName: "溪上和园 6 栋 1201",
+      projectAddress: "溪上和园 6 栋 1201 室",
+      contractAmount: 218000,
+      // 本月签：项目 createdAt 落本月（createProject 默认 now 即本月，故不回填；
+      //   此字段仅作为「期望值」用于自检对照，005 不做实际 update）
+      projectCreatedAt: thisMonth1,
+      leadCreatedAt: lead007Created,
+      signedAt: thisMonth1,
+      followContent: "签约建项，合同额 ¥218,000，进入设计阶段。",
+    },
+    {
+      code: "LEAD-2026-008",
+      name: "钱先生",
+      phone: "139-0000-0106",
+      estate: "云锦雅舍 3 栋 1606",
+      area: 96,
+      style: "北欧",
+      budgetRange: "15-20 万",
+      source: "小红书",
+      intentLevel: "medium",
+      assignee: "周工",
+      projectCode: "RP-2026-006",
+      projectName: "云锦雅舍 3 栋 1606",
+      projectAddress: "云锦雅舍 3 栋 1606 室",
+      contractAmount: 176000,
+      // 上月签：项目 createdAt 须回填到上月（createProject 默认 now=本月，需 update）
+      projectCreatedAt: lastMonth15,
+      leadCreatedAt: lead008Created,
+      signedAt: lastMonth15,
+      followContent: "签约建项，合同额 ¥176,000，设计深化中。",
+    },
+  ];
+
+  /** 取一个未被占用的项目 code（从 base 起递增；脏库里 005/006 可能已被手测项目占了号）。 */
+  async function nextFreeProjectCode(base: string): Promise<string> {
+    const m = /^(.*-)(\d+)$/.exec(base);
+    const prefix = m ? m[1] : "RP-";
+    let n = m ? Number(m[2]) : 1;
+    for (;;) {
+      const code = `${prefix}${String(n).padStart(3, "0")}`;
+      const taken = await prisma.project.findUnique({ where: { code }, select: { id: true } });
+      if (!taken) return code;
+      n++;
+    }
+  }
+
+  for (const s of SIGNED) {
+    const existsLead = await prisma.lead.findUnique({
+      where: { code: s.code },
+      select: { id: true, projectId: true },
+    });
+    if (existsLead) continue; // 幂等：已 seed 跳过
+
+    // 脏库护栏（集成者加）：该签约月若已存在「带线索的项目」（手测签过），环比演示位
+    // 就已成立，不再补建——否则既重复占位，又必撞 `Lead.projectId @unique`。
+    const mStart = new Date(s.projectCreatedAt.getFullYear(), s.projectCreatedAt.getMonth(), 1);
+    const mEnd = new Date(s.projectCreatedAt.getFullYear(), s.projectCreatedAt.getMonth() + 1, 1);
+    const alreadySigned = await prisma.lead.count({
+      where: {
+        projectId: { not: null },
+        project: { createdAt: { gte: mStart, lt: mEnd } },
+      },
+    });
+    if (alreadySigned > 0) continue;
+
+    // 项目：只复用「同 code 且尚未被任何线索占用」的项目；否则用空闲 code 新建。
+    //（Lead.projectId 是 @unique——实测 dev.db 里 RP-2026-005/006 已被手测签约项目占号，
+    //  原「按 code 复用」写法直接 P2002 崩 seed。）
+    let project = await prisma.project.findFirst({
+      where: { code: s.projectCode, lead: { is: null } },
+      select: { id: true, createdAt: true },
+    });
+    if (!project) {
+      const freeCode = await nextFreeProjectCode(s.projectCode);
+      const created = await createProject({
+        name: s.projectName,
+        code: freeCode,
+        clientName: s.name,
+        clientPhone: s.phone,
+        area: s.area,
+        address: s.projectAddress,
+        designer: s.assignee,
+        pm: "周工",
+        status: "draft", // 与真实签约一致（signLead 建的项目同为 draft），不进在建三态、不扰动矩阵
+        source: s.source,
+        style: s.style,
+        contractAmount: s.contractAmount,
+        startDate: dateStr(s.signedAt),
+      });
+      project = { id: created.id, createdAt: new Date() };
+    }
+
+    // 回写项目 createdAt 到签约月（008 须落到上月；007 落本月）
+    // createProject 默认 createdAt=now；若 now 的日历月 ≠ 期望月，则 update。
+    const wantMonth = `${s.projectCreatedAt.getFullYear()}-${String(s.projectCreatedAt.getMonth() + 1).padStart(2, "0")}`;
+    const gotMonth = `${project.createdAt.getFullYear()}-${String(project.createdAt.getMonth() + 1).padStart(2, "0")}`;
+    if (wantMonth !== gotMonth) {
+      await prisma.project.update({
+        where: { id: project.id },
+        data: { createdAt: s.projectCreatedAt },
+      });
+    }
+
+    // 建 lead（stage=signed，projectId 回写）
+    await prisma.lead.create({
+      data: {
+        orgId: org.id,
+        code: s.code,
+        name: s.name,
+        phone: s.phone,
+        estate: s.estate,
+        area: s.area,
+        style: s.style,
+        budgetRange: s.budgetRange,
+        source: s.source,
+        stage: "signed",
+        intentLevel: s.intentLevel,
+        assignee: s.assignee,
+        createdAt: s.leadCreatedAt,
+        lastFollowAt: s.signedAt,
+        nextFollowAt: null, // 已签约，无后续跟进
+        projectId: project.id,
+        followUps: {
+          create: [{ content: s.followContent, date: s.signedAt }],
+        },
+      },
+    });
+  }
+
+  // ── 自检断言（报数取 DB 真值；断言按「签约月」而非按「固定 code」——
+  //    脏库里手测可能已占掉 RP-2026-005/006 与某个月的签约位，按 code 断言会误报）──
+  const [totalLeads, stageRows, signedLeads] = await Promise.all([
+    prisma.lead.count(),
+    prisma.lead.findMany({ select: { stage: true } }),
+    prisma.lead.findMany({
+      where: { stage: "signed" },
+      select: {
+        id: true,
+        code: true,
+        projectId: true,
+        project: { select: { code: true, contractAmount: true, createdAt: true } },
+      },
+    }),
+  ]);
+
+  const stageMap: Record<string, number> = {};
+  for (const r of stageRows) stageMap[r.stage] = (stageMap[r.stage] ?? 0) + 1;
+  const STAGES = ["leads", "contacted", "confirmed", "quoted", "signed"];
+  const minPerStage = Math.min(...STAGES.map((s) => stageMap[s] ?? 0));
+  const signedMissingProject = signedLeads.filter((l) => !l.projectId).length;
+  const stageSummary = STAGES.map((s) => `${s}:${stageMap[s] ?? 0}`).join(" · ");
+
+  const monthKeyOf = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  const thisMonth = monthKeyOf(now);
+  const lastMonth = monthKeyOf(new Date(now.getFullYear(), now.getMonth() - 1, 15));
+  const signedIn = (k: string) =>
+    signedLeads.filter((l) => l.project && monthKeyOf(l.project.createdAt) === k);
+  const sumOf = (list: typeof signedLeads) =>
+    Math.round(list.reduce((s, l) => s + (l.project?.contractAmount ?? 0), 0) * 100) / 100;
+  const cur = signedIn(thisMonth);
+  const prev = signedIn(lastMonth);
+
+  console.log(
+    `M9-b-2a seed 完成：线索 ${totalLeads}（阶段 ${stageSummary}）· signed 带项目 ${signedLeads.length}` +
+      ` · 本月(${thisMonth}) ${cur.length} 条 / ${sumOf(cur)} 元 · 上月(${lastMonth}) ${prev.length} 条 / ${sumOf(prev)} 元`
+  );
+
+  if (minPerStage < 2) {
+    throw new Error(
+      `leads seed 自检失败：五阶段应各≥2（实际 ${stageSummary}，最小 ${minPerStage}）`
+    );
+  }
+  if (signedMissingProject > 0) {
+    throw new Error(
+      `leads seed 自检失败：${signedMissingProject} 条 signed 线索缺 projectId（漏回写）`
+    );
+  }
+  // 驾驶舱「本月签单额」环比演示位：本月与上月各至少一条签约建项（缺哪月补哪月）
+  if (cur.length < 1) {
+    throw new Error(
+      `leads seed 自检失败：本月(${thisMonth}) 应有 ≥1 条签约建项项目，实际 0（环比演示位落空）`
+    );
+  }
+  if (prev.length < 1) {
+    throw new Error(
+      `leads seed 自检失败：上月(${lastMonth}) 应有 ≥1 条签约建项项目，实际 0（环比将显「不可比」）`
     );
   }
 }

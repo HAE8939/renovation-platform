@@ -27,13 +27,22 @@ const dotCls: Record<Light | "neutral", string> = {
 /** 灯位 tooltip 词语（展示文案，不含阈值）。 */
 const lightWord: Record<Light, string> = { green: "正常", yellow: "预警", red: "告警" };
 
+/** 线索阶段中文标签（本地映射，不 import crm/stages.ts 模块内部，照 ProjectTabs/finance 既有先例）。 */
+const STAGE_LABEL: Record<string, string> = {
+  leads: "线索",
+  contacted: "已联系",
+  confirmed: "已确认",
+  quoted: "已报价",
+  signed: "已签约",
+};
+
 /** 全站统一色点范式。 */
 function Dot({ cls }: { cls: string }) {
   return <span aria-hidden className={`inline-block h-2 w-2 shrink-0 rounded-full ${cls}`} />;
 }
 
 export default async function DashboardPage() {
-  const { kpi, health, todos, generatedAt } = await getDashboardOverview();
+  const { kpi, health, todos, funnel, generatedAt } = await getDashboardOverview();
 
   return (
     <div className="space-y-12">
@@ -206,11 +215,33 @@ export default async function DashboardPage() {
         </div>
       </section>
 
-      {/* 四、灰占位：不画假图、不放假数字 */}
-      <section className="grid gap-4 sm:grid-cols-3">
+      {/* 四、商务漏斗（真内容）+ 两块灰占位（不画假图、不放假数字）；items-start 让三卡各自
+          按内容取高，避免占位卡被漏斗拉成一整列空白（V0.3 §7.4 节奏） */}
+      <section className="grid items-start gap-4 sm:grid-cols-3">
         <Card>
           <SectionTitle>商务漏斗</SectionTitle>
-          <p className="mt-2 text-xs text-secondary">后续单元接入（M3-e 商务漏斗在此清账）</p>
+          <p className="mt-2 text-xs text-secondary">阶段存量分布（非累计流量）</p>
+          <ul className="mt-4 space-y-2">
+            {funnel.stages.map((s) => (
+              <li key={s.stage} className="flex items-center gap-3">
+                <span className="w-12 shrink-0 text-[13px] text-secondary">
+                  {STAGE_LABEL[s.stage] ?? s.stage}
+                </span>
+                <div className="h-2 flex-1 rounded-full bg-sunken">
+                  <div className="h-2 rounded-full bg-accent" style={{ width: s.barWidth }} />
+                </div>
+                <span className="num w-8 shrink-0 text-right text-[13px] text-primary">
+                  {s.count}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-4 text-xs text-secondary">
+            签约率{" "}
+            <span className="num text-primary">
+              {funnel.conversionRate === null ? "—" : formatPercent(funnel.conversionRate)}
+            </span>
+          </p>
         </Card>
         <Card>
           <SectionTitle>月度营收毛利趋势</SectionTitle>

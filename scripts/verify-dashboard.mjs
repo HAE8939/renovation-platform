@@ -29,7 +29,15 @@ const {
   collectionLight,
   riskItemCount,
   formatSignedPercent,
+  funnelCounts,
+  FUNNEL_STAGE_ORDER,
+  leadConversion,
 } = dash;
+// crm 的阶段序列（纯常量文件，无 prisma，plain-node 可直 import）——用于锁死
+// 「驾驶舱漏斗阶段顺序」与「线索真实阶段顺序」不漂移。
+const { LEAD_STAGE_ORDER } = await import(
+  pathToFileURL(join(ROOT, "src/modules/crm/stages.ts")).href
+);
 
 const results = [];
 let failed = 0;
@@ -221,6 +229,135 @@ function check(name, ok, detail = "") {
     `${formatSignedPercent(NaN)} / ${formatSignedPercent(Infinity)}`);
 }
 
+/* ── funnelCounts / leadConversion（M9-b-2a 追加）───────────────── */
+{
+  const ORDER = [...FUNNEL_STAGE_ORDER];
+
+  // 漂移护栏：core 的漏斗阶段顺序必须与 crm 的真实线索阶段序列同序同值
+  // （两处不互相 import，靠这条断言锁死——crm 加阶段而驾驶舱忘了改，这里直接红）
+  check("阶段顺序不漂移：FUNNEL_STAGE_ORDER ≡ crm LEAD_STAGE_ORDER",
+    JSON.stringify(ORDER) === JSON.stringify([...LEAD_STAGE_ORDER]),
+    `core ${JSON.stringify(ORDER)} vs crm ${JSON.stringify([...LEAD_STAGE_ORDER])}`);
+
+  // 空集 → 五阶段全 0、pct 全 0
+  const empty = funnelCounts([], ORDER);
+  check("funnelCounts: 空集 → 五阶段全 0、pct 全 0",
+    empty.length === 5 && empty.every((r) => r.count === 0 && r.pct === 0),
+    JSON.stringify(empty));
+
+  // 全在同一阶段（leads ×3）→ leads count=3 pct=1、其余 0
+  const single = funnelCounts(
+    [{ stage: "leads" }, { stage: "leads" }, { stage: "leads" }],
+    ORDER
+  );
+  check("funnelCounts: 三条全 leads → leads count=3 pct=1、其余 0",
+    single[0].stage === "leads" && single[0].count === 3 && single[0].pct === 1
+      && single.slice(1).every((r) => r.count === 0 && r.pct === 0),
+    JSON.stringify(single));
+
+  // 五阶段各 2（共 10）→ 各 count=2 pct=0.2
+  const five = funnelCounts(
+    [
+      { stage: "leads" }, { stage: "leads" },
+      { stage: "contacted" }, { stage: "contacted" },
+      { stage: "confirmed" }, { stage: "confirmed" },
+      { stage: "quoted" }, { stage: "quoted" },
+      { stage: "signed" }, { stage: "signed" },
+    ],
+    ORDER
+  );
+  check("funnelCounts: 五阶段各 2 → 各 count=2 pct=0.2",
+    five.every((r) => r.count === 2 && r.pct === 0.2),
+    JSON.stringify(five));
+
+  // 2/1/2/1/1=7 → pct 之和≈1（各值独立 round4，容差见下方断言）
+  const mixed = funnelCounts(
+    [
+      { stage: "leads" }, { stage: "leads" },
+      { stage: "contacted" },
+      { stage: "confirmed" }, { stage: "confirmed" },
+      { stage: "quoted" },
+      { stage: "signed" },
+    ],
+    ORDER
+  );
+  const pctSum = mixed.reduce((s, r) => s + r.pct, 0);
+  // 各 pct 独立 round4，和会有舍入漂移（如 1/7=0.1429、2/7=0.2857 → 和 1.0001），
+  // 容差取 1e-3 覆盖 5 值各自的尾数漂移（最坏 5×0.00005=0.00025）。
+  check("funnelCounts: 2/1/2/1/1=7 → pct 之和≈1（容差 1e-3，容独立 round4 漂移）",
+    Math.abs(pctSum - 1) < 1e-3,
+    `pctSum=${pctSum}`);
+
+  // 输出顺序与 order 一致
+  check("funnelCounts: 输出顺序与 order 一致",
+    JSON.stringify(five.map((r) => r.stage)) === JSON.stringify(ORDER),
+    JSON.stringify(five.map((r) => r.stage)));
+
+  // order 外的 stage 不计入任何输出行
+  const extra = funnelCounts([{ stage: "unknown" }, { stage: "leads" }], ORDER);
+  check("funnelCounts: order 外 stage 不冒泡到输出",
+    extra.length === 5 && extra[0].stage === "leads" && extra[0].count === 1
+      && extra.every((r) => r.stage !== "unknown"),
+    JSON.stringify(extra));
+
+  // order 外的 stage 仍计入 total（分母）—— leads 行 pct = 1/2 = 0.5
+  check("funnelCounts: order 外 stage 计入 total（leads pct=1/2=0.5）",
+    extra[0].pct === 0.5,
+    `leads pct=${extra[0].pct}`);
+
+  // leadConversion: 空集 → null
+  check("leadConversion: 空集 → null",
+    leadConversion([]) === null,
+    `${leadConversion([])}`);
+
+  // 1/4 signed → 0.25
+  check("leadConversion: 1/4 signed → 0.25",
+    leadConversion([{ stage: "leads" }, { stage: "contacted" }, { stage: "signed" }, { stage: "quoted" }]) === 0.25,
+    `${leadConversion([{ stage: "leads" }, { stage: "contacted" }, { stage: "signed" }, { stage: "quoted" }])}`);
+
+  // 2/4 signed → 0.5
+  check("leadConversion: 2/4 signed → 0.5",
+    leadConversion([{ stage: "signed" }, { stage: "signed" }, { stage: "leads" }, { stage: "contacted" }]) === 0.5,
+    `${leadConversion([{ stage: "signed" }, { stage: "signed" }, { stage: "leads" }, { stage: "contacted" }])}`);
+
+  // 0 signed → 0（非 null）
+  check("leadConversion: 0 signed → 0（非 null）",
+    leadConversion([{ stage: "leads" }, { stage: "contacted" }, { stage: "confirmed" }]) === 0,
+    `${leadConversion([{ stage: "leads" }, { stage: "contacted" }, { stage: "confirmed" }])}`);
+
+  // 全 signed → 1
+  check("leadConversion: 全 signed → 1",
+    leadConversion([{ stage: "signed" }, { stage: "signed" }]) === 1,
+    `${leadConversion([{ stage: "signed" }, { stage: "signed" }])}`);
+
+  // 独立整数预言机复算：8 条 2 signed → 2/8=0.25
+  const indep = ((2 / 8) * 10000) / 10000;
+  check("leadConversion: 独立复算 2/8=0.25 与函数一致",
+    leadConversion([
+      { stage: "signed" }, { stage: "signed" },
+      { stage: "leads" }, { stage: "leads" }, { stage: "leads" },
+      { stage: "leads" }, { stage: "leads" }, { stage: "leads" },
+    ]) === indep,
+    `${leadConversion([
+      { stage: "signed" }, { stage: "signed" },
+      { stage: "leads" }, { stage: "leads" }, { stage: "leads" },
+      { stage: "leads" }, { stage: "leads" }, { stage: "leads" },
+    ])}`);
+
+  // 与 funnelCounts signed 行 pct 同值（口径单点收敛验证）
+  const bothFive = funnelCounts(
+    [{ stage: "signed" }, { stage: "signed" }, { stage: "leads" }, { stage: "leads" }],
+    ORDER
+  );
+  const signedPct = bothFive.find((r) => r.stage === "signed")?.pct;
+  const conv = leadConversion(
+    [{ stage: "signed" }, { stage: "signed" }, { stage: "leads" }, { stage: "leads" }]
+  );
+  check("leadConversion: 与 funnelCounts signed 行 pct 同值（口径单点）",
+    signedPct === conv && signedPct === 0.5,
+    `signedPct=${signedPct} conv=${conv}`);
+}
+
 /* ── 输出禁 emoji 自检（与 verify-crm 保持同一纪律）─────────────── */
 const EMOJI_RE =
   /[\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{1F000}-\u{1FAFF}\u{FE00}-\u{FE0F}]/u;
@@ -244,6 +381,13 @@ const fnStrings = [
   formatSignedPercent(Infinity),
   formatSignedPercent(-2),
   formatSignedPercent(0.256),
+  JSON.stringify(funnelCounts(
+    [{ stage: "leads" }, { stage: "signed" }],
+    ["leads", "contacted", "confirmed", "quoted", "signed"]
+  )),
+  JSON.stringify(funnelCounts([], ["leads", "signed"])),
+  String(leadConversion([{ stage: "signed" }])),
+  String(leadConversion([])),
 ].join("|");
 check("输出契约：全部函数字符串返回值不含 emoji / 符号字形",
   !EMOJI_RE.test(fnStrings), "已扫描");
