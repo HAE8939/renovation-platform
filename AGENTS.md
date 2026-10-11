@@ -84,7 +84,8 @@ export interface ModuleManifest {
 
 - **UI 相关任务必读并遵守 `E:\19 Python File\MT-Visual-Language\HAE Creator Design System V0.3.md`**（唯一真源，一行指针引用，不在本仓复制全文）。
 - 设计语言：纸感底、**全画面单点 accent**、气声描边、**无阴影**、层级靠字重与对比度，不靠字号与粗线。中文段落排版/负空间按 V0.3 §3.1、§7.4。
-- **accent 选钴蓝 `#3368A0` 主题**（V0.3 默认铁锈红会与 danger 状态色撞车——见 V0.3 红线）。换主题只动 `--accent` 一族变量。
+- **accent 选钴蓝 `#3368A0` 主题**（V0.3 默认铁锈红会与 danger 状态色撞车——见 V0.3 红线）。**主题切换（M9-d）**：`--accent` 一族现为**四值**（`--accent` / `--accent-ink` / `--accent-tint` / `--accent-fg` 主按钮前景），换主题只动这一族、其余 token 一律不动；四套插槽键名 `cobalt/rust/emerald/teal` 存 `PlatformSetting.themeKey`（**只存键名不存自由色值**，R1），实际色值只在 `tokens.css` 的 `:root[data-theme="X"]`，键名口径在 `core/domain/theme.ts`，两处由 `verify-theme` 交叉锁死。teal 浅青上主按钮用深墨（`--accent-fg`），非白。
+- **设计令牌阶梯（M9-e §4-2 固化，硬约束）**：**字号只用 `12/13/15/17/20/28`px、间距只用 `4/8/12/16/24/32/48`px**（对应 V0.3 §3.1/§7.4）。Tailwind 默认刻度未关，写任意值或 off-ladder 工具类（`text-[22px]`、`p-5`、`gap-7`、`text-lg` 等）即越界——新页面/改动必须走这套阶梯，收口批已把历史越界清零，勿再引入。（`text-xs`/`text-sm` 等命名字号作为既定 body 尺寸保留，约束针对**任意值与自造档**。）
 - 本仓 `src/styles/tokens.css` 是把 V0.3 token **首次**落成 CSS 变量的地方（设计系统等这个"首个真实项目验证"）。令牌值以 V0.3 为准，不得凭感觉。
 - 反 AI 模板：避免千篇一律的圆角大卡片堆叠、避免彩虹渐变/玻璃拟态/emoji 满屏；遵循 V0.3 的"反模板清单"与页面节奏。
 
