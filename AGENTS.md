@@ -15,7 +15,7 @@
 ## 1. 技术栈（DECIDED，长期沿用）
 
 - **框架**：Next.js（App Router）+ TypeScript，全栈一体（前端页面 + 后端 Route Handler/Server Action 同仓）。
-- **ORM/数据**：Prisma。开发期与首个部署用 **SQLite**；`schema` 保持**可移植**（禁用 PG 专有类型如 `String[]` 数组、`dbgenerated` 特殊函数；枚举用 string + 常量；JSON 用 `Json`）。上多用户/并发时**一步迁 PostgreSQL**（见 §7，列为 QA 关卡，非现在）。
+- **ORM/数据**：Prisma。开发期与首个部署用 **SQLite**；`schema` 保持**可移植**（禁用 PG 专有类型如 `String[]` 数组、`dbgenerated` 特殊函数；枚举用 string + 常量）。**JSON 例外（2026-10-11 实测更正）**：本栈 **Prisma 5.22 + SQLite 不支持 `Json` 类型**（`prisma validate` 报 `The current connector does not support the Json type`）——需要存列表/结构时改用**纯文本约定**（如「每行一个选项」）或 JSON 字符串 + 服务层解析函数单点收口；迁 PostgreSQL 后再按需用 `Json`。上多用户/并发时**一步迁 PostgreSQL**（见 §7，列为 QA 关卡，非现在）。
 - **包管理**：pnpm。
 - **样式**：Tailwind（仅作原子工具类）+ 一层从设计系统派生的 **CSS 变量令牌**（`src/styles/tokens.css`）。**禁止**引入 Element / Antd / MUI 等成套组件库；基础组件在 `src/core/ui/` 手写，严格遵循设计系统。
 - **部署**：Docker Compose（app + 反代 Caddy/HTTPS + 后期 postgres），目标阿里云轻量 2G。保持单运行时、少进程、省内存。

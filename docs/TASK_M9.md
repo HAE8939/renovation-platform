@@ -38,6 +38,10 @@
 | 14 | **待办中心不收「超期未跟进线索」**（M9-b） | 「3 天未跟进」的真源在 `src/app/crm/LeadDrawer.tsx`（模块私有客户端组件，禁 import）。驾驶舱要用只能复制阈值 → 造第二口径，违反 §4 口径单点。**本单元不做该类待办**；若将来该规则上收 `core/domain` 再接入。付款段类待办只数 `paid=false`，**不算派生解锁态**（`finance/payment.ts` 属模块私有禁区），可收/未解锁的判定留在财务页。 |
 | 15 | **毛利率排行剔除「无成本数据的 100%」**（M9-b-2b，集成者裁定待 HAE 复核） | `marginRate` 口径本身不动，但 `expenseTotal === 0` 的项目（筹备期只录了合同额）按口径恰得 1.0、摆在榜首必误导 → **不入榜**：灰态置末、率显「—」、文案「未录入支出」；`rate === null` 另给「未录入合同额，不可算」。与「未排程」「未录入合同额」两处既有诚实降级同族（详见 §7-7-1②）。 |
 | 16 | **不为「铺满六个月」重排演示支出行**（M9-b-2b，集成者裁定待 HAE 复核） | §7-6 预告原写「把 7 笔 expense 重排到近 6 个月」，但三演示项目最早开工日 2026-08-02 → 挪到 5~7 月即造出「开工前采购」反序，违反 `STATUS.md` §5 时间自洽。**改为不重排**，5~7 月如实为 0；台账增补只做 2 笔 `income/change` 变更款收款（不进毛利、不破两本账对照）。详见 §7-7-1①。 |
+| 17 | **EAV 只做项目侧界面**（M9-c，已与 HAE 确认） | 决策 6 的服务对象是 Project 与 Client，但全站**无 `/clients` 路由**（客户名只在项目设置按名 upsert）。为放一个字段值凭空扩出客户管理面＝违反红线三。表结构 `entityKind` 保留 `"client"` 留位、纯函数与 repo 服务两实体全覆盖（门禁断言覆盖），**UI 本期只接项目侧**，客户侧登记 `STATUS.md` §4-18。 |
+| 18 | **定义管理页新建 `fields` 独立模块**（M9-c，已与 HAE 确认） | `order: 9`、`entryPath: "/fields"`，registry 加一行即出现在侧栏与首页（**外壳与首页零改动**＝registry 机制第二次验收）。不塞进 M9-d 的 `/settings`（那是主题 + Logo 的平台设置页，职责不同、也不撞）；读写服务落 `core/domain/customFieldRepo.ts`（三处消费方跨模块，AGENTS §2）。 |
+| 19 | **筛选四类型各配一谓词 ⇒ 值按类型分列存**（M9-c，已与 HAE 确认） | 文本/多行＝包含、数字＝最小~最大区间、日期＝起止区间、单选＝精确。**直接推论：`CustomFieldValue` 必须有 `valueText`/`valueNumber`/`valueDate` 三列且互斥**——数字与日期塞进字符串列，SQLite 的 `gte/lte` 会按字典序比较（`"9" > "10"`），区间筛选必错。条件之间只「且」不做「或」（本期）。 |
+| 20 | **停用优先；删除连带硬删值**（M9-c，已与 HAE 确认） | `active=false`＝不进录入、不进筛选、**历史值原样保留可查**（给"这字段暂时不要了"留不丢数据的退路）；真要删走行内两步确认硬删，服务内**显式 `deleteMany` + `onDelete: Cascade` 双保险**（SQLite 级联依赖 `PRAGMA foreign_keys`，只靠外键会留孤儿行）。与 M8-b 台账、M9-a 变更单的「单用户无回收站」惯例一致。 |
 
 ## 2. 单元拆分
 
@@ -460,3 +464,156 @@ export interface DashboardMargins { rows: MarginRankRow[] }
 - **动 seed ⇒ 四隔离库集成门禁全量重跑**（sign 12 / schedgen 27 / quality-flow 94 / finance-flow 76，各自 `migrate reset --force` 重灌 seed）。
 - `pnpm build` 绿 + `npx tsc --noEmit` 0 + qa-shots 33 页全 200 + 目检（折线两条线形状 / 5~7 月贴基线为 0 且表内显 ¥0.00 不显「—」/ 月份轴与点位对齐 / 毛利率榜首是 002 38.6% 而非某 100% 项 / 005~007 灰态「未录入支出」置末 / 004「未录入合同额，不可算」最后 / `/finance` 已收款随 2 笔变更款上浮）+ 375 探针 `/dashboard`（`scrollWidth ≤ 375`，别肉眼判溢出）+ 实值巡检扩（`_scratch/m9b_dash_check.mts` 加六个月分桶逐月笨算与排行顺序复核）+ **seed 连跑两次幂等**（收支 13、变更款 2 条不变）。
 - 同步基线（集成者）：`STATUS.md` §1 数据基线（收支 11 → 13、已收 ¥130,600 → ¥136,600、全司回款率与 001/002 预算灯/`paidPct` 数字）、§2 门禁表 dashboard 计数、§8 交接。
+
+## 8. M9-c 详细范围（EAV 自定义字段 · 权威规格）
+
+> 口径来源：§1 决策 6（已与 HAE 确认）＋ 2026-10-11 四项落地裁定（已与 HAE 确认，逐条见 §8-0）。业务要素源 v5.1 §6.4（**只取业务不取皮**）。
+> 拆单元：**c-1 = 两表 + 纯函数口径 + 读写服务 + 定义管理页 + 项目侧值录入**｜ **c-2 = 项目列表按自定义字段筛选**。执行通道＝opencode standalone 讯飞池（`--variant low`，每轮 1~3 文件自包含卡，见工作手册 §8.3 与 `STATUS.md` §5）。**动 schema ⇒ 四隔离库集成门禁全量重跑**；迁移执行归集成者。
+
+### 8-0 本轮四项落地裁定（把决策 6 的抽象口径钉成可实现形状）
+
+| # | 议题 | 裁定 | 理由 |
+|---|---|---|---|
+| 17 | Client 侧值录入 | **本期只做 Project 侧**；`CustomFieldValue.entityKind` 保留 `"project" \| "client"` 两值、纯函数与 repo 服务两种实体都覆盖（门禁断言覆盖），但**不做客户界面**。 | 全站无 `/clients` 路由（客户名只在项目设置里按名 upsert）。为放一个字段值凭空扩出客户管理面＝违反红线三。表结构留位是平台原语的自然形状，不是死代码。 |
+| 18 | 定义管理页宿主 | **新建 `fields` 模块**（`order: 9`、`entryPath: "/fields"`），registry 加一行。 | 与 M9-d 的 `/settings`（主题 + Logo）不撞；职责单一；顺带再验一次 registry 可插拔机制（M9-b-1 首验）。 |
+| 19 | c-2 筛选能力 | **四类型各配一谓词**：文本/多行＝包含、数字＝最小~最大区间、日期＝起~止区间、单选＝下拉精确。 | 这是 EAV 筛选有意义的**最小集**。直接推论＝**值必须按类型分列存**（见 §8-1 三列互斥）：数字/日期若塞进字符串列，SQLite 的 `gte/lte` 会按字典序比较（`"9" > "10"`），筛选必错。 |
+| 20 | 删除字段定义 | **停用优先**（`active=false`：不进录入、不进筛选、历史值原样保留可查）；真要删走行内两步确认硬删，值随外键 `onDelete: Cascade` 连带删。 | 与 M8-b 台账、M9-a 变更单的「单用户无回收站、硬删」惯例一致；同时给"这字段暂时不要了"留一条不丢历史值的退路。 |
+
+### 8-1 数据模型（`prisma/schema.prisma`，可移植、无 PG 专有类型）
+
+```prisma
+// ── M9-c：EAV 自定义字段（平台原语，落 core 消费）──
+model CustomFieldDef {
+  id       String  @id @default(cuid())
+  key      String  @unique          // 稳定机读键（^[a-z][a-z0-9_]{1,39}$），创建后不可改
+  label    String                    // 中文名（列表 / 表单 / 报错文案都用它）
+  type     String                    // text | textarea | number | date | select（决策 6：不做金额）
+  options  Json?                     // 仅 select：["不含家电","仅厨电"]；其余 null
+  required Boolean @default(false)
+  active   Boolean @default(true)    // 停用＝不进录入、不进筛选、不删历史值（§8-0-20）
+  order    Int     @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  values CustomFieldValue[]
+  @@map("custom_field_defs")
+}
+
+model CustomFieldValue {
+  id String @id @default(cuid())
+  fieldId    String
+  entityKind String     // project | client（本期只写 project，见 §8-0-17）
+  entityId   String     // Project.id / Client.id；**不建外键**（多态指向两张核心表）
+  valueText   String?
+  valueNumber Float?
+  valueDate   DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  field CustomFieldDef @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+
+  @@unique([fieldId, entityKind, entityId])   // 一字段 × 一实体 = 一值（upsert 的锚）
+  @@index([entityKind, entityId])
+  @@index([fieldId, valueNumber])
+  @@index([fieldId, valueDate])
+  @@map("custom_field_values")
+}
+```
+
+三条硬约束（写进卡，别漂）：
+
+1. **三列互斥**：一条值行只按 `def.type` 填 `valueText`（text/textarea/select）/ `valueNumber`（number）/ `valueDate`（date）中的**一列**，其余必为 `null`。清空＝三列全 `null`（保留行，upsert 语义简单；不删行，免得"清空"与"从未填过"两种状态在计数上分不清）。
+2. **`entityId` 不建外键**：多态指向两张表，Prisma 表达不了；存在性由服务层事务内校验（照 M3-d2 那套「项目存在」）。
+3. `entityKind` 用 string + 常量（`ENTITY_KIND`），**不建 Prisma enum**（AGENTS §1 可移植性）。
+4. **`Project` / `Client` 表零改动**——EAV 的全部意义就是不撑宽主脊。
+
+### 8-2 共享口径（新建 `src/core/domain/customField.ts`，纯函数、零 import、plain-node 可直跑）
+
+照 `dashboard.ts` 的自包含范式（不穿无扩展名链、不 import 任何东西）：
+
+```ts
+export const FIELD_TYPE = { text:"text", textarea:"textarea", number:"number", date:"date", select:"select" } as const;
+export type FieldType = (typeof FIELD_TYPE)[keyof typeof FIELD_TYPE];
+export const FIELD_TYPE_ORDER: readonly FieldType[];                 // 展示与新建下拉的顺序
+export const FIELD_TYPE_LABEL: Record<FieldType, string>;             // 单行文本/多行文本/数字/日期/单选
+export function isFieldType(v: string): boolean;
+export const ENTITY_KIND = { project: "project", client: "client" } as const;
+export const TEXT_MAX = 200; export const TEXTAREA_MAX = 2000;        // 长度上限（超限中文报错）
+
+/** 机读键校验：^[a-z][a-z0-9_]{1,39}$（首字符小写字母、总长 2~40）。返回 null＝合法，否则中文原因。 */
+export function validateFieldKey(key: string): string | null;
+
+/** Json 脏值 → 干净字符串数组（非数组 → []；元素去空白、丢空串、按首次出现去重）。 */
+export function parseOptions(raw: unknown): string[];
+
+/** 三列互斥的值载体。 */
+export interface ValueColumns { valueText: string | null; valueNumber: number | null; valueDate: Date | null }
+/** 表单原始串 → 按类型转换。空串一律视为「未填」→ 三列全 null（是否再报必填由 requiredEmptyError 决定）。 */
+export function coerceFieldValue(
+  def: { type: string; label: string; required?: boolean; options?: string[] },
+  raw: string,
+): { ok: true; columns: ValueColumns } | { ok: false; error: string };
+/** 必填闸门（与 coerce 分开：先转类型、再判必填，报错顺序稳定）。 */
+export function requiredEmptyError(def: { label: string; required: boolean }, columns: ValueColumns): string | null;
+/** DB 行 → 表单控件值（date 取本地 YYYY-MM-DD；number 去尾零；null → ""）。 */
+export function valueToFormInput(def: { type: string }, row: Partial<ValueColumns> | null | undefined): string;
+/** 展示串（列表/详情共用；null/空 → 「—」）。日期走 zh-CN 数字三位，与项目中心/驾驶舱同款。 */
+export function formatFieldValue(def: { type: string }, row: Partial<ValueColumns> | null | undefined): string;
+
+/** 筛选谓词词汇（§8-0-19 四类型各一谓词）。 */
+export type FilterOp = "contains" | "between" | "oneOf";
+export interface FilterInput { fieldId: string; type: FieldType; raw: string; raw2?: string }
+/** → Prisma where 片段（如 `{ valueText: { contains: "瓷砖" } }` / `{ valueNumber: { gte: 1, lte: 5 } }`
+ *  / `{ valueDate: { gte: Date, lte: Date } }` / `{ valueText: { equals: "仅厨电" } }`）。
+ *  输入非法或空 → **null**（调用方跳过该条件，不许造 `{}` 空条件把全部筛掉）。 */
+export function buildValueWhere(f: FilterInput): Record<string, unknown> | null;
+/** 深链片段解析：`<fieldId>:<值>`，只按**第一个**冒号切（值里再含冒号不误切）。脏串 → null。 */
+export function parseFilterParam(s: string): { fieldId: string; raw: string } | null;
+/** 筛选条件的中文摘要（页头"已筛"行用）：`{label} 包含「瓷砖」` / `{label} {a} ~ {b}` / `{label} ＝ {选项}`。 */
+export function describeFilter(def: { label: string; type: string }, f: FilterInput): string | null;
+```
+
+**报错文案钉死**（门禁逐条断言，防各页各写一套）：`未知字段类型：X` / `字段标识须以小写字母开头，仅含小写字母、数字与下划线，长度 2~40` / `「{label}」应为数字` / `「{label}」应为有效日期（YYYY-MM-DD）` / `「{label}」的值不在可选范围内` / `「{label}」为必填` / `「{label}」不能超过 {n} 个字符` / `「{label}」的选项不能为空`（select 建/改时 options 为空）。
+
+### 8-3 读写服务（新建 `src/core/domain/customFieldRepo.ts`，prisma）
+
+**为什么落 `core/domain` 而不落 `modules/fields/server`**：值录入面在项目中心（`projects` 模块）、定义管理面在 `fields` 模块、筛选面在 `projects` 列表——三处都要用。AGENTS §2/§3：模块之间不互相 import 内部，只通过 `core` 协作。`modules/fields/**` 只放 manifest，页面放 `src/app/fields/`。
+
+- `listDefs(opts?: { includeInactive?: boolean })` → 定义行数组（`order asc, createdAt asc`；默认只给 active）。
+- `createDef(input)` / `updateDef(id, input)`（**`key` 与 `type` 创建后不可改**——改了历史值的列语义就漂；服务端拒并中文提示「字段标识与类型创建后不可修改」）/ `setDefActive(id, boolean)` / `deleteDef(id)`（硬删，级联删值）/ `reorderDefs(orderedIds)`（先全量校验 id 集合恰等现有集再整表写 `order = index`，照 M6-d 模板库「先全量预校验再写」）。
+- `getEntityValues(entityKind, entityId)` → `{ def, columns }[]`（只含 active 定义，按 order）。
+- `saveEntityValues(entityKind, entityId, inputs: {fieldId, raw}[])`：逐定义 `coerceFieldValue` → `requiredEmptyError` → **全部通过才开事务**（纯校验在前，照 M8-b/M9-a 惯例）；未知 `fieldId` 直接拒；`entityId` 存在性事务内校验；单事务内逐条 `upsert`（`where: { fieldId_entityKind_entityId }`）。
+- `filterProjectIdsByCustomFields(filters)` → `Promise<string[] | null>`（null＝无条件；多条件取**交集**＝"同时满足"）。
+- 模块级错误类 `CustomFieldError`（中文直达 UI，照 `FinanceRecordError` / `ChangeOrderError` 范式）。
+
+### 8-4 页面
+
+- **`/fields`（c-1）**：`src/modules/fields/manifest.ts`（`id:"fields"`、`name:"自定义字段"`、一句话 `description`、`icon:"定"` 单字符禁 emoji、`order: 9`、`entryPath:"/fields"`、**不给 `nav`**）+ `registry.ts` 加 import 与数组一行；`src/app/fields/page.tsx`（server，`force-dynamic`，取 `listDefs({includeInactive:true})` + 每定义已填值计数）+ `src/app/fields/FieldsAdmin.tsx`（client）：表格＝顺序 / 标识 `key`（`num`）/ 名称 / 类型 label / 必填 / 状态（在用·停用）/ 已填值数 / 操作；新建与编辑走 `Modal`，**编辑态 `key` 与 `type` 只读**（同 M8-b「控件必须与写侧语义一致」教训，不留"改了静默不生效"的口子）；类型↔选项联动（只有 select 显示选项输入）；停用/启用行内一键；删除行内两步确认 `danger` 描边；上下移调序。
+- **项目侧值录入（c-1）**：`/projects/[id]`「基础信息」Tab 末尾加「自定义字段」卡。取数＝`modules/projects/server/projectDetail.ts` 的 `ProjectHub` 加 `customFields`（经 `core/domain/customFieldRepo.getEntityValues`，**不 import fields 模块**）；写侧＝新建 `src/app/projects/[id]/actions.ts`（`saveCustomFieldValuesAction`，`useFormState`，`revalidatePath("/projects/${id}")` + `"/projects"`）；表单独立成 `src/app/projects/[id]/CustomFieldsForm.tsx`（client），`ProjectTabs.tsx` 只加 import + 渲染一行（改动面压到最小）。控件按类型：text→`Input`、textarea→`textarea`、number→`Input type="number"`、date→`Input type="date"`、select→`Select`；`required` 项 label 后加「\*」；无 active 定义 → 诚实空态「尚未定义自定义字段」+ 链 `/fields`。
+- **`/projects` 筛选（c-2）**：`StatusFilter` 旁加 `src/app/projects/CustomFieldFilter.tsx`（client），按 active 定义逐个渲染条件行（文本/多行＝一个输入框；数字与日期＝两个框成区间；单选＝下拉），写深链 **两个参数名各表一端**：`?cfv=<fieldId>:<值或下界>` 与 `?cfvto=<fieldId>:<上界>`（可各多条，`useSearchParams` 追加/删除）；服务端 `listProjectsForManagement` 加 `cfv?: FilterInput[]`（由 `customFieldRepo.parseProjectFilters(searchParams, defs)` 把 `cfv`/`cfvto` 按 fieldId 配对、并从定义表取真类型后组装——**页面不得自己猜类型**）→ 先 `filterProjectIdsByCustomFields` 取 id 集，再与 `status` **合并成一个 where**（`{ status, id: { in: ids } }`；**ids 为空数组 → 直接返回空列表，绝不退化成无筛选**）。已筛中时页头显中文摘要行（`describeFilter`）+ 一键清除。
+
+### 8-5 seed（幂等 + 自检 + 时间自洽）
+
+`seedCustomFields()` 排在 `main()` 最后。四个演示定义（**按 `key` 存在性跳过，不靠总数**——§5 教训）：`survey_date` 复尺日期（date）、`warranty_years` 保修年限（number，**`required=true`**）、`appliance_scope` 家电交付范围（select：不含家电 / 仅厨电 / 含全屋家电）、`handover_note` 交付备注（textarea）。
+
+- 值：001/002/003 各四条——复尺日期落各自 `startDate` **之前** 3~10 天（复尺发生在开工前，且不得为未来日，承 §5 时间自洽）；保修年限 2/2/5；家电范围三档各一（让筛选三种谓词都有形态）；备注一句中文。
+- **004 故意全空**＝必填拦截与诚实空态演示位。
+- 自检：定义数与值行数取 DB 真值打印；断言「四个 key 的 type/required 恰如预期」+「001/002/003 各恰四条值行、004 零条」+「**每行只填了与类型对应的那一列、其余两列必为 null**」（§8-1 硬约束 1 的守门断言）。
+
+### 8-6 门禁与验收
+
+- 新建 `scripts/verify-fields.mjs`（**≥ 45 项**，plain-node 直 import `src/core/domain/customField.ts` 带 `.ts`）：`FIELD_TYPE` 五值与 label 全覆盖 + `isFieldType` 正反例；`validateFieldKey` 八例（首字符大写 / 数字开头 / 含横线 / 含空格 / 长度 1 / 长度 41 拒 + 两正例）；`parseOptions` 五例（非数组 / null / 含空串 / 重复 / 非字符串元素）；`coerceFieldValue` 逐类型（空串→三列全 null、number 非数字拒、number 负数与 0 合法、date 非法与 `2026-13-40` 拒、date 本地构造不漂移 UTC、select 不在 options 拒、text 超 200 拒、textarea 内部换行保留）；`requiredEmptyError` 三例；`valueToFormInput` ↔ `coerceFieldValue` **往返一致**；`formatFieldValue` null→「—」；`buildValueWhere` 四类型各一 + 空输入→null + 只给一端的区间（`{ gte }` 不带 `lte`）+ 区间倒置（min>max）→ null 或自动交换（**取一并在卡里钉死**）；`parseFilterParam` 正反例（`cf9:a:b:c` → raw 为 `a:b:c` 只切第一个冒号 / 值含冒号不误切 / 无冒号 → null / 空 fieldId → null）；`describeFilter` 三型各一；**三列互斥不变量**（任一类型转换后断言其余两列为 null）；输出禁 emoji。
+- `scripts/qa-shots.mjs` targets 加 `{ name: "24-fields", path: "/fields" }`（33 → 34 页）。
+- 既有八纯门禁零回退（quote 79 / crm 11 / health 20 / design 28 / schedule 55 / quality 108 / finance 135 / dashboard 86）。
+- **动 schema ⇒ 四隔离库集成门禁全量重跑**（sign 12 / schedgen 27 / quality-flow 94 / finance-flow 76；新表不改既有数据，reset 重灌 seed 后必须仍全过）。
+- `pnpm build` 绿 + `npx tsc --noEmit` 0 + qa-shots 34 页全 200 + 目检（`/fields` 表格与新建 Modal 的类型↔选项联动、编辑态 key/type 只读、停用行灰态、两步删除；`/projects/[id]?tab=basic` 自定义字段卡四控件与类型对得上、004 空态；`/projects?cfv=…` 摘要与结果数、与 `?status=` 叠加、空结果不退化）+ 375 探针三页（`/fields` · `/projects` · `/projects/[id]`）+ **实值巡检**（新建 `_scratch/m9c_field_check.mts`：逐定义逐项目笨算值列，与 `getEntityValues` / `filterProjectIdsByCustomFields` 交叉比对，含「只填一列」不变量与筛选交集）。
+- 同步基线（集成者）：`STATUS.md` §1 路由（+`/fields`）与数据基线（4 定义 + 12 值行）、§2 门禁表新增 `verify-fields`、§8 交接 M9-d。
+
+> **规格自纠（2026-10-11，集成者冒烟实测撞破）**：本节原写「`?cfv=<fieldId>:<raw>[:<raw2>]` 三段式、第三段之后全归 raw2」与「值里含冒号不被误切」**互相矛盾**（`cf3:2026-01-05 10:00` 两种要求给出不同结果）。已改为上面的**双参数名**方案——每段只切第一个冒号，无歧义，且类型真值由服务端从定义表取，URL 不携带类型。
+
+### 8-7 范围红线（越界即返工）
+
+不做：金额类型（决策 6 明写）、字段级权限与模块作用域、Client 侧界面（§8-0-17）、字段值的历史版本流水、字段导入导出、条件间"或"逻辑（本期只"且"）、`/settings` 平台页（M9-d）。**不新增跨模块写入点**；`Project` / `Client` 表**零改动**（EAV 的全部意义就是不撑宽主脊）。
+- **M9-c EAV 自定义字段（c-1 + c-2 · 2026-10-11 合入）**：交付 15 文件——**新** `core/domain/customField.ts`（14 导出：五类型常量 / `validateFieldKey` / `parseOptions` / `coerceFieldValue` 三列互斥 / `requiredEmptyError` / `valueToFormInput` / `formatFieldValue` / `buildValueWhere` 四谓词 / `parseFilterParam` / `describeFilter`，零 import 自包含）、`core/domain/customFieldRepo.ts`（`listDefs/getDef/createDef/updateDef/setDefActive/deleteDef/reorderDefs/getEntityValues/saveEntityValues/buildFiltersFromParams/filterProjectIdsByCustomFields` + `CustomFieldError`）、`modules/fields/manifest.ts`（order 9）、`app/fields/{page,FieldsAdmin,actions}`、`app/projects/[id]/{actions,CustomFieldsForm}`、`app/projects/CustomFieldFilter.tsx`、`scripts/verify-fields.mjs`（**89 项**）、迁移 `20261011140008_m9c_custom_field`（两表）、`prisma/seed.ts` 追加 `seedCustomFields()`（4 定义 + 001/002/003 各 4 值、**004 全空＝必填与空态演示位**）；**改** `registry.ts`（+1 行）、`app/layout`/`app/page` **零改动**（侧栏与首页卡片自动出现＝registry 验收点）、`projectDetail.ts`（`ProjectHub.customFields`）、`projects.ts`（`ListProjectsFilter.cfv`＋交集，**筛不到返回空列表绝不退化成无筛选**）、`/projects/page.tsx`（深链 + 已筛摘要行）、`ProjectTabs.tsx`（基础信息 Tab 末尾一行）、`qa-shots.mjs`（33 → **35** 页：`24-fields` + `06b-projects-cfv`）。**验收**：build 绿 + tsc 0 + **九纯门禁**零回退（quote 79 / crm 11 / health 20 / design 28 / schedule 55 / quality 108 / finance 135 / dashboard 86 / **fields 89**）+ **四隔离库集成门禁全量重跑**（sign 12 / schedgen 27 / quality-flow 94 / finance-flow 76；净库 seed 现含 M9-c 4 定义 12 值）+ qa-shots 35 页全 200 + 375 探针三页（`/fields` `scrollWidth=375`、`/projects` 与 `/projects/[id]` `=360`，`trueOffenders=0`）+ **实值巡检 `_scratch/m9c_field_check.mts` 91 项全过**（三列互斥全表逐行 / 值列与类型对应 / 无孤儿行 / 展示串与表单回填串逐条独立复算 / 十种筛选谓词与 JS 笨算交集交叉比对 / 选项解析与计数）+ **写入路径验收 `_scratch/m9c_write_check.mts` 12 项全过**（必填拦截 / 数字与日期与单选三类拒绝 / 未知 fieldId 拒 / 未知实体类型拒 / 项目不存在拒 / 未提交的定义按清空生效 / 写入后三列互斥仍成立）+ seed 连跑幂等。目检：`/fields` 四定义表格与「已注册模块 9 个」页脚；`/projects?cfv=warranty_years:3` 命中「共 1 个」＝RP-2026-003（保修 5 年）且摘要行显「「保修年限」≥ 3」+ 清除链；项目详情自定义字段卡四控件形态正确、必填项带红 `*`、`已收 33%` 与 M9-b-2b 变更款一致。
+  **执行通道（本轮实况）**：opencode 讯飞池跑通 **R1a（schema 两表）** 与 **R1b1（常量+键校验+选项解析，84 行）** 两轮；把 9 个函数塞一张卡的 **R1b 与 M9-b-2b 轮 A 同族跑飞**（`reason:"length"`、reasoning 31,931 tok、零落盘、exit 0），且实测 **`--variant low` 与 `--variant minimal` 都压不住**（该网关疑不理 `reasoning_effort`）→ **HAE 指示：opencode 修好前由集成者自己写**，其余文件全部集成者实现并按同一纪律独立验收。
+  **集成者自纠五处（含我自己写错的规格）**：① **项目契约 AGENTS §1「JSON 用 `Json`」在本栈不成立**——Prisma 5.22 + SQLite `prisma validate` 直接报 `The current connector does not support the Json type` → 单选选项改存「每行一个」纯文本（`parseOptions` 同时吃字符串与数组），比 JSON 更可读可手改、迁 PG 照用；② 我写的 `parseFilterParam` 规格自相矛盾（既要求「按前两个冒号切、第三段归 raw2」又要求「值含冒号不误切」）——冒烟测试当场撞破 → 改**双参数名** `?cfv=<key>:<值或下界>` / `?cfvto=<key>:<上界>`，每段只切第一个冒号；③ 深链令牌由 cuid 改 **`key`**（unique 且创建后不可改，链接可读可长期分享）；④ `buildFiltersFromParams` 首版只遍历 `cfv`，**只填上界的条件（保修年限 ≤ 2）会静默失效** → 补两端并集；⑤ 我写的 seed 自检用了 `CustomFieldValue` 上**不存在的 `project` 关系**并用 `as never` 把类型错误压掉（Prisma 运行时会直接拒）→ 改为先取 `projectId` 再按 `entityId` 数。**教训**：`as never` / `as any` 是类型系统的消音器，多态外键（无 relation 的 `entityId`）尤其容易写出编译过、运行时炸的查询——写侧与自检都只能按真实形状来。
+  **范围红线执行情况**：`Project`/`Client` 主脊**零改列**；`core/domain` 既有文件**零改动**（全部新增）；无新跨模块写入点；未做金额类型 / 模块作用域 / Client 界面 / 条件"或" / 字段值历史流水（均 §8-7 明列不做）。
