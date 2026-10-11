@@ -491,3 +491,54 @@ model ChangeOrder {
   @@index([quoteId])
   @@map("change_orders")
 }
+
+// ── M9-c：EAV 自定义字段（平台原语；定义与值两张表）──────────────────────
+// 决策（TASK_M9 §1 决策 6 + §8-0）：类型五种（单行文本/多行文本/数字/日期/单选），不做金额；
+// 全司共享、不做模块作用域；校验＝必填 + 类型。本期只接 Project 侧界面，entityKind 保留
+// client 留位（不建客户页面）。
+// 关键设计：**值按类型分列存**（valueText / valueNumber / valueDate 三列互斥）——数字与日期若
+// 塞进字符串列，SQLite 的 gte/lte 会按字典序比较（"9" > "10"），区间筛选必错（§8-0-19 推论）。
+model CustomFieldDef {
+  id       String  @id @default(cuid())
+  key      String  @unique // 稳定机读键，如 survey_date；创建后不可改
+  label    String          // 中文名，列表/表单/报错文案都用它
+  type     String          // text | textarea | number | date | select
+  // 仅 select 用：**每行一个选项**的纯文本（如 "不含家电\n仅厨电"）；其余类型存 ""。
+  // 为什么不用 Json：Prisma 5.22 在 SQLite 上不支持 Json 类型（`prisma validate` 实测报
+  // "The current connector does not support the Json type"），而本栈开发期与首个部署就是 SQLite
+  // （AGENTS §1）。按行文本比 JSON 字符串更可读、可手改、无转义坑，迁 PG 时也照样能用。
+  // 清洗与解析单点在 core/domain/customField.ts 的 parseOptions（同时兼容数组入参）。
+  options  String   @default("")
+  required Boolean @default(false)
+  active   Boolean @default(true) // 停用＝不进录入、不进筛选，历史值原样保留可查
+  order    Int     @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  values CustomFieldValue[]
+
+  @@map("custom_field_defs")
+}
+
+model CustomFieldValue {
+  id String @id @default(cuid())
+
+  fieldId    String
+  entityKind String // project | client
+  entityId   String // Project.id / Client.id；多态指向两张表 → **不建外键**，存在性由服务层事务内校验
+
+  valueText   String?
+  valueNumber Float?
+  valueDate   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  field CustomFieldDef @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+
+  @@unique([fieldId, entityKind, entityId]) // 一字段 × 一实体 = 一值（upsert 的锚）
+  @@index([entityKind, entityId])
+  @@index([fieldId, valueNumber])
+  @@index([fieldId, valueDate])
+  @@map("custom_field_values")
+}

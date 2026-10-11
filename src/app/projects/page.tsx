@@ -10,8 +10,11 @@ import {
   type ProjectManagementItem,
 } from "@/modules/projects/server/projects";
 import { formatCny, formatQty } from "@/modules/budget/lib/quote";
+import { buildFiltersFromParams, listDefs } from "@/core/domain/customFieldRepo";
+import { describeFilter } from "@/core/domain/customField";
 import { ViewToggle } from "./ViewToggle";
 import { StatusFilter } from "./StatusFilter";
+import { CustomFieldFilter } from "./CustomFieldFilter";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "项目管理" };
@@ -110,11 +113,34 @@ function ProjectCard({ p }: { p: ProjectManagementItem }) {
 export default async function ProjectsListPage({
   searchParams,
 }: {
-  searchParams: { view?: string; status?: string };
+  searchParams: {
+    view?: string;
+    status?: string;
+    /** 自定义字段条件下界或唯一值：`?cfv=<key>:<值>`（可多条） */
+    cfv?: string | string[];
+    /** 自定义字段条件上界：`?cfvto=<key>:<值>`（可多条） */
+    cfvto?: string | string[];
+  };
 }) {
   const view: ViewMode = searchParams?.view === "table" ? "table" : "card";
   const status = searchParams?.status;
-  const projects = await listProjectsForManagement(status ? { status } : undefined);
+  const asArray = (v: string | string[] | undefined): string[] =>
+    v === undefined ? [] : Array.isArray(v) ? v : [v];
+
+  // 自定义字段筛选（M9-c c-2）：类型真值从定义表取，URL 只带 key 与值
+  const fieldDefs = await listDefs();
+  const cfvFilters = buildFiltersFromParams(
+    fieldDefs,
+    asArray(searchParams?.cfv),
+    asArray(searchParams?.cfvto),
+  );
+  const projects = await listProjectsForManagement({ status, cfv: cfvFilters });
+  const applied = cfvFilters
+    .map((f) => {
+      const def = fieldDefs.find((d) => d.id === f.fieldId);
+      return def ? describeFilter({ label: def.label, type: def.type }, f) : null;
+    })
+    .filter((x): x is string => x !== null);
 
   return (
     <div className="space-y-8">
@@ -141,6 +167,17 @@ export default async function ProjectsListPage({
             </span>
           </div>
         </div>
+
+        {fieldDefs.length > 0 && <CustomFieldFilter defs={fieldDefs} />}
+
+        {applied.length > 0 && (
+          <p className="mt-3 text-[13px] text-secondary">
+            已按自定义字段筛选：<span className="text-primary">{applied.join(" · ")}</span>
+            <a href="/projects" className="ml-3 text-accent-ink hover:underline">
+              清除条件
+            </a>
+          </p>
+        )}
 
         {projects.length === 0 ? (
           <Card className="mt-3 py-10 text-center text-[15px] text-secondary">

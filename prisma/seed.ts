@@ -289,6 +289,8 @@ async function main() {
   await seedLeads();
   // M9-b-2b：变更款收款台账（金额来自 M9-a 变更单，幂等按项目不变量，驾驶舱现金线补格）。
   await seedChangeIncome();
+  // M9-c：自定义字段定义与演示值（幂等按 key / 按 (字段,项目) 不变量，排在最后——值要挂已存在的项目）。
+  await seedCustomFields();
 }
 
 /** M1a/M2-A 基础数据：组织 + 用户 + 客户 + 项目 + 报价 + 科目模板 + 线索。 */
@@ -2524,5 +2526,189 @@ async function seedChangeIncome() {
     throw new Error(
       `changeIncome seed 自检失败：既有行被动过（expense 应 7 实际 ${expenseCnt} · income/contract 应 4 实际 ${contractCnt}）`
     );
+  }
+}
+
+// ── M9-c 自定义字段 seed（定义 + 演示值；幂等 + 自检 + 时间自洽）──────────────
+// 定义幂等**按 key 逐条判存在**（不靠总数——HAE 可能在界面上自己加过字段）；
+// 值幂等**按 (字段, 实体) 唯一键 upsert**（同 seedChangeIncome 的"只写不变量"纪律）。
+// 复尺日期落在各自开工日**之前** 3~10 天：复尺发生在开工前，不得倒挂、也不得是未来日
+// （承 §5「演示数据时间自洽要主动回填」）。
+// RP-2026-004 **故意全空**＝必填拦截（保修年限 required=true）与"未填写"诚实空态演示位。
+const CUSTOM_FIELD_DEFS: {
+  key: string;
+  label: string;
+  type: string;
+  options: string;
+  required: boolean;
+}[] = [
+  { key: "survey_date", label: "复尺日期", type: "date", options: "", required: false },
+  { key: "warranty_years", label: "保修年限", type: "number", options: "", required: true },
+  {
+    key: "appliance_scope",
+    label: "家电交付范围",
+    type: "select",
+    options: "不含家电\n仅厨电\n含全屋家电",
+    required: false,
+  },
+  { key: "handover_note", label: "交付备注", type: "textarea", options: "", required: false },
+];
+
+const CUSTOM_FIELD_DEMO_VALUES: {
+  code: string;
+  /** 相对开工日的天数偏移（负＝开工前） */
+  offsetDays: number;
+  warranty: number;
+  appliance: string;
+  note: string;
+}[] = [
+  {
+    code: "RP-2026-001",
+    offsetDays: -5,
+    warranty: 2,
+    appliance: "不含家电",
+    note: "业主自购家电，交付前需预留厨房电位与洗衣机上下水。",
+  },
+  {
+    code: "RP-2026-002",
+    offsetDays: -10,
+    warranty: 2,
+    appliance: "仅厨电",
+    note: "厨电随主材一并下单，复尺后两周内到货。",
+  },
+  {
+    code: "RP-2026-003",
+    offsetDays: -3,
+    warranty: 5,
+    appliance: "含全屋家电",
+    note: "全屋家电由我方代采，验收时逐项点交并留存发票。",
+  },
+];
+
+async function seedCustomFields() {
+  const DAY = 24 * 60 * 60 * 1000;
+  const now = new Date();
+
+  // ──  定义（按 key 幂等）──
+  const defIdByKey = new Map<string, string>();
+  for (const d of CUSTOM_FIELD_DEFS) {
+    const existing = await prisma.customFieldDef.findUnique({
+      where: { key: d.key },
+      select: { id: true },
+    });
+    if (existing) {
+      defIdByKey.set(d.key, existing.id);
+      continue;
+    }
+    const max = await prisma.customFieldDef.aggregate({ _max: { order: true } });
+    const created = await prisma.customFieldDef.create({
+      data: {
+        key: d.key,
+        label: d.label,
+        type: d.type,
+        options: d.options,
+        required: d.required,
+        active: true,
+        order: (max._max.order ?? -1) + 1,
+      },
+      select: { id: true },
+    });
+    defIdByKey.set(d.key, created.id);
+  }
+
+  // ── ② 演示值（按 (字段,项目) upsert；三列互斥由这里保证，自检再验一遍）──
+  for (const v of CUSTOM_FIELD_DEMO_VALUES) {
+    const p = await prisma.project.findUnique({
+      where: { code: v.code },
+      select: { id: true, startDate: true },
+    });
+    if (!p) {
+      console.log(`  ${v.code} 项目不存在，自定义字段值 seed 跳过。`);
+      continue;
+    }
+    // 复尺日期＝开工日 + 偏移（负偏移＝开工前）；越过今天则钳到昨天
+    const base = p.startDate ?? now;
+    const rawSurvey = new Date(base.getTime() + v.offsetDays * DAY);
+    const survey = rawSurvey.getTime() > now.getTime() ? new Date(now.getTime() - DAY) : rawSurvey;
+
+    const plan: { key: string; columns: { valueText: string | null; valueNumber: number | null; valueDate: Date | null } }[] = [
+      { key: "survey_date", columns: { valueText: null, valueNumber: null, valueDate: survey } },
+      { key: "warranty_years", columns: { valueText: null, valueNumber: v.warranty, valueDate: null } },
+      { key: "appliance_scope", columns: { valueText: v.appliance, valueNumber: null, valueDate: null } },
+      { key: "handover_note", columns: { valueText: v.note, valueNumber: null, valueDate: null } },
+    ];
+    for (const one of plan) {
+      const fieldId = defIdByKey.get(one.key);
+      if (!fieldId) continue; // 定义被手测删掉了 → 不硬造孤儿值
+      await prisma.customFieldValue.upsert({
+        where: {
+          fieldId_entityKind_entityId: { fieldId, entityKind: "project", entityId: p.id },
+        },
+        create: { fieldId, entityKind: "project", entityId: p.id, ...one.columns },
+        update: { ...one.columns },
+      });
+    }
+  }
+
+  // ── ③ 自检（报数取 DB 真值；断言按不变量）──
+  // 注意：CustomFieldValue 的 entityId 是**多态指向**（无外键、无 project 关系），
+  // 所以按项目数值得先取到 projectId 再按 entityId 查——不能写 where: { project: ... }。
+  const [defTotal, valueTotal, mutexRows, idByCode] = await Promise.all([
+    prisma.customFieldDef.count(),
+    prisma.customFieldValue.count(),
+    prisma.customFieldValue.findMany({
+      select: { fieldId: true, valueText: true, valueNumber: true, valueDate: true },
+    }),
+    prisma.project.findMany({
+      where: { code: { in: ["RP-2026-001", "RP-2026-002", "RP-2026-003", "RP-2026-004"] } },
+      select: { id: true, code: true },
+    }),
+  ]);
+  const pid = new Map(idByCode.map((x) => [x.code, x.id]));
+  const countFor = async (code: string): Promise<number> => {
+    const id = pid.get(code);
+    if (!id) return -1;
+    return prisma.customFieldValue.count({ where: { entityKind: "project", entityId: id } });
+  };
+
+  console.log(
+    `M9-c seed 完成：自定义字段定义 ${defTotal} 个（本批 ${CUSTOM_FIELD_DEFS.length}）· 值 ${valueTotal} 行`
+  );
+
+  // 四个演示定义的 type / required 恰如预期（被手测改过就要报警，别静默）
+  for (const d of CUSTOM_FIELD_DEFS) {
+    const row = await prisma.customFieldDef.findUnique({
+      where: { key: d.key },
+      select: { type: true, required: true },
+    });
+    if (!row) {
+      throw new Error(`customField seed 自检失败：定义 ${d.key} 不存在`);
+    }
+    if (row.type !== d.type || row.required !== d.required) {
+      throw new Error(
+        `customField seed 自检失败：${d.key} 应为 ${d.type}/required=${d.required}，实际 ${row.type}/required=${row.required}`
+      );
+    }
+  }
+
+  // 001/002/003 各恰四条；004 零条（必填与空态演示位）
+  for (const code of ["RP-2026-001", "RP-2026-002", "RP-2026-003"]) {
+    const n = await countFor(code);
+    if (n !== CUSTOM_FIELD_DEFS.length) {
+      throw new Error(`customField seed 自检失败：${code} 应有 ${CUSTOM_FIELD_DEFS.length} 条值，实际 ${n}`);
+    }
+  }
+  const p4Values = await countFor("RP-2026-004");
+  if (p4Values !== 0) {
+    throw new Error(`customField seed 自检失败：RP-2026-004 应为空态演示位，实际 ${p4Values} 条值`);
+  }
+
+  // 三列互斥不变量：每行至多一列非 null（与 coerceFieldValue 同口径）
+  const bad = mutexRows.filter((r) => {
+    const filled = [r.valueText, r.valueNumber, r.valueDate].filter((x) => x !== null).length;
+    return filled > 1;
+  });
+  if (bad.length > 0) {
+    throw new Error(`customField seed 自检失败：${bad.length} 行违反三列互斥（多列同时非 null）`);
   }
 }

@@ -6,6 +6,7 @@ import { Badge, SectionTitle, type BadgeVariant } from "@/core/ui";
 import { formatCny, formatPercent, formatSignedCny } from "@/core/domain/pricing";
 import type { Light } from "@/core/domain/health";
 import type { ProjectHub } from "@/modules/projects/server/projectDetail";
+import { CustomFieldsForm } from "./CustomFieldsForm";
 
 const TABS = [
   { key: "basic", label: "基础信息" },
@@ -137,6 +138,9 @@ function BasicTab({ hub }: { hub: ProjectHub }) {
           </span>
         </div>
       </div>
+
+      {/* 自定义字段（M9-c EAV）：值与控件形态由 core 口径给好，本文件不含校验逻辑 */}
+      <CustomFieldsForm projectId={hub.id} rows={hub.customFields} />
     </div>
   );
 }

@@ -1,7 +1,10 @@
 import prisma from "@/core/db";
+import type { Prisma } from "@prisma/client";
 import { computeTotals } from "@/core/domain/pricing";
 import type { QuoteItemRow } from "@/core/domain/pricing";
 import { overallProgress } from "@/core/domain/health";
+import { filterProjectIdsByCustomFields } from "@/core/domain/customFieldRepo";
+import type { FilterInput } from "@/core/domain/customField";
 
 /**
  * 项目管理服务（projects 模块 M4-a）。
@@ -38,6 +41,11 @@ export interface ProjectManagementItem {
 export interface ListProjectsFilter {
   /** 按 Project.status 过滤（同步 core/domain/types 的 PROJECT_STATUS）。 */
   status?: string;
+  /**
+   * 自定义字段筛选条件（M9-c c-2）。条件之间取**交集**（"同时满足"，本期不做"或"）；
+   * 类型真值已由 core 从定义表取好，调用方只负责传条件本身。
+   */
+  cfv?: FilterInput[];
 }
 
 /**
@@ -47,8 +55,20 @@ export interface ListProjectsFilter {
 export async function listProjectsForManagement(
   filter?: ListProjectsFilter
 ): Promise<ProjectManagementItem[]> {
+  // 自定义字段先筛出命中的项目 id，再与 status 合并成**一个** where。
+  // null＝无条件；[] ＝筛不到 → 直接返回空列表（**绝不退化成"没筛子"**，那是骗人的全量结果）。
+  const hitIds =
+    filter?.cfv && filter.cfv.length > 0
+      ? await filterProjectIdsByCustomFields(filter.cfv)
+      : null;
+  if (hitIds !== null && hitIds.length === 0) return [];
+
+  const where: Prisma.ProjectWhereInput = {};
+  if (filter?.status) where.status = filter.status;
+  if (hitIds !== null) where.id = { in: hitIds };
+
   const projects = await prisma.project.findMany({
-    where: filter?.status ? { status: filter.status } : undefined,
+    where,
     include: {
       client: { select: { name: true } },
       quotes: {

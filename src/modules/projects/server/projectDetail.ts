@@ -1,4 +1,5 @@
 import prisma from "@/core/db";
+import { getEntityValues, type EntityFieldValue } from "@/core/domain/customFieldRepo";
 import {
   computeTotals,
   groupByCategory,
@@ -144,6 +145,8 @@ export interface ProjectHub {
   endDate: string | null; // 计划完工
   actualEndDate: string | null;
   client: { name: string; phone: string | null } | null;
+  /** 自定义字段（M9-c EAV）：只含在用定义，按 order；值与展示串由 core 口径算好。 */
+  customFields: EntityFieldValue[];
   people: {
     designer: string | null;
     pm: string | null;
@@ -387,6 +390,10 @@ export async function getProjectHub(projectId: string): Promise<ProjectHub | nul
     }),
   };
 
+  // 自定义字段（M9-c）：走 core 读写服务取"在用定义 + 本项目值"，
+  // 不 import fields 模块内部（AGENTS §2）；无定义时返回空数组，页面走诚实空态。
+  const customFields: EntityFieldValue[] = await getEntityValues("project", project.id);
+
   return {
     id: project.id,
     code: project.code,
@@ -403,6 +410,7 @@ export async function getProjectHub(projectId: string): Promise<ProjectHub | nul
     endDate: fmtDate(project.endDate),
     actualEndDate: fmtDate(project.actualEndDate),
     client: project.client ? { name: project.client.name, phone: project.client.phone } : null,
+    customFields,
     people: {
       designer: project.designer,
       pm: project.pm,
