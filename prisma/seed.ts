@@ -287,6 +287,8 @@ async function main() {
   await seedChanges();
   // M9-b-2a：线索 seed（未签四阶段补至≥2 + 两条已签线索配套建项目，幂等）。
   await seedLeads();
+  // M9-b-2b：变更款收款台账（金额来自 M9-a 变更单，幂等按项目不变量，驾驶舱现金线补格）。
+  await seedChangeIncome();
 }
 
 /** M1a/M2-A 基础数据：组织 + 用户 + 客户 + 项目 + 报价 + 科目模板 + 线索。 */
@@ -1535,6 +1537,8 @@ main()
 // TASK_M8 §3 标 financeRecord=9，但 §3 同时要求 4 笔 income（两本账一致）+
 // 7 笔 expense（001/002/003 毛利率 35%/37.5%/22.7% 由金额锁死）= 11；9 与金额/毛利
 // 约束不可兼得，取 11（金额与毛利优先，count 让位，集成者复跑见末尾报数）。
+// M9-b-2b 边界：category="change" 的变更款收款由末尾 seedChangeIncome() 增补（本函数
+// 不建不计），故本函数自检只对非 change 的 11 笔负责，幂等复跑不受新增 2 笔影响。
 async function seedFinance() {
   const DAY = 24 * 60 * 60 * 1000;
   const addDays = (base: Date, n: number) => new Date(base.getTime() + n * DAY);
@@ -1677,7 +1681,9 @@ async function seedFinance() {
   // ── ⑤ 自检断言（报数取 DB 真值）──
   const [pnTotal, frTotal, p1Sum, p2Sum, p3Sum, p3Contract, p1Contract, p2Contract, p3ShuiDian, p3Zhuti, p4Pn, p4Fr, p3ExpenseRecords] = await Promise.all([
     prisma.paymentNode.count(),
-    prisma.financeRecord.count(),
+    // M9-b-2b：本函数只对自己的 11 笔负责；category="change" 由 seedChangeIncome()
+    // 增补，不计入本断言（否则幂等复跑时全表变 13，!== 11 必误报）。
+    prisma.financeRecord.count({ where: { category: { not: "change" } } }),
     prisma.paymentNode.aggregate({ where: { project: { code: "RP-2026-001" } }, _sum: { amountDue: true } }),
     prisma.paymentNode.aggregate({ where: { project: { code: "RP-2026-002" } }, _sum: { amountDue: true } }),
     prisma.paymentNode.aggregate({ where: { project: { code: "RP-2026-003" } }, _sum: { amountDue: true } }),
@@ -1703,7 +1709,7 @@ async function seedFinance() {
     throw new Error(`finance seed 自检失败：付款段应 15，实际 ${pnTotal}`);
   }
   if (frTotal !== 11) {
-    throw new Error(`finance seed 自检失败：收支记录应 11（4 income + 7 expense），实际 ${frTotal}`);
+    throw new Error(`finance seed 自检失败：收支记录应 11（4 income + 7 expense，排除 change），实际 ${frTotal}`);
   }
   if (round2(p1Sum._sum.amountDue ?? 0) !== p1Contract?.contractAmount) {
     throw new Error(`finance seed 自检失败：001 五段之和 ${p1Sum._sum.amountDue} ≠ 合同额 ${p1Contract?.contractAmount}`);
@@ -1901,7 +1907,8 @@ async function seedChanges() {
 //   008（上月签）→ RP-2026-006 contractAmount 176000
 // 两条都走 core/domain/projects.createProject（自动建草稿 BudgetQuote、Client 按名归并+手机号回写），
 // 再回写 Lead.projectId + stage="signed"。不建付款计划段/收支台账/变更单
-// （verify-finance-flow 初态守卫 15/11/2 与 seedFinance 自检 11 不受影响）。
+// （verify-finance-flow 初态守卫 15/11/2 与 seedFinance 自检 11 不受影响；
+//  M9-b-2b 起 flow 收支基线随 seedChangeIncome 的 2 笔变更款升到 13）。
 // 日期一律本地构造 new Date(y,m,d)，避开月末 UTC 漂移；lastFollowAt ≥ createdAt 且不晚于今天。
 async function seedLeads() {
   const org = await prisma.organization.findUnique({ where: { slug: "default" } });
@@ -2351,6 +2358,171 @@ async function seedLeads() {
   if (prev.length < 1) {
     throw new Error(
       `leads seed 自检失败：上月(${lastMonth}) 应有 ≥1 条签约建项项目，实际 0（环比将显「不可比」）`
+    );
+  }
+}
+
+/**
+ * M9-b-2b：变更款收款台账 seed（驾驶舱「近 6 个月现金收付折线」补"变更款收款"格）。
+ *
+ * 为什么单独成函数：不塞进 seedFinance() —— 那边自检对 11 笔负责，混建会让幂等
+ * 复跑必误报；本函数独立建 income/change，各管各的幂等与断言。
+ * 为什么排在 seedChanges() 之后：金额取自 M9-a 建好的变更单（changeTotal 聚合），
+ * 变更单不在就无款可收。
+ * 为什么不重排既有 11 笔收支：支出挪到 5~7 月会造出「开工前（最早开工 2026-08-02）
+ * 采购主材」的时间反序假数据；折线 5~7 月为 0 是真实空白。income 不进毛利口径，
+ * 对 grossProfit/marginRate 零影响。
+ * 幂等按不变量（项目已有 income/change 即跳过），不按条数——HAE 可能在界面自录过
+ * 变更款，按条数判会重复建或误报。
+ */
+async function seedChangeIncome() {
+  const u = await getFinanceUser();
+  const uid = u?.id ?? null;
+  const targets = [{ code: "RP-2026-001" }, { code: "RP-2026-002" }];
+  const DAY = 24 * 60 * 60 * 1000;
+  // 本次真正建了行的项目（金额等式只对这些行成立；被合法跳过的不参与比对）。
+  // SEED_DESC 兼作"这行是 seed 建的"标识——自检按它圈定范围，防与手测自录的变更款混算。
+  const SEED_DESC = "变更款收款（seed 演示）";
+  const created: { code: string; net: number }[] = [];
+
+  // 顺序 for…of 逐项目处理，不并发写库。
+  for (const { code } of targets) {
+    const p = await prisma.project.findUnique({
+      where: { code },
+      select: { id: true, startDate: true },
+    });
+    if (!p) {
+      console.log(`  ${code} 项目不存在，变更款收款 seed 跳过。`); // 脏库容忍，不抛错
+      continue;
+    }
+
+    const already = await prisma.financeRecord.count({
+      where: { projectId: p.id, type: "income", category: "change" },
+    });
+    if (already > 0) {
+      console.log(`  ${code} 已有 ${already} 条变更款收款，跳过。`);
+      continue;
+    }
+
+    const chs = await prisma.changeOrder.findMany({
+      where: { quote: { projectId: p.id } },
+      select: { amount: true, date: true },
+    });
+    const total = changeTotal(chs); // 带符号合计走 core 口径，不自己 Σ
+    if (chs.length === 0 || total <= 0) {
+      console.log(`  ${code} 无变更单或变更净额 ≤ 0（${total}），不建收款。`);
+      continue;
+    }
+
+    // 收款日 = 最晚变更日 + 5 天，再钳到今天：必不早于变更发生日、也不落未来
+    // （承 seedFinance/seedChanges 的时间自洽教训）。
+    let lastChange = chs[0].date;
+    for (const c of chs) {
+      if (c.date.getTime() > lastChange.getTime()) lastChange = c.date;
+    }
+    const now = new Date();
+    let date = new Date(lastChange.getTime() + 5 * DAY);
+    if (date.getTime() > now.getTime()) date = now;
+
+    // amount 恒正（方向由 type 决定）；total 已在上一步保证 > 0。
+    await prisma.financeRecord.create({
+      data: {
+        projectId: p.id,
+        type: "income",
+        category: "change",
+        amount: total,
+        date,
+        description: SEED_DESC,
+        recordedBy: uid,
+      },
+    });
+    created.push({ code, net: total });
+  }
+
+  // ── 自检断言（报数取 DB 真值；断言按不变量，不写死条数）──
+  // 关键：金额等式只约束**本次 seed 自建的那几行**（按 description 圈定）。
+  // 若某项目被合法跳过（HAE 已在界面自录过变更款 ⇒ `already > 0`），全表 change
+  // 合计就会 ≠ 两项目净额之和——用全表比对会让脏库上的 seed 必红（同 M9-b-2a 撞
+  // Lead.projectId @unique 那族教训：断言只能按不变量与自建范围写，不能假定全表形状）。
+  const [cnt, sumAgg, totalAll, expenseCnt, contractCnt] = await Promise.all([
+    prisma.financeRecord.count({ where: { type: "income", category: "change" } }),
+    prisma.financeRecord.aggregate({
+      where: { type: "income", category: "change", description: SEED_DESC },
+      _sum: { amount: true },
+    }),
+    prisma.financeRecord.count(),
+    prisma.financeRecord.count({ where: { type: "expense" } }),
+    prisma.financeRecord.count({ where: { type: "income", category: "contract" } }),
+  ]);
+  const sum = sumAgg._sum.amount ?? 0;
+
+  // 合法跳过判定镜像：只有「变更净额 > 0」的项目才必须存在收款行——无变更单/
+  // 净额 ≤ 0/项目缺失被跳过是合法的，断言不得要求它有收款行。
+  const expected: { code: string; mustHave: boolean; net: number }[] = [];
+  for (const { code } of targets) {
+    const p = await prisma.project.findUnique({ where: { code }, select: { id: true } });
+    if (!p) {
+      expected.push({ code, mustHave: false, net: 0 });
+      continue;
+    }
+    const chs = await prisma.changeOrder.findMany({
+      where: { quote: { projectId: p.id } },
+      select: { amount: true, date: true },
+    });
+    const t = changeTotal(chs);
+    expected.push({ code, mustHave: t > 0, net: t > 0 ? t : 0 });
+  }
+
+  const fmt = (n: number) => (Math.round((n + Number.EPSILON) * 100) / 100).toFixed(2);
+  console.log(
+    `M9-b-2b seed 完成：变更款收款 全表 ${cnt} 条（本次自建 ${created.length} 条 · ${fmt(sum)}）· 全表收支 ${totalAll} 笔`
+  );
+
+  // 断言 1：净额 > 0 的项目各自至少一条 income/change。
+  for (const e of expected) {
+    if (!e.mustHave) continue;
+    const own = await prisma.financeRecord.count({
+      where: { project: { code: e.code }, type: "income", category: "change" },
+    });
+    if (own < 1) {
+      throw new Error(
+        `changeIncome seed 自检失败：${e.code}（变更净额 ${e.net}）应有一条变更款收款，实际 0`
+      );
+    }
+  }
+
+  // 断言 2：**按项目**判等式——凡该项目存在带 SEED_DESC 的 seed 自建行，则这些行的
+  // 金额合计（整数分比对，勿用 === 比浮点）必须等于该项目的变更净额。
+  // 首次跑与幂等复跑跑的是同一条式子（复跑时行已存在、本次不建，等式照样成立）；
+  // 手测自录的变更款 description 不同，不参与等式；净额 ≤ 0 或无变更单的项目本就没建行。
+  for (const { code } of targets) {
+    const seedRows = await prisma.financeRecord.findMany({
+      where: { project: { code }, type: "income", category: "change", description: SEED_DESC },
+      select: { amount: true },
+    });
+    if (seedRows.length === 0) continue; // 历史与本次都没建过（合法跳过）→ 不参与等式
+    const prow = await prisma.project.findUnique({ where: { code }, select: { id: true } });
+    const rows = prow
+      ? await prisma.changeOrder.findMany({
+          where: { quote: { projectId: prow.id } },
+          select: { amount: true },
+        })
+      : [];
+    const net = changeTotal(rows);
+    const rowSum = seedRows.reduce((s, r) => s + r.amount, 0);
+    if (Math.round(rowSum * 100) !== Math.round(net * 100)) {
+      throw new Error(
+        `changeIncome seed 自检失败：${code} 的 seed 自建变更款合计 ${rowSum} ≠ 该项目变更净额 ${net}（整数分比对）`
+      );
+    }
+  }
+
+  // 断言 3：「本单元没动既有行」的护栏——expense 仍 7 笔、income/contract 仍 4 笔。
+  // 只保条数：金额/日期基线由 verify-finance.mjs / verify-finance-flow.mts 的毛利
+  // 断言（grossProfit 24900 / marginRate 0.3819）把守，这里不重复。
+  if (expenseCnt !== 7 || contractCnt !== 4) {
+    throw new Error(
+      `changeIncome seed 自检失败：既有行被动过（expense 应 7 实际 ${expenseCnt} · income/contract 应 4 实际 ${contractCnt}）`
     );
   }
 }

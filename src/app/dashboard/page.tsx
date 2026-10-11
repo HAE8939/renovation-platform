@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Badge } from "@/core/ui/Badge";
 import { Card, SectionTitle } from "@/core/ui/Card";
-import { formatCny, formatPercent } from "@/core/domain/pricing";
+import { formatCny, formatPercent, formatSignedCny } from "@/core/domain/pricing";
 import { formatSignedPercent } from "@/core/domain/dashboard";
 import type { Light } from "@/core/domain/health";
 import { getDashboardOverview } from "@/modules/dashboard/server/overview";
@@ -42,7 +42,11 @@ function Dot({ cls }: { cls: string }) {
 }
 
 export default async function DashboardPage() {
-  const { kpi, health, todos, funnel, generatedAt } = await getDashboardOverview();
+  const { kpi, health, todos, funnel, cash, margins, generatedAt } = await getDashboardOverview();
+
+  // 折线坐标串：只做几何拼接（xPct / incomeY / expenseY 均由服务层算好），本页不算数。
+  const incomePts = cash.points.map((p) => `${p.xPct},${p.incomeY}`).join(" ");
+  const expensePts = cash.points.map((p) => `${p.xPct},${p.expenseY}`).join(" ");
 
   return (
     <div className="space-y-12">
@@ -215,9 +219,144 @@ export default async function DashboardPage() {
         </div>
       </section>
 
-      {/* 四、商务漏斗（真内容）+ 两块灰占位（不画假图、不放假数字）；items-start 让三卡各自
+      {/* 四、月度现金收付（左）+ 项目毛利率排行（右）：与上节同构的 3:2 版式；items-start
+          让两卡各自按内容取高，避免被拉成等高空白（V0.3 §7.4 节奏） */}
+      <section className="grid items-start gap-8 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+        <Card className="min-w-0">
+          <SectionTitle>月度现金收付</SectionTitle>
+          <p className="mt-2 text-xs text-secondary">现金收付口径 · {cash.rangeLabel}</p>
+          <div className="mt-3 space-y-1 text-[12px] text-secondary">
+            <p className="flex items-center gap-2">
+              <span aria-hidden className="inline-block h-[2px] w-3 bg-accent" />
+              当月收款
+            </p>
+            <p className="flex items-center gap-2">
+              <span aria-hidden className="inline-block h-[2px] w-3 bg-muted" />
+              当月支出
+            </p>
+          </div>
+          <svg
+            viewBox="0 0 100 100"
+            preserveAspectRatio="none"
+            className="mt-4 h-40 w-full"
+            role="img"
+            aria-label={`近 6 个月现金收付折线，收款合计 ${formatCny(cash.totalIncome)}，支出合计 ${formatCny(cash.totalExpense)}`}
+          >
+            <line
+              x1={0}
+              y1={100}
+              x2={100}
+              y2={100}
+              stroke="var(--border)"
+              strokeWidth={1}
+              vectorEffect="non-scaling-stroke"
+            />
+            {cash.hasAnyCash && (
+              <>
+                <polyline
+                  points={incomePts}
+                  fill="none"
+                  stroke="var(--accent)"
+                  strokeWidth={1.5}
+                  vectorEffect="non-scaling-stroke"
+                />
+                <polyline
+                  points={expensePts}
+                  fill="none"
+                  stroke="var(--text-disabled)"
+                  strokeWidth={1.5}
+                  vectorEffect="non-scaling-stroke"
+                />
+              </>
+            )}
+          </svg>
+          <div className="mt-2 grid grid-cols-6">
+            {cash.points.map((p) => (
+              <span key={p.key} className="text-center text-[12px] text-secondary">
+                {p.label}
+              </span>
+            ))}
+          </div>
+          {!cash.hasAnyCash && (
+            <p className="mt-2 text-sm text-secondary">近 6 个月暂无现金记录</p>
+          )}
+          <ul className="mt-4 divide-y divide-line">
+            <li className="grid grid-cols-[auto_1fr_1fr_1fr] items-baseline gap-x-4 py-2 text-[12px] text-muted">
+              <span>月份</span>
+              <span className="text-right">收款</span>
+              <span className="text-right">支出</span>
+              <span className="text-right">净现金</span>
+            </li>
+            {cash.points.map((p) => (
+              <li
+                key={p.key}
+                className="grid grid-cols-[auto_1fr_1fr_1fr] items-baseline gap-x-4 py-2"
+              >
+                <span className="text-[13px] text-secondary">{p.label}</span>
+                <span className="num text-right text-[13px]">{formatCny(p.income)}</span>
+                <span className="num text-right text-[13px]">{formatCny(p.expense)}</span>
+                <span
+                  className={`num text-right text-[13px] ${
+                    p.cashTone === "warning" ? "text-warning" : "text-success"
+                  }`}
+                >
+                  {formatSignedCny(p.net)}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs text-secondary">
+            近 6 个月合计 收款 {formatCny(cash.totalIncome)} · 支出 {formatCny(cash.totalExpense)} ·
+            净现金 {formatSignedCny(cash.totalNet)}
+          </p>
+        </Card>
+
+        <Card className="min-w-0">
+          <SectionTitle>项目毛利率排行</SectionTitle>
+          <p className="mt-2 text-xs text-secondary">
+            口径：合同额 + 变更 − 支出（项目维度，非现金收付）
+          </p>
+          {margins.rows.length === 0 ? (
+            <p className="mt-4 text-sm text-secondary">暂无项目</p>
+          ) : (
+            <ul className="mt-4 divide-y divide-line">
+              {margins.rows.map((row) => (
+                <li key={row.id} className="py-3">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span
+                      className={`truncate text-[13px] ${row.rankable ? "" : "text-secondary"}`}
+                    >
+                      {row.name}
+                    </span>
+                    <span className="num shrink-0 text-[12px] text-muted">{row.code}</span>
+                  </div>
+                  <div className="mt-2 flex items-center gap-3">
+                    {row.rankable ? (
+                      <div className="h-2 flex-1 rounded-full bg-sunken">
+                        <div
+                          className="h-2 rounded-full bg-accent"
+                          style={{ width: row.barWidth ?? "0%" }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="h-2 flex-1" />
+                    )}
+                    <span className="num w-14 shrink-0 text-right text-[13px]">
+                      {!row.rankable || row.rate === null ? "—" : formatPercent(row.rate)}
+                    </span>
+                    {row.rankable && <Dot cls={dotCls[row.light]} />}
+                  </div>
+                  {!row.rankable && <p className="mt-2 text-[12px] text-muted">{row.note}</p>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      </section>
+
+      {/* 五、商务漏斗（真内容）+ 人效排行灰占位（不画假图、不放假数字）；items-start 让两卡各自
           按内容取高，避免占位卡被漏斗拉成一整列空白（V0.3 §7.4 节奏） */}
-      <section className="grid items-start gap-4 sm:grid-cols-3">
+      <section className="grid items-start gap-4 sm:grid-cols-2">
         <Card>
           <SectionTitle>商务漏斗</SectionTitle>
           <p className="mt-2 text-xs text-secondary">阶段存量分布（非累计流量）</p>
@@ -242,10 +381,6 @@ export default async function DashboardPage() {
               {funnel.conversionRate === null ? "—" : formatPercent(funnel.conversionRate)}
             </span>
           </p>
-        </Card>
-        <Card>
-          <SectionTitle>月度营收毛利趋势</SectionTitle>
-          <p className="mt-2 text-xs text-secondary">后续单元接入 · 现金收付口径</p>
         </Card>
         <Card>
           <SectionTitle>人效排行</SectionTitle>

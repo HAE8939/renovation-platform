@@ -207,3 +207,102 @@ export function leadConversion(rows: { stage: string }[]): number | null {
   }
   return round4(signed / rows.length);
 }
+
+// ── M9-b-2b 月度现金序列口径（TASK_M9 §7-7-3）─────
+
+/**
+ * 近 n 个日历月键，由近到远（首元素＝当月）。
+ *
+ * 逐 i 用 `new Date(now.getFullYear(), now.getMonth() - i, 1)` 取 monthKey——
+ * Date 构造器自动把负月份借位到上一年，跨年由此保证，不写 1 月特判分支。
+ * n 非正数（<= 0 / NaN / Infinity / 非 number）→ []；小数向下取整；n=1 只含当月。
+ */
+export function monthKeysDescending(n: number, now: Date): string[] {
+  if (typeof n !== "number" || !Number.isFinite(n) || n <= 0) return [];
+  const count = Math.floor(n);
+  const keys: string[] = [];
+  for (let i = 0; i < count; i++) {
+    keys.push(monthKey(new Date(now.getFullYear(), now.getMonth() - i, 1)));
+  }
+  return keys;
+}
+
+/** 月度现金序列输入行（与 prisma FinanceRecord 投影同形状）。 */
+export interface CashRow {
+  type: string;
+  amount: number;
+  date: Date;
+}
+
+/** 一个月键的现金收付点，三项均已 round2；net 可为负。 */
+export interface CashPoint {
+  key: string;
+  income: number;
+  expense: number;
+  net: number;
+}
+
+/**
+ * 按传入 keys 给定顺序逐键输出现金收付点。
+ *
+ * 取数口径与 ledger.ts 的 receivedTotal/expenseTotal 同源（不 import，此处内联）：
+ * type === "income" 计 income、"expense" 计 expense，其余两侧不计；amount 非有限
+ * 或 <= 0 按 0 参与（不影响合计），方向只由 type 决定。行本身 null/undefined、或
+ * date 缺失/不可解析（new Date(...).getTime() 为 NaN）→ 整行跳过，不抛异常。
+ * 先按 monthKey(r.date) 分一次桶再按 keys 取；输出与 keys 同长度同顺序（重复键
+ * 按重复各输出一份，不去重），keys 为空 → []。某键当月无现金 → 显式
+ * { key, income: 0, expense: 0, net: 0 }，不返回 null、不跳键、不造演示数字。
+ * income/expense 各自 round2 后再相减取 round2 作 net，防二次舍入分叉。
+ */
+export function cashSeries(rows: CashRow[], keys: readonly string[]): CashPoint[] {
+  const buckets = new Map<string, { income: number; expense: number }>();
+  for (const r of rows) {
+    if (r == null) continue;
+    const d = r.date;
+    if (!d) continue;
+    if (Number.isNaN(new Date(d).getTime())) continue;
+    const amt = Number.isFinite(r.amount) && r.amount > 0 ? r.amount : 0;
+    if (amt === 0) continue;
+    const key = monthKey(d);
+    const bucket = buckets.get(key) ?? { income: 0, expense: 0 };
+    if (r.type === "income") bucket.income += amt;
+    else if (r.type === "expense") bucket.expense += amt;
+    else continue;
+    buckets.set(key, bucket);
+  }
+  const out: CashPoint[] = [];
+  for (const key of keys) {
+    const bucket = buckets.get(key);
+    const income = round2(bucket?.income ?? 0);
+    const expense = round2(bucket?.expense ?? 0);
+    out.push({ key, income, expense, net: round2(income - expense) });
+  }
+  return out;
+}
+
+/**
+ * 折线纵轴峰值：所有点里 income 与 expense 两者的最大值，round2 后返回。
+ * 空数组、全 0、入参 null/undefined → 0（不抛）；点内非有限值按 0 计，
+ * 免得 NaN 吞掉同组有效峰值。
+ */
+export function cashPeak(points: readonly CashPoint[]): number {
+  if (!points) return 0;
+  let peak = 0;
+  for (const p of points) {
+    const income = Number.isFinite(p?.income) ? p.income : 0;
+    const expense = Number.isFinite(p?.expense) ? p.expense : 0;
+    if (income > peak) peak = income;
+    if (expense > peak) peak = expense;
+  }
+  return round2(peak);
+}
+
+/**
+ * 净现金色档：net < 0 → "warning"；否则（含 0、正数）→ "success"。
+ * net 非有限（NaN/undefined）按 0 → "success"。只返回这两个语义 token，
+ * 不输出 "danger" 或 emoji（负现金流用 warning 语义色，属已定视觉决策）。
+ */
+export function cashTone(net: number): "success" | "warning" {
+  const v = Number.isFinite(net) ? net : 0;
+  return v < 0 ? "warning" : "success";
+}

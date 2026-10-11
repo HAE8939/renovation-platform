@@ -62,7 +62,7 @@ const centEq = (a: number, b: number): boolean => cent(a) === cent(b);
 
 async function main() {
   // ── 库初态守卫 ──────────────────────────────────────────────
-  // fresh seed = paymentNode 15 · financeRecord 11（M8-a seed 自检基线）
+  // fresh seed = paymentNode 15 · financeRecord 13（11 笔 M8-a + 2 笔 M9-b-2b 变更款）
   //   · changeOrder 2（M9-a seed：001 +3200 / 002 +2800）。
   // 不符即视为上次运行残留 → 明确提示先重置，避免一串误导性级联失败。
   const [baselineNodes, baselineRecords, baselineChanges] = await Promise.all([
@@ -70,17 +70,17 @@ async function main() {
     prisma.financeRecord.count(),
     prisma.changeOrder.count(),
   ]);
-  if (baselineNodes !== 15 || baselineRecords !== 11 || baselineChanges !== 2) {
+  if (baselineNodes !== 15 || baselineRecords !== 13 || baselineChanges !== 2) {
     console.error(
-      `✗ 库非初始态（付款段 ${baselineNodes}/15 · 收支记录 ${baselineRecords}/11 · 变更单 ${baselineChanges}/2，疑为上次运行残留）。\n` +
+      `✗ 库非初始态（付款段 ${baselineNodes}/15 · 收支记录 ${baselineRecords}/13 · 变更单 ${baselineChanges}/2，疑为上次运行残留）。\n` +
         `  请先重置临时库再跑：\n` +
         `  DATABASE_URL="file:../_scratch/finance-flow.db" npx prisma migrate reset --force --skip-generate`
     );
     process.exit(1);
   }
   chk(
-    "初态守卫：付款段 15 · 收支记录 11 · 变更单 2",
-    baselineNodes === 15 && baselineRecords === 11 && baselineChanges === 2
+    "初态守卫：付款段 15 · 收支记录 13 · 变更单 2",
+    baselineNodes === 15 && baselineRecords === 13 && baselineChanges === 2
   );
 
   // 护栏（M8.5）：付款模板 triggerStages 必须都能在工序模板库找到对应工序——

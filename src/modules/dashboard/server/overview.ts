@@ -6,17 +6,30 @@ import {
   scheduleLight,
   type Light,
 } from "@/core/domain/health";
-import { changeTotal, changeWatch, receivedTotal } from "@/core/domain/ledger";
-import { formatSignedCny } from "@/core/domain/pricing";
 import {
+  changeTotal,
+  changeWatch,
+  expenseTotal,
+  marginLight,
+  marginRate,
+  receivedTotal,
+  type MarginLight,
+} from "@/core/domain/ledger";
+import { formatSignedCny, round2 } from "@/core/domain/pricing";
+import {
+  cashPeak,
+  cashSeries,
+  cashTone,
   collectionLight,
   collectionRate,
   funnelCounts,
   FUNNEL_STAGE_ORDER,
   isInProgress,
   leadConversion,
+  monthKeysDescending,
   riskItemCount,
   signedAmountAt,
+  type CashRow,
   type CollectionLight,
   type RiskCounts,
 } from "@/core/domain/dashboard";
@@ -33,6 +46,7 @@ import {
  * - 口径纪律：在建三态 / 签单月键 / 回款率与色档 / 风险红灯全部收敛在
  *   core/domain/{dashboard,health,ledger}，本文件不出现阈值字面量；
  *   回款率进度条宽度换算只在此处做一次，页面直接消费不再计算。
+ * - 现金序列与毛利率排行同样「零写入、零新增查询、算式只在本文件一次」（M9-b-2b）。
  */
 
 /**
@@ -107,6 +121,8 @@ export interface DashboardOverview {
   health: HealthRow[];
   todos: TodoGroup[];
   funnel: DashboardFunnel;
+  cash: DashboardCash;
+  margins: DashboardMargins;
   generatedAt: string;
 }
 
@@ -140,6 +156,71 @@ export interface DashboardFunnel {
  * （不 import crm/stages.ts 模块内部，TASK_M9 §7-1）。
  */
 
+/**
+ * 现金序列视图模型（M9-b-2b）——现金收付口径（当月 Σincome、当月 Σexpense）。
+ * 与项目毛利率口径（合同额+变更−支出）没有时间维度，二者并存但不混用；
+ * 某几个月为 0 是真实现金流空白（演示项目最早 2026-08 开工），不是缺数据也不是 mock。
+ * 几何值（xPct 与两个 y）在服务层换算一次，页面不再做算式。
+ */
+
+/** 现金折线单点。 */
+export interface CashMonthPoint {
+  /** 月键，如 "2026-08" */
+  key: string;
+  /** 中文月标，如 "8月"（年份由 rangeLabel 交代） */
+  label: string;
+  income: number;
+  expense: number;
+  /** income − expense，可负（两位舍入） */
+  net: number;
+  /** 净额色档：负 → warning */
+  cashTone: "success" | "warning";
+  /** 0–100，一位小数；中心等分，与页面月份轴 grid-cols-6 对齐 */
+  xPct: number;
+  /** 0＝峰顶、100＝基线，一位小数 */
+  incomeY: number;
+  expenseY: number;
+}
+
+export interface DashboardCash {
+  /** 近 6 个月，左→右时间升序（最早在左） */
+  points: CashMonthPoint[];
+  /** max(income, expense)，空 → 0；y 映射分母 */
+  peak: number;
+  totalIncome: number;
+  totalExpense: number;
+  totalNet: number;
+  /** "2026-05 ~ 2026-10"（升序键，最早在前） */
+  rangeLabel: string;
+  /** false → 页面可显「无现金流」空态 */
+  hasAnyCash: boolean;
+}
+
+/**
+ * 项目毛利率排行视图模型（M9-b-2b）。
+ *
+ * 范围＝主查询全部非 archived 项目（不筛在建，与健康矩阵的在建口径不同）。
+ * 顺序：rankable 组按 rate 降序、同值按 code 升序；其后接「未录入支出」组、
+ * 最后接「未录入合同额，不可算」组（后两组按 code 升序）。
+ */
+export interface MarginRankRow {
+  id: string;
+  code: string;
+  name: string;
+  /** ledger.marginRate 原值；null ＝ 合同额+变更 分母 ≤ 0 */
+  rate: number | null;
+  light: MarginLight;
+  /** 条 CSS 宽度，rankable 才给；灰态 null（页面不渲条）。率为负时条为 "0%" 但率数值照显 */
+  barWidth: string | null;
+  rankable: boolean;
+  /** 灰态文案；rankable 时 null */
+  note: string | null;
+}
+
+export interface DashboardMargins {
+  rows: MarginRankRow[];
+}
+
 /** 主查询单行的中间计算结果（KPI / 健康矩阵 / 待办共用，避免重复展开关系）。 */
 interface CalcRow {
   id: string;
@@ -156,6 +237,10 @@ interface CalcRow {
   budget: Light;
   changeWarn: boolean;
   changeAmount: number;
+  /** 毛利率与其色档在 map 里一次算出，供排行块消费，不二次计算 */
+  expenseAmount: number;
+  margin: number | null;
+  marginLight: MarginLight;
 }
 
 export async function getDashboardOverview(
@@ -182,7 +267,7 @@ export async function getDashboardOverview(
         scheduleTasks: { select: { progress: true } },
         acceptanceNodes: { select: { status: true } },
         issues: { select: { status: true } },
-        financeRecords: { select: { type: true, amount: true } },
+        financeRecords: { select: { type: true, amount: true, date: true } },
         quotes: { select: { status: true, changes: { select: { amount: true } } } },
       },
       orderBy: { code: "asc" },
@@ -234,6 +319,13 @@ export async function getDashboardOverview(
   const rows: CalcRow[] = projects.map((p) => {
     const changeAmount = changeTotal(p.quotes.flatMap((q) => q.changes));
     const paidTotal = receivedTotal(p.financeRecords);
+    // 毛利率原料：同一遍循环一次算出，供排行块消费，不二次计算
+    const expenseAmount = expenseTotal(p.financeRecords);
+    const margin = marginRate({
+      contractAmount: p.contractAmount,
+      changeTotal: changeAmount,
+      expenseTotal: expenseAmount,
+    });
     const openIssues = p.issues.filter((i) => i.status !== "closed").length;
     const pendingNodes =
       p.acceptanceNodes.length - p.acceptanceNodes.filter((n) => n.status === "passed").length;
@@ -265,6 +357,10 @@ export async function getDashboardOverview(
       }),
       changeWarn: changeWatch(p.contractAmount, changeAmount).warn,
       changeAmount,
+      // 毛利率与其色档在 map 里一次算出，供排行块消费，不二次计算
+      expenseAmount,
+      margin,
+      marginLight: marginLight(margin),
     };
   });
 
@@ -317,6 +413,104 @@ export async function getDashboardOverview(
     })),
     total: leads.length,
     conversionRate: leadConversion(leadStages),
+  };
+
+  // ── 现金序列（M9-b-2b）：现金收付口径 ─────────────────────────────────────
+  // 当月 Σincome、当月 Σexpense，与项目毛利率口径（合同额+变更−支出）没有
+  // 时间维度，二者并存但不混用；某几个月为 0 是真实现金流空白（演示项目
+  // 最早 2026-08 开工），不是缺数据也不是 mock。
+  const descKeys = monthKeysDescending(6, now);
+  // 时间升序（最早在左）：monthKeysDescending 由近到远，故浅拷贝后反转
+  const keys = [...descKeys].reverse();
+  // 全司口径：与 KPI 同一批非 archived 项目，复用主查询 financeRecords（带 date），不另发查询
+  const cashRows: CashRow[] = projects.flatMap((p) =>
+    p.financeRecords.map((r) => ({ type: r.type, amount: r.amount, date: r.date }))
+  );
+  const pts = cashSeries(cashRows, keys);
+  const peak = cashPeak(pts);
+  const n = keys.length;
+  // 纵坐标映射：峰顶＝0、基线＝100，一位小数消浮点尾差；peak<=0 时两点都贴基线
+  const yOf = (v: number): number => (peak > 0 ? Math.round((1 - v / peak) * 1000) / 10 : 100);
+  const totalIncome = round2(pts.reduce((s, p) => s + p.income, 0));
+  const totalExpense = round2(pts.reduce((s, p) => s + p.expense, 0));
+  const cash: DashboardCash = {
+    points: pts.map((p, i) => ({
+      key: p.key,
+      label: `${Number(p.key.slice(5, 7))}月`,
+      income: p.income,
+      expense: p.expense,
+      net: p.net,
+      cashTone: cashTone(p.net),
+      // 中心等分：第 i 点落在横轴 (i+0.5)/n 处，与页面月份轴 grid-cols-6 对齐
+      xPct: n > 0 ? Math.round(((i + 0.5) / n) * 1000) / 10 : 50,
+      incomeY: yOf(p.income),
+      expenseY: yOf(p.expense),
+    })),
+    peak,
+    totalIncome,
+    totalExpense,
+    totalNet: round2(totalIncome - totalExpense),
+    rangeLabel: `${keys[0]} ~ ${keys[n - 1]}`,
+    hasAnyCash: pts.some((p) => p.income > 0 || p.expense > 0),
+  };
+
+  // ── 项目毛利率排行（M9-b-2b）──────────────────────────────────────────────
+  // 范围＝主查询全部非 archived 项目（不筛在建，与健康矩阵的在建口径不同）。
+  // 灰态剔除规则已拍板：只录合同额、没录任何支出的项目按公式恰得 100%，
+  // 摆进榜首必误导 → 不入榜、率不展示（light 字段留着给巡检用，页面灰态不渲色点）。
+  // 三档 tier（优先级从高到低）：0 rankable / 1 未录入支出 / 2 不可算。
+  // 一次 sort 做完：tier 升序；rankable 组 rate 降序、同值 code 升序；
+  // tier 1 的率恒为恰值 1（支出为 0）、tier 2 的率全为 null，故「rate 降序」
+  // 这把次级键在这两组内不生效，自然落到 code 升序。
+  type MarginTierRow = MarginRankRow & { tier: 0 | 1 | 2 };
+  const marginTierRows: MarginTierRow[] = rows.map((r) => {
+    if (r.margin === null) {
+      return {
+        id: r.id,
+        code: r.code,
+        name: r.name,
+        rate: null,
+        light: "neutral",
+        barWidth: null,
+        rankable: false,
+        note: "未录入合同额，不可算",
+        tier: 2,
+      };
+    }
+    if (r.expenseAmount === 0) {
+      return {
+        id: r.id,
+        code: r.code,
+        name: r.name,
+        rate: r.margin,
+        light: r.marginLight,
+        barWidth: null,
+        rankable: false,
+        note: "未录入支出",
+        tier: 1,
+      };
+    }
+    return {
+      id: r.id,
+      code: r.code,
+      name: r.name,
+      rate: r.margin,
+      light: r.marginLight,
+      // 一位小数消浮点尾差；支出超合同+变更时率可为负 → 条宽 "0%" 但率数值照显
+      barWidth: r.margin > 0 ? `${Math.round(r.margin * 1000) / 10}%` : "0%",
+      rankable: true,
+      note: null,
+      tier: 0,
+    };
+  });
+  const margins: DashboardMargins = {
+    // tier 仅参与排序，交付前剥掉
+    rows: marginTierRows
+      .sort(
+        (a, b) =>
+          a.tier - b.tier || (b.rate ?? 0) - (a.rate ?? 0) || a.code.localeCompare(b.code)
+      )
+      .map(({ tier: _tier, ...row }) => row),
   };
 
   // 七组待办，顺序与口径固定；第 7 组为灰占位（人员管控模块未上线）
@@ -412,6 +606,8 @@ export async function getDashboardOverview(
     health,
     todos,
     funnel,
+    cash,
+    margins,
     generatedAt: fmtStamp(now),
   };
 }

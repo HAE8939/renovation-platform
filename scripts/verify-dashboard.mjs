@@ -32,6 +32,10 @@ const {
   funnelCounts,
   FUNNEL_STAGE_ORDER,
   leadConversion,
+  monthKeysDescending,
+  cashSeries,
+  cashPeak,
+  cashTone,
 } = dash;
 // crm 的阶段序列（纯常量文件，无 prisma，plain-node 可直 import）——用于锁死
 // 「驾驶舱漏斗阶段顺序」与「线索真实阶段顺序」不漂移。
@@ -358,6 +362,242 @@ function check(name, ok, detail = "") {
     `signedPct=${signedPct} conv=${conv}`);
 }
 
+/* ── monthKeysDescending / cashSeries / cashPeak / cashTone（M9-b-2b 追加）─ */
+
+// 第 14 条与「跨源不漂移护栏」共用的同一组三个月混合收支 rows
+// （2026-08/09/10 全覆盖，含一笔 1234.56 小数尾数；本地构造日期，禁字符串形式）。
+const oracleRows = [
+  { type: "income", amount: 50000, date: new Date(2026, 9, 3) },
+  { type: "income", amount: 1234.56, date: new Date(2026, 9, 20) },
+  { type: "expense", amount: 9800.5, date: new Date(2026, 9, 25) },
+  { type: "income", amount: 30000.05, date: new Date(2026, 8, 10) },
+  { type: "expense", amount: 15000.75, date: new Date(2026, 8, 15) },
+  { type: "income", amount: 8000, date: new Date(2026, 7, 5) },
+  { type: "expense", amount: 999.99, date: new Date(2026, 7, 30) },
+  { type: "expense", amount: 2200.01, date: new Date(2026, 7, 31) },
+];
+
+{
+  const NOW = new Date(2026, 9, 11); // 固定「当月」= 2026-10
+
+  // monthKeysDescending
+  check("monthKeysDescending: n=6 由近到远、首元素=当月（JSON 整体比对含顺序）",
+    JSON.stringify(monthKeysDescending(6, NOW)) ===
+      JSON.stringify(["2026-10", "2026-09", "2026-08", "2026-07", "2026-06", "2026-05"]),
+    JSON.stringify(monthKeysDescending(6, NOW)));
+
+  check("monthKeysDescending: 跨年借位（2026-02 倒推 4 个月入 2025）",
+    JSON.stringify(monthKeysDescending(4, new Date(2026, 1, 15))) ===
+      JSON.stringify(["2026-02", "2026-01", "2025-12", "2025-11"]),
+    JSON.stringify(monthKeysDescending(4, new Date(2026, 1, 15))));
+
+  check("monthKeysDescending: n=1 只含当月 2026-10",
+    JSON.stringify(monthKeysDescending(1, NOW)) === JSON.stringify(["2026-10"]),
+    JSON.stringify(monthKeysDescending(1, NOW)));
+
+  check("monthKeysDescending: n=0 / 负数 / NaN / Infinity → 全空数组",
+    monthKeysDescending(0, NOW).length === 0
+      && monthKeysDescending(-3, NOW).length === 0
+      && monthKeysDescending(NaN, NOW).length === 0
+      && monthKeysDescending(Infinity, NOW).length === 0,
+    `0:${monthKeysDescending(0, NOW).length} -3:${monthKeysDescending(-3, NOW).length} `
+      + `NaN:${monthKeysDescending(NaN, NOW).length} Infinity:${monthKeysDescending(Infinity, NOW).length}`);
+
+  check("monthKeysDescending: 小数 n=2.7 向下取整 → 恰 2 个月",
+    monthKeysDescending(2.7, NOW).length === 2
+      && JSON.stringify(monthKeysDescending(2.7, NOW)) === JSON.stringify(["2026-10", "2026-09"]),
+    JSON.stringify(monthKeysDescending(2.7, NOW)));
+
+  check("monthKeysDescending: 月末 23:30 构造不漂移（首元素仍当月 2026-10）",
+    JSON.stringify(monthKeysDescending(3, new Date(2026, 9, 31, 23, 30))) ===
+      JSON.stringify(["2026-10", "2026-09", "2026-08"]),
+    JSON.stringify(monthKeysDescending(3, new Date(2026, 9, 31, 23, 30))));
+
+  // cashSeries —— 真实空白必须是 0（不是 null、不是缺项）
+  const blank = cashSeries([], ["2026-10", "2026-09"]);
+  check("cashSeries: 空 rows → 与 keys 同长同序、每点三值全 0（非 null 非缺项）",
+    blank.length === 2 && blank[0].key === "2026-10" && blank[1].key === "2026-09"
+      && blank.every((p) => p.income === 0 && p.expense === 0 && p.net === 0),
+    JSON.stringify(blank));
+
+  const merged = cashSeries([
+    { type: "income", amount: 50000.05, date: new Date(2026, 9, 6) },
+    { type: "income", amount: 30000.05, date: new Date(2026, 9, 21) },
+  ], ["2026-10"]);
+  check("cashSeries: 同月两笔 income 合并 50000.05+30000.05=80000.10（整数分 8000010）",
+    merged[0].income === 80000.1 && Math.round(merged[0].income * 100) === 8000010
+      && merged[0].expense === 0,
+    `income=${merged[0].income}`);
+
+  const boundary = cashSeries([
+    { type: "income", amount: 700, date: new Date(2026, 8, 30, 23, 30) },
+    { type: "income", amount: 900, date: new Date(2026, 9, 1, 0, 30) },
+  ], ["2026-10", "2026-09"]);
+  check("cashSeries: 跨月边界本地不漂移（8/30 23:30 归 09、10/1 00:30 归 10，互不串月）",
+    boundary[0].key === "2026-10" && boundary[0].income === 900 && boundary[0].expense === 0
+      && boundary[1].key === "2026-09" && boundary[1].income === 700 && boundary[1].expense === 0,
+    JSON.stringify(boundary));
+
+  const dirtyType = cashSeries([
+    { type: "refund", amount: 100, date: new Date(2026, 9, 3) },
+    { type: "", amount: 200, date: new Date(2026, 9, 4) },
+    { type: "INCOME", amount: 300, date: new Date(2026, 9, 5) },
+  ], ["2026-10"]);
+  check("cashSeries: 脏 type（refund/空串/大写 INCOME）收支两侧都不计",
+    dirtyType[0].income === 0 && dirtyType[0].expense === 0 && dirtyType[0].net === 0,
+    JSON.stringify(dirtyType));
+
+  const dirtyAmount = cashSeries([
+    { type: "income", amount: -100, date: new Date(2026, 9, 3) },
+    { type: "income", amount: NaN, date: new Date(2026, 9, 4) },
+    { type: "expense", amount: Infinity, date: new Date(2026, 9, 5) },
+  ], ["2026-10"]);
+  check("cashSeries: 脏 amount（-100/NaN/Infinity）按 0 参与、两桶保持 0 且不抛错",
+    dirtyAmount[0].income === 0 && dirtyAmount[0].expense === 0 && dirtyAmount[0].net === 0,
+    JSON.stringify(dirtyAmount));
+
+  const outside = cashSeries([
+    { type: "income", amount: 777, date: new Date(2026, 6, 15) }, // 2026-07，不在 keys
+    { type: "income", amount: 555, date: new Date(2026, 7, 20) }, // 2026-08
+  ], ["2026-09", "2026-08"]);
+  check("cashSeries: keys 之外的月份被忽略（无 2026-07 键、其余桶不受影响）",
+    outside.length === 2 && !outside.some((p) => p.key === "2026-07")
+      && outside[0].key === "2026-09" && outside[0].income === 0
+      && outside[1].key === "2026-08" && outside[1].income === 555,
+    JSON.stringify(outside));
+
+  const negative = cashSeries([
+    { type: "income", amount: 10000, date: new Date(2026, 9, 8) },
+    { type: "expense", amount: 24500, date: new Date(2026, 9, 9) },
+  ], ["2026-10"]);
+  check("cashSeries: net 可为负（10000-24500=-14500）",
+    negative[0].net === -14500, `net=${negative[0].net}`);
+
+  // 独立整数分预言机（不借用被测函数的浮点累加+round2 路径，逐行以「分」手算）：
+  //   2026-10 income = 5000000 + 123456 = 5123456 分 = 51234.56
+  //          expense = 980050 分 = 9800.50；net = 5123456 - 980050 = 4143406 分 = 41434.06
+  //   2026-09 income = 3000005 分 = 30000.05；expense = 1500075 分 = 15000.75
+  //          net = 3000005 - 1500075 = 1499930 分 = 14999.30
+  //   2026-08 income = 800000 分 = 8000.00；expense = 99999 + 220001 = 320000 分 = 3200.00
+  //          net = 800000 - 320000 = 480000 分 = 4800.00
+  const oracle = cashSeries(oracleRows, ["2026-10", "2026-09", "2026-08"]);
+  const byKey = Object.fromEntries(oracle.map((p) => [p.key, p]));
+  check("cashSeries: 整数分预言机 2026-10（51234.56 / 9800.50 / net 41434.06）",
+    byKey["2026-10"].income === 51234.56 && byKey["2026-10"].expense === 9800.5
+      && byKey["2026-10"].net === 41434.06
+      && Math.round(byKey["2026-10"].income * 100) === 5123456
+      && Math.round(byKey["2026-10"].net * 100) === 4143406,
+    JSON.stringify(byKey["2026-10"]));
+  check("cashSeries: 整数分预言机 2026-09（30000.05 / 15000.75 / net 14999.30）",
+    byKey["2026-09"].income === 30000.05 && byKey["2026-09"].expense === 15000.75
+      && byKey["2026-09"].net === 14999.3
+      && Math.round(byKey["2026-09"].net * 100) === 1499930,
+    JSON.stringify(byKey["2026-09"]));
+  check("cashSeries: 整数分预言机 2026-08（8000 / 3200 / net 4800）",
+    byKey["2026-08"].income === 8000 && byKey["2026-08"].expense === 3200
+      && byKey["2026-08"].net === 4800
+      && Math.round(byKey["2026-08"].expense * 100) === 320000,
+    JSON.stringify(byKey["2026-08"]));
+
+  const withBlankMonth = cashSeries(
+    [{ type: "income", amount: 100, date: new Date(2026, 10, 5) }], // 仅 2026-11 有数据
+    ["2026-10", "2026-11", "2026-12"]
+  );
+  check("cashSeries: 输出长度严格 === keys.length（无数据月也在列且全 0）",
+    withBlankMonth.length === 3 && withBlankMonth[0].key === "2026-10"
+      && withBlankMonth[2].key === "2026-12"
+      && withBlankMonth[0].income === 0 && withBlankMonth[0].net === 0
+      && withBlankMonth[1].income === 100 && withBlankMonth[1].net === 100
+      && withBlankMonth[2].income === 0,
+    JSON.stringify(withBlankMonth));
+
+  check("cashSeries: keys=[] → 输出 []（长度 0）",
+    Array.isArray(cashSeries(oracleRows, [])) && cashSeries(oracleRows, []).length === 0,
+    `len=${cashSeries(oracleRows, []).length}`);
+
+  let dirtyRow = null;
+  let noThrowDirty = true;
+  try {
+    dirtyRow = cashSeries(
+      [null, { type: "income" }, { type: "income", amount: 5, date: new Date(2026, 9, 1) }],
+      ["2026-10"]
+    );
+  } catch {
+    noThrowDirty = false;
+  }
+  check("cashSeries: null 行 / 缺 date 行不崩，仅完整第三行计入（income=5）",
+    noThrowDirty && dirtyRow !== null && dirtyRow[0].income === 5 && dirtyRow[0].expense === 0,
+    noThrowDirty ? JSON.stringify(dirtyRow) : "抛出异常");
+
+  // net 必须用「已各自 round2 的 income/expense」相减（手算）：
+  //   income 两笔 8.002 + 2.002 → 原始和 10.004 → round2 → 10.00
+  //   expense 一笔 0.005 → round2 → 0.01（0.5 分进位）
+  //   net = round2(10.00 - 0.01) = 9.99
+  //   若误用未舍入原始差 10.004 - 0.005 = 9.999 → round2 后为 10.00，本断言即红
+  const roundedNet = cashSeries([
+    { type: "income", amount: 8.002, date: new Date(2026, 9, 2) },
+    { type: "income", amount: 2.002, date: new Date(2026, 9, 3) },
+    { type: "expense", amount: 0.005, date: new Date(2026, 9, 4) },
+  ], ["2026-10"]);
+  check("cashSeries: net 用已舍入值相减（10.00-0.01=9.99，非原始差 9.999→10.00）",
+    roundedNet[0].income === 10 && roundedNet[0].expense === 0.01 && roundedNet[0].net === 9.99,
+    `income=${roundedNet[0].income} expense=${roundedNet[0].expense} net=${roundedNet[0].net}`);
+
+  // cashPeak
+  check("cashPeak: 空数组 / null / undefined → 0 且不抛错",
+    cashPeak([]) === 0 && cashPeak(null) === 0 && cashPeak(undefined) === 0,
+    `[]:${cashPeak([])} null:${cashPeak(null)} undefined:${cashPeak(undefined)}`);
+
+  const peakPoints = [
+    { key: "2026-10", income: 112000, expense: 98000, net: 14000 },
+    { key: "2026-09", income: 88000, expense: 120000, net: -32000 },
+  ];
+  check("cashPeak: 取两列最大（income 峰 112000、expense 峰 120000 → 120000）",
+    cashPeak(peakPoints) === 120000, `peak=${cashPeak(peakPoints)}`);
+
+  check("cashPeak: 全 0 点 → 0",
+    cashPeak([{ key: "2026-10", income: 0, expense: 0, net: 0 }]) === 0,
+    `peak=${cashPeak([{ key: "2026-10", income: 0, expense: 0, net: 0 }])}`);
+
+  // cashTone
+  check("cashTone: 0 / 正数 → success（含 0 不算流出）",
+    cashTone(0) === "success" && cashTone(1) === "success",
+    `0:${cashTone(0)} 1:${cashTone(1)}`);
+  check("cashTone: -0.01 → warning（净流出即黄档）",
+    cashTone(-0.01) === "warning", cashTone(-0.01));
+  check("cashTone: NaN / undefined 按 0 处理 → success",
+    cashTone(NaN) === "success" && cashTone(undefined) === "success",
+    `NaN:${cashTone(NaN)} undefined:${cashTone(undefined)}`);
+}
+
+/* ── 跨源不漂移护栏：驾驶舱现金线 ≡ 财务台账（M9-b-2b 追加）───────────── */
+{
+  // 为什么这么测：驾驶舱现金线（cashSeries）与财务台账（ledger 的
+  // receivedTotal / expenseTotal）必须是同一把尺子——两处各自演进就会静默
+  // 漂移（本项目 §5 已登记过同类口径漂移教训）。两文件互不 import，靠这里
+  // 对「同一组 rows」交叉比对整数分锁死，谁先改口径这里直接红。
+  const { receivedTotal, expenseTotal } = await import(
+    pathToFileURL(join(ROOT, "src/core/domain/ledger.ts")).href
+  );
+
+  // 复用上面第 14 条那组 8 行混合收支（oracleRows，keys 覆盖全部有数据月份）
+  const guardPoints = cashSeries(oracleRows, ["2026-10", "2026-09", "2026-08"]);
+  const sumIncome = guardPoints.reduce((s, p) => s + p.income, 0);
+  const sumExpense = guardPoints.reduce((s, p) => s + p.expense, 0);
+
+  // 手算：Σincome = 5123456 + 3000005 + 800000 = 8923461 分 = 89234.61
+  //       Σexpense = 980050 + 1500075 + 320000 = 2800125 分 = 28001.25
+  check("跨源护栏：cashSeries 各点 income 之和 ≡ ledger.receivedTotal（整数分 8923461）",
+    Math.round(sumIncome * 100) === 8923461
+      && Math.round(receivedTotal(oracleRows) * 100) === 8923461,
+    `cash=${Math.round(sumIncome * 100)} ledger=${Math.round(receivedTotal(oracleRows) * 100)}`);
+
+  check("跨源护栏：cashSeries 各点 expense 之和 ≡ ledger.expenseTotal（整数分 2800125）",
+    Math.round(sumExpense * 100) === 2800125
+      && Math.round(expenseTotal(oracleRows) * 100) === 2800125,
+    `cash=${Math.round(sumExpense * 100)} ledger=${Math.round(expenseTotal(oracleRows) * 100)}`);
+}
+
 /* ── 输出禁 emoji 自检（与 verify-crm 保持同一纪律）─────────────── */
 const EMOJI_RE =
   /[\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{1F000}-\u{1FAFF}\u{FE00}-\u{FE0F}]/u;
@@ -388,6 +628,11 @@ const fnStrings = [
   JSON.stringify(funnelCounts([], ["leads", "signed"])),
   String(leadConversion([{ stage: "signed" }])),
   String(leadConversion([])),
+  JSON.stringify(monthKeysDescending(3, new Date(2026, 9, 11))),
+  cashTone(0),
+  cashTone(-1),
+  JSON.stringify(cashSeries([{ type: "income", amount: 1, date: new Date(2026, 9, 1) }], ["2026-10"])),
+  String(cashPeak([])),
 ].join("|");
 check("输出契约：全部函数字符串返回值不含 emoji / 符号字形",
   !EMOJI_RE.test(fnStrings), "已扫描");
