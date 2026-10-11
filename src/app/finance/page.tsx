@@ -70,8 +70,6 @@ export default async function FinanceLedgerPage({
 
   const marginText =
     summary.marginRate === null ? "—" : formatPercent(summary.marginRate);
-  const marginHint =
-    summary.marginRate === null ? "合同额未录入，不可算" : `毛利率 ${marginText}`;
 
   return (
     <div className="space-y-8">
@@ -133,27 +131,47 @@ export default async function FinanceLedgerPage({
         </div>
       </form>
 
-      {/* 汇总条：口径不受 Tab 切换影响。待收款与计划未付合计分列两框（§7-12）。 */}
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-        <StatBox label="合同额" value={formatCny(summary.contractAmount)} />
-        <StatBox label="已收款" value={formatCny(summary.receivedTotal)} />
-        <StatBox
-          label="待收款"
-          value={formatCny(summary.pendingTotal)}
-          hint="合同额 − 已收"
-        />
-        <StatBox
-          label="计划未付合计"
-          value={formatCny(summary.unpaidPlanTotal)}
-          hint="付款段未标记已付"
-        />
-        <StatBox label="总支出" value={formatCny(summary.expenseTotal)} />
-        <StatBox
-          label="毛利"
-          value={formatCny(summary.grossProfit)}
-          hint={marginHint}
-          dot={summary.marginRate === null ? "neutral" : summary.marginLight}
-        />
+      {/* 汇总条（V0.3 阶梯权重，§4-12 历史遗留债）：
+          毛利为主级（独占一行、text-[28px] + 色点 + 毛利率），
+          其余五格为次级紧凑（text-[17px]）。
+          口径不受 Tab 切换影响。待收款与计划未付合计分列两框（§7-12）。 */}
+      <section className="space-y-3">
+        {/* 毛利：主级，独占一行 */}
+        <div className="rounded-card border border-line bg-surface px-4 py-4">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-secondary">毛利</span>
+            <MarginDot
+              light={summary.marginRate === null ? "neutral" : summary.marginLight}
+            />
+          </div>
+          <div className="mt-2 flex flex-wrap items-baseline gap-x-6 gap-y-1">
+            <span className="num text-[28px] font-semibold text-primary whitespace-nowrap">
+              {formatCny(summary.grossProfit)}
+            </span>
+            <span className="text-[13px] text-secondary whitespace-nowrap">
+              毛利率 {marginText}
+            </span>
+            {summary.marginRate === null && (
+              <span className="text-xs text-secondary">合同额未录入，不可算</span>
+            )}
+          </div>
+        </div>
+        {/* 其余五格：次级紧凑 */}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          <StatBox label="合同额" value={formatCny(summary.contractAmount)} />
+          <StatBox label="已收款" value={formatCny(summary.receivedTotal)} />
+          <StatBox
+            label="待收款"
+            value={formatCny(summary.pendingTotal)}
+            hint="合同额 − 已收"
+          />
+          <StatBox
+            label="计划未付合计"
+            value={formatCny(summary.unpaidPlanTotal)}
+            hint="付款段未标记已付"
+          />
+          <StatBox label="总支出" value={formatCny(summary.expenseTotal)} />
+        </div>
       </section>
 
       <section>

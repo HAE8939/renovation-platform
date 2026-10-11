@@ -118,7 +118,19 @@ function BasicTab({ hub }: { hub: ProjectHub }) {
                     : "存在问题"
             }
           />
-          <Light label="预算" tone="gray" text="未接入（M8 起）" />
+          <Light
+            label="预算"
+            tone={
+              hub.finance.contractAmount > 0
+                ? hub.finance.budgetLight
+                : "gray"
+            }
+            text={
+              hub.finance.contractAmount > 0
+                ? `已收 ${formatPercent(hub.finance.paidPct ?? 0)}`
+                : "未录入合同额"
+            }
+          />
           <span className="text-muted">
             整体进度：
             {hub.schedule.hasSchedule ? `${hub.schedule.progress}%` : "未排程"}
@@ -154,53 +166,114 @@ function Light({
   );
 }
 
-function BudgetTab({ hub }: { hub: ProjectHub }) {
-  const q = hub.quote;
-  if (!q || !q.exists) {
-    return (
-      <EmptyTab
-        title="该项目暂无报价单"
-        note="在「装修预算报价」为该项目编制报价后，这里会显示直接费 / 税金 / 总价与分科目占比。"
-      />
-    );
-  }
+function MarginDot({ light }: { light: "green" | "yellow" | "red" | "neutral" }) {
+  const cls =
+    light === "green"
+      ? "bg-success"
+      : light === "yellow"
+        ? "bg-warning"
+        : light === "red"
+          ? "bg-danger"
+          : "bg-sunken";
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <Stat label="直接费" value={formatCny(q.directSubtotal)} />
-        <Stat label={`税金 ${formatPercent(q.taxRate)}`} value={formatCny(q.tax)} />
-        <Stat label="报价总价" value={formatCny(q.grand)} strong />
-        <Stat label="单方造价" value={q.unitCost != null ? `${formatCny(q.unitCost)}/㎡` : "—"} />
-      </div>
+    <span aria-hidden className={`inline-block h-2 w-2 shrink-0 rounded-full ${cls}`} />
+  );
+}
 
-      <div className="rounded-card border border-line bg-surface p-5">
-        <SectionTitle className="mb-4">分科目占比</SectionTitle>
-        <div className="space-y-4">
-          {q.categories.map((c) => (
-            <div key={c.categoryName}>
-              <div className="flex items-baseline justify-between gap-4 text-[13px]">
-                <span className="whitespace-nowrap">{c.categoryName}</span>
-                <span className="whitespace-nowrap text-secondary">
-                  {formatCny(c.subtotal)} · {formatPercent(c.pct)}
-                </span>
-              </div>
-              <div
-                className="mt-2 h-2 w-full overflow-hidden rounded-inner bg-sunken"
-                aria-label={`${c.categoryName} 占比 ${formatPercent(c.pct)}`}
-              >
-                <div className="h-full bg-accent" style={{ width: `${Math.min(100, c.pct * 100)}%` }} />
-              </div>
-            </div>
-          ))}
+/**
+ * 毛利卡（M8-d）：毛利额 + 毛利率 + marginLight 色点 + 收支台账链。
+ * 毛利依赖台账支出入账、不依赖报价，故置于 BudgetTab 顶部、q.exists 判断之外，
+ * 无报价单也显示。marginRate==null（合同额未录入）→ 毛利率「—」+ 灰态提示，
+ * 不造 0%。色点用语义色（success/warning/danger），neutral→bg-sunken。
+ */
+function GrossProfitCard({ hub }: { hub: ProjectHub }) {
+  const f = hub.finance;
+  return (
+    <div className="rounded-card border border-line bg-surface p-5">
+      <div className="flex items-center gap-2">
+        <SectionTitle>毛利</SectionTitle>
+        <MarginDot light={f.marginLight} />
+      </div>
+      <div className="mt-3 flex flex-wrap items-baseline gap-x-8 gap-y-2">
+        <div>
+          <p className="text-xs text-secondary">毛利额</p>
+          <p className="num mt-1.5 text-[20px] font-semibold text-primary whitespace-nowrap">
+            {formatCny(f.grossProfit)}
+          </p>
+        </div>
+        <div>
+          <p className="text-xs text-secondary">毛利率</p>
+          <p className="num mt-1.5 text-[17px] font-medium whitespace-nowrap">
+            {f.marginRate === null ? "—" : formatPercent(f.marginRate)}
+          </p>
         </div>
       </div>
-
+      {f.marginRate === null && (
+        <p className="mt-2 text-xs leading-relaxed text-secondary">
+          未录入合同额，不可算毛利率
+        </p>
+      )}
       <Link
-        href={`/budget/${hub.id}`}
-        className="inline-block whitespace-nowrap text-[13px] text-accent-ink hover:underline underline-offset-4"
+        href={`/finance?projectId=${hub.id}`}
+        className="mt-4 inline-block whitespace-nowrap text-[13px] text-accent-ink hover:underline underline-offset-4"
       >
-        打开报价单 →
+        打开收支台账 →
       </Link>
+    </div>
+  );
+}
+
+function BudgetTab({ hub }: { hub: ProjectHub }) {
+  const q = hub.quote;
+  return (
+    <div className="space-y-6">
+      {/* 毛利区块：依赖台账支出入账、不依赖报价，故置于 q.exists 判断之外 */}
+      <GrossProfitCard hub={hub} />
+
+      {!q || !q.exists ? (
+        <EmptyTab
+          title="该项目暂无报价单"
+          note="在「装修预算报价」为该项目编制报价后，这里会显示直接费 / 税金 / 总价与分科目占比。"
+        />
+      ) : (
+        <>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <Stat label="直接费" value={formatCny(q.directSubtotal)} />
+            <Stat label={`税金 ${formatPercent(q.taxRate)}`} value={formatCny(q.tax)} />
+            <Stat label="报价总价" value={formatCny(q.grand)} strong />
+            <Stat label="单方造价" value={q.unitCost != null ? `${formatCny(q.unitCost)}/㎡` : "—"} />
+          </div>
+
+          <div className="rounded-card border border-line bg-surface p-5">
+            <SectionTitle className="mb-4">分科目占比</SectionTitle>
+            <div className="space-y-4">
+              {q.categories.map((c) => (
+                <div key={c.categoryName}>
+                  <div className="flex items-baseline justify-between gap-4 text-[13px]">
+                    <span className="whitespace-nowrap">{c.categoryName}</span>
+                    <span className="whitespace-nowrap text-secondary">
+                      {formatCny(c.subtotal)} · {formatPercent(c.pct)}
+                    </span>
+                  </div>
+                  <div
+                    className="mt-2 h-2 w-full overflow-hidden rounded-inner bg-sunken"
+                    aria-label={`${c.categoryName} 占比 ${formatPercent(c.pct)}`}
+                  >
+                    <div className="h-full bg-accent" style={{ width: `${Math.min(100, c.pct * 100)}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <Link
+            href={`/budget/${hub.id}`}
+            className="inline-block whitespace-nowrap text-[13px] text-accent-ink hover:underline underline-offset-4"
+          >
+            打开报价单 →
+          </Link>
+        </>
+      )}
     </div>
   );
 }

@@ -71,7 +71,7 @@ export function ReviewForm({
       {mode === "approve" && (
         <div className="space-y-4">
           <p className="text-[13px] leading-relaxed text-primary">
-            确认通过此验收节点？通过后节点状态将转为「已通过」，付款联动将在财务模块（M8）接入。
+            确认通过此验收节点？通过后节点状态将转为「已通过」，并作为付款段解锁依据，见付款计划。
           </p>
           <div className="flex flex-wrap items-center gap-4">
             <ReviewSubmitButton

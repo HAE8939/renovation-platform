@@ -2,15 +2,25 @@ import prisma from "@/core/db";
 import {
   computeTotals,
   groupByCategory,
+  round2,
   type QuoteItemRow,
 } from "@/core/domain/pricing";
 import { PROJECT_STATUS_LABEL, type ProjectStatus } from "@/core/domain/types";
 import {
+  budgetLight,
   overallProgress,
   scheduleLight,
   qualityLight,
   type Light,
 } from "@/core/domain/health";
+import {
+  expenseTotal,
+  grossProfit,
+  marginLight,
+  marginRate,
+  receivedTotal,
+  type LedgerRecord,
+} from "@/core/domain/ledger";
 import { syncAcceptanceNodes } from "@/core/domain/acceptance";
 
 /**
@@ -23,6 +33,10 @@ import { syncAcceptanceNodes } from "@/core/domain/acceptance";
  * 质量聚合：读前先 syncAcceptanceNodes 兜底（core 整合器，M7-e 调用点③），
  * 再 prisma 直读 AcceptanceNode/Issue 计数；灯复用 core/domain/health.qualityLight
  * （不改公式）；不 import quality 模块内部。
+ * 财务聚合（M8-d）：prisma 直读 financeRecord，口径复用 core/domain/ledger
+ * （receivedTotal/expenseTotal/grossProfit/marginRate/marginLight）与
+ * core/domain/health.budgetLight（合同执行/收款进度灯，changeTotal 传 0 留 M9）；
+ * 不 import finance 模块内部（records.ts/payments.ts 是禁区，TASK_M8 §5）。
  */
 
 export interface HubCategory {
@@ -81,6 +95,28 @@ export interface HubQuality {
   }[];
 }
 
+/**
+ * 财务聚合（M8-d）：prisma 直读 financeRecord，口径全走 core/domain/ledger.ts
+ * 与 core/domain/health.ts。changeTotal 恒传 0 并注明「变更额留 M9」（§0 红线 / §7-9）。
+ * budgetLight 为合同执行/收款进度（已收 vs 合同额），与 marginLight（毛利率色档）
+ * 不同灯位（§1-3、§7-12）。
+ */
+export interface HubFinance {
+  hasRecords: boolean;
+  /** 合同额（哨兵：0 = 未录入，毛利/计划/灯下游第一次用到它） */
+  contractAmount: number;
+  receivedTotal: number;
+  expenseTotal: number;
+  grossProfit: number;
+  /** 毛利率（合同额未录入 → null，UI 显「—」不造 0%） */
+  marginRate: number | null;
+  marginLight: "green" | "yellow" | "red" | "neutral";
+  /** 已收/合同额（contractAmount<=0 → null，UI 显「未录入合同额」不假绿） */
+  paidPct: number | null;
+  /** 预算灯（health.budgetLight，合同执行/收款进度） */
+  budgetLight: Light;
+}
+
 export interface ProjectHub {
   id: string;
   code: string;
@@ -117,6 +153,7 @@ export interface ProjectHub {
   schedule: HubSchedule;
   design: HubDesign;
   quality: HubQuality;
+  finance: HubFinance;
 }
 
 function fmtDate(d: Date | null): string | null {
@@ -285,6 +322,46 @@ export async function getProjectHub(projectId: string): Promise<ProjectHub | nul
     })),
   };
 
+  // ── 财务聚合（prisma 直读 financeRecord，口径复用 core/domain/ledger.ts /
+  //    health.ts；不 import finance 模块内部，AGENTS §2 / TASK_M8 §5）──
+  //    changeTotal 恒传 0（变更额留 M9，§0 红线 / §7-9）。
+  const financeRecords = await prisma.financeRecord.findMany({
+    where: { projectId },
+    select: { type: true, amount: true },
+  });
+  const ledgerRecords: LedgerRecord[] = financeRecords.map((r) => ({
+    type: r.type,
+    amount: r.amount,
+  }));
+  const contractAmount = project.contractAmount;
+  const received = receivedTotal(ledgerRecords);
+  const expense = expenseTotal(ledgerRecords);
+  const profit = grossProfit({
+    contractAmount,
+    changeTotal: 0, // 变更额留 M9
+    expenseTotal: expense,
+  });
+  const rate = marginRate({
+    contractAmount,
+    changeTotal: 0, // 变更额留 M9
+    expenseTotal: expense,
+  });
+  const finance: HubFinance = {
+    hasRecords: financeRecords.length > 0,
+    contractAmount,
+    receivedTotal: round2(received),
+    expenseTotal: round2(expense),
+    grossProfit: profit,
+    marginRate: rate,
+    marginLight: marginLight(rate),
+    paidPct: contractAmount > 0 ? round2(received / contractAmount) : null,
+    budgetLight: budgetLight({
+      contractAmount,
+      changeTotal: 0, // 变更额留 M9
+      paidTotal: received,
+    }),
+  };
+
   return {
     id: project.id,
     code: project.code,
@@ -311,5 +388,6 @@ export async function getProjectHub(projectId: string): Promise<ProjectHub | nul
     schedule,
     design,
     quality,
+    finance,
   };
 }

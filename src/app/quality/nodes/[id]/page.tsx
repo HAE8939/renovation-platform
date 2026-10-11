@@ -127,7 +127,13 @@ export default async function NodeDetailPage({
         <div className="rounded-card border border-line bg-[color-mix(in_srgb,var(--success)_8%,var(--surface))] p-6">
           <p className="text-[15px] font-medium text-success">该节点已通过验收</p>
           <p className="mt-2 text-[13px] leading-relaxed text-secondary">
-            付款联动将在财务模块（M8）接入，本期不做钩子行为。
+            财务模块已上线：本节点通过即作为付款段解锁依据。
+            <Link
+              href={`/finance/payments?projectId=${detail.projectId}`}
+              className="ml-1 text-accent-ink hover:underline underline-offset-4 whitespace-nowrap"
+            >
+              查看付款计划 →
+            </Link>
           </p>
         </div>
       )}
