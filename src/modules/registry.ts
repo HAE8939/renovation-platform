@@ -1,5 +1,6 @@
 import { budgetManifest } from "./budget/manifest";
 import { crmManifest } from "./crm/manifest";
+import { dashboardManifest } from "./dashboard/manifest";
 import { projectsManifest } from "./projects/manifest";
 import { designManifest } from "./design/manifest";
 import { scheduleManifest } from "./schedule/manifest";
@@ -14,6 +15,7 @@ import type { DeferredModule, ModuleManifest } from "./types";
  * 导航与首页自动出现，无需改外壳代码。
  */
 export const modules: ModuleManifest[] = [
+  dashboardManifest,
   budgetManifest,
   crmManifest,
   projectsManifest,
@@ -24,14 +26,9 @@ export const modules: ModuleManifest[] = [
 ].sort((a, b) => a.order - b.order);
 
 /** DEFERRED 占位模块：首页可见、不可点、不进导航。
- *  对齐 docs/PLAN_FULL_SERVICE_V1.md v1.2 的模块清单（budget/crm 已上线，故不在此列）。
- *  顺序即首页展示顺序（驾驶舱 → 项目 → 设计 → 工期 → 质量 → 财务 → 人员）。 */
+ *  对齐 docs/PLAN_FULL_SERVICE_V1.md v1.2 的模块清单（budget/crm 已上线，故不在此列；
+ *  驾驶舱已于 M9-b 转实，不再占位）。顺序即首页展示顺序（当前仅剩人员）。 */
 export const deferredModules: DeferredModule[] = [
-  {
-    id: "dashboard",
-    name: "数据驾驶舱",
-    description: "在建项目、签单额、回款率、健康三色灯与全局待办的聚合首页",
-  },
   {
     id: "hr",
     name: "人员管控",

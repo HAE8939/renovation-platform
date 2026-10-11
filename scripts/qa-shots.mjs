@@ -164,6 +164,7 @@ const archiveProject =
 await prisma.$disconnect();
 
 const targets = [
+  { name: "00-dashboard", path: "/dashboard" },
   { name: "01-home", path: "/" },
   { name: "02-budget-list", path: "/budget" },
   project
