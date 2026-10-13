@@ -216,12 +216,21 @@
 - 决策与审计：`docs/PROPOSAL_M1.5.md`、`docs/REQUIREMENTS.md`、`docs/DESIGN_AUDIT_M1A.md`、`docs/BUILD_SPEC_M1.md`、**`docs/PLATFORM_EVOLUTION_V0.1.md`**（插件化话题单一裁决）、`docs/REVIEW_PLATFORM_2026-10-11.md` + `docs/REVIEW_EXTERNAL_2026-10-11.md`（整站审查：自包含简报 + 外部报告）、`docs/TASK_M8.5.md`（M8.5 执行记录与裁定）。
 - 全案计划真源：`docs/PLAN_FULL_SERVICE_V1.md`（v1.2，路线 B；整合 `Full-Service Project Management/` 三份妙搭资料）。
 - 任务卡：`docs/TASK_M1A.md`、`TASK_M1B_A.md`、`_A2`、`_A3`、`_A4_FIX`、`_B1`、`_B1_FIX`、`_B2`、`_B3`、`TASK_M2A.md`、`TASK_M3_CRM.md`、`TASK_M4.md`、`TASK_M5.md`、`TASK_M6.md`、`TASK_M7.md`、`TASK_M8.md`（M8 四单元全结）、`TASK_M8.5.md`（M8.5 修复批）、**`TASK_M9.md`（M9 边界与逐单元规格；§5 执行记录）**。
+- **下一批任务卡 `docs/TASK_M11.md`**（2026-10-13 立，供独立会话冷启动）：HAE 12 条意见里未做的四件（质量项目筛选框 / 验收证据图片上传 / 人员管控模块 / 单项目导出）+ 两件欠账（项目动态页、报价汇总条等宽与 fields 死码）+ 一件待 HAE 答复（局域网内测）。已按「能直接干 / 必须先拍板」分组，含必读清单、落点文件、验收套件要求与禁区。
 - 上线前备料与改版（2026-10-13）：`docs/TASK_M10A.md`（三备料规格 + HAE 12 条 UI 意见的逐条处置与"未做四件"理由）、`docs/TASK_M10C.md`（归档口径二分收口批 + §4.5 集成者收口记录）、`docs/ACCEPTANCE_WRITEBACK_2026-10-13.md`（交互写回代验报告，含 7 条未通过的逐条判定与"需 HAE 判断"清单）、`docs/QA_MANUAL_2026-10-13.md`（手测清单，锚点已按真库更正）、`docs/preview/dashboard-v2.html`（驾驶舱改版已批样张）。
 - 配色决策产物：`docs/preview/theme-picker.html`（四套 accent × 同一张报价单，含无障碍实测与撞色风险）——**M9-d 已消费**：四套插槽键名与色值逐字取自此文件，`tokens.css` 的 `:root[data-theme]` 与 `theme.ts` 的 `THEME_KEYS` 均对齐它。
 - 本地产物（不入库）：`_scratch/logs/`、`_scratch/qa/`（截图与 PDF）、`_scratch/qa-tall/`（整页 tall 截图，目检两图用）、`_scratch/backup/dev.db.2026-10-11-M9b2b前`（本轮 seed 前备份）、`_scratch/m85_guards_check.mts`（M8.5 守卫验收脚本）、`_scratch/m9b_dash_check.mts`（M9-b-1/2a/2b 驾驶舱实值巡检·独立预言机，**现 77 项**）、`_scratch/m9b2a_state.mts`（线索/项目状态转储）、`_scratch/m9b2b_state.mts`（收支台账与施工期日期转储·本轮 seed 前定位真值用）、`_scratch/logs/oc_m9b2b_{A,A1,A2,B1,B2,C}_prompt.md`（**opencode 派工卡六张**，A＝首跑失败原卡留档）、`_scratch/logs/oc_m9b2b_*_out.jsonl`（各轮事件流·审计用）、`_scratch/logs/m9b2b_integration_gates.log` 与 `_scratch/logs/m9c_integration_gates.log`（四隔离库集成门禁重跑输出）、`_scratch/m9c_state.mts`（定义与值 + 十种筛选谓词真值转储）、`_scratch/m9c_field_check.mts`（**M9-c 实值巡检 91 项·独立预言机**）、`_scratch/m9c_write_check.mts`（**写入路径验收 12 项**：必填拦截 / 三类拒绝 / 未知 fieldId / 未提交即清空 / 三列互斥）、`_scratch/m9c_pid.mts`（项目 id 转储）、`_scratch/logs/oc_m9c_R1{a,b1,b}_prompt.md`（opencode 派工卡，R1b 为跑飞留档）、`_scratch/logs/loomy_m9b1{A,B}_prompt.md`（Loomy 两轮自包含派工卡）、`_scratch/logs/cb_m9b2a_prompt.md`（codebuddy M9-b-2a 派工卡）、`_scratch/m9d_theme_shot.mjs`（**M9-d 运行时四套真切换目检**：逐套改库起服务截图，跑完复位 cobalt）、`_scratch/qa-theme/`（四套 × 三页截图目检产物）、`_scratch/m9d_logo_check.mts`（**Logo 落盘核心逻辑验收 16 项**：命名防穿越 / 四类拒绝 / URL 净化 / 清理归零）、`_scratch/m9d_probe_run.mjs`（M9-d 375 探针 runner）。
 - 废弃分支（仅存档，勿参考勿 checkout）：`wip/m1b-a`、`feat/presentation`、`pre-m1b-checkpoint`。
 
-## 8. 下次接续（2026-10-11 handoff）
+## 8. 下次接续（2026-10-13 handoff）
+
+- **本轮（M10-a/b/c）已全部合入并 commit，工作树干净、无远端未推**。下一批按 `docs/TASK_M11.md` 开工，
+  该卡自带必读清单与绿门要求，新会话可直接冷启动。
+- **给下一批的一句话**：这套代码的读侧口径已经细到"事实含归档、前瞻不含"这种粒度，
+  改任何聚合前先问自己这个数是"发生过的事实"还是"还要做的事"；改完必须跑
+  `scripts/acceptance/` 里对应套件并加新场景，纯函数门禁拦不住跨表 where 只做一半。
+
+## 8.1 历史 handoff（2026-10-11）
 
 - **进度**：M2-A → M7 五单元全部合入 → **M8-a 财务基座**（`95f0bc6`）→ **M8-b 台账写入**（`60f716c`）→ **M8-c 付款计划页**（`8c5a8db`）→ **M8-d 项目中心接线+视觉收口合入 → M8 全案结案**（`078bcdd`）→ **M8.5 小修复单元合入**（`5e84957`/`87f13e4`）→ **M9-a 变更单合入**（`92da264`/`eb5430e`）→ **M9-b-1 数据驾驶舱骨架合入**（`b368e54`/`82045fc`）→ **M9-b-2a 商务漏斗 + seed 补线索合入**（`4299845`/`cfcfa21`）→ **M9-b-2b 月度现金折线 + 项目毛利率排行合入**（`545ca5a`/`fbd81bd`）→ **M9-c EAV 自定义字段合入（c-1 + c-2）**（本轮，见下）。M7/M8-a~d/M8.5/M9-a/M9-b-1/M9-b-2a/M9-b-2b/M9-c 均候用户手测。
 - **M8-a 验收记录**：`pnpm build` 绿 + `npx tsc --noEmit` 0 + **新 `verify-finance` 115** + 六既有纯函数门禁零回退（quote37/crm11/health20/design28/schedule55/quality108）+ **三隔离库集成门禁零回退**（sign 12 / schedule-gen 27 / quality-flow 94——因动了 core `updateProject` 与 `seed.ts`，这三个必须重跑确认）+ qa-shots 30 目标全 200 + `22-finance` 目检（抓出并修好"毛利率数值未渲染"一处）。DB 备份在 `_scratch/backup/dev.db.2026-10-10-M8前`。
