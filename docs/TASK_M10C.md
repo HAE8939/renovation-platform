@@ -53,7 +53,7 @@ M10-a 给平台加了归档/作废，并在 `AGENTS` §4.3 写下「全司读侧
 
 ## 4. 未做四件（都不是遗漏，是有意留给下一手）
 
-1. ~~**驾驶舱现金折线与本月签单额仍排除归档项目**~~ **[已收口 · M10-b/c 合流]** —— 这是本口径**没合上的另一半**：按「钱按事实」，`dashboard/server/overview.ts` 主查询把归档项目整体剔除，连带把它的**历史钱**也剔了，故归档会让历史月份的收款线凭空掉一截。落点文件正被 M10-a/M10-b 实时改写（`overview.ts` 已 +106 行、`dashboard/page.tsx` 本批期间又变了 431 行），**不在那里抢改**。驾驶舱改版落地时应按本条口径一并修，并同步 `_scratch/accept/dash-data.mjs` 那份预言机（它现在也整体排除）。
+1. ~~**驾驶舱现金折线与本月签单额仍排除归档项目**~~ **[已收口 · M10-b/c 合流]** —— 这是本口径**没合上的另一半**：按「钱按事实」，`dashboard/server/overview.ts` 主查询把归档项目整体剔除，连带把它的**历史钱**也剔了，故归档会让历史月份的收款线凭空掉一截。落点文件正被 M10-a/M10-b 实时改写（`overview.ts` 已 +106 行、`dashboard/page.tsx` 本批期间又变了 431 行），**不在那里抢改**。驾驶舱改版落地时应按本条口径一并修，并同步 `scripts/acceptance/dash-data.mjs` 那份预言机（它现在也整体排除）。
 2. ~~**归档「允许但提示」的确认框**~~ **[已收口]** —— HAE 已拍板：归档一个还有未整改问题 / 未收付款段的项目时，确认框里如实列出这些未闭环事项，知情后才归档、数据一律保留。落点 `projects/ArchiveButton.tsx`、`projects/page.tsx`、`core/domain/projects.ts` 全在另一会话手上（`LeadArchiveButton.tsx` 同为新建未跟踪文件），**本批一行未碰**。要做的是给归档入口配一个「未闭环事项」读数（问题 open 数 + 未付段数 + 金额），守卫仍在服务层。
 3. ~~**`AGENTS` §4.3 补「事实/前瞻」二分 + `STATUS` 行**~~ **[已入册 · 契约 v0.4]** —— 两个文件都在被改写，改完由集成者一并入册；本文即入册素材（口径见 §1，逐字可搬）。
 4. **`pnpm build` 与 `qa-shots` 目检** —— 两套构建抢同一个 `.next` 会互相打坏，且此刻工作树里有另一会话的半成品页面。留给驾驶舱那一路收口时统一跑；本批 UI 只加了两处文案块，复用既有 `rounded-card border-line bg-surface px-4 py-3` + `text-[13px] leading-relaxed text-secondary` 形态，未引入新令牌值。
@@ -64,7 +64,7 @@ M10-a 给平台加了归档/作废，并在 `AGENTS` §4.3 写下「全司读侧
 
 留的三件已全部合上，本批与 M10-b 的改动现已在同一棵树上互相验证：
 
-- **驾驶舱另一半**：`dashboard/server/overview.ts` 主查询改为**含已归档**，派生出 `liveRows` 只喂前瞻类（风险计数、健康度表、告警行）；`archivedFacts`（归档项目数 + 历史已收/支出）随概览返回，`dashboard/page.tsx` 页头据此出说明行，无归档时一个字不加。`_scratch/accept/dash-data.mjs` 那份预言机同步成同一二分口径。
+- **驾驶舱另一半**：`dashboard/server/overview.ts` 主查询改为**含已归档**，派生出 `liveRows` 只喂前瞻类（风险计数、健康度表、告警行）；`archivedFacts`（归档项目数 + 历史已收/支出）随概览返回，`dashboard/page.tsx` 页头据此出说明行，无归档时一个字不加。`scripts/acceptance/dash-data.mjs` 那份预言机同步成同一二分口径。
 - **归档提示**：`listProjectsForManagement` 加两条 groupBy 带出 `unclosed`（未整改问题数 / 未收段数 / 未收金额，不做 N+1），`ArchiveButton` 的确认框如实列出。
 - **入册**：`AGENTS` §4.3 改写为事实/前瞻二分（契约 v0.4），`STATUS` 同步。
 - 新增验收套件 **`s12-archive-facts`**：动态挑一个有历史收入的项目 → 读基线 → UI 点归档（含确认框文案断言）→ 验「签单额/回款率/现金合计一格未动、健康表少一行、待办按未闭环数收窄、说明行带出历史已收」→ 验 `/finance` 已收含归档而待收款不含 → 恢复 → 验一切分毫回来且 `financeRecord` 行数全程不变、流水 `before` 是机器值。

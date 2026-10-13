@@ -3,7 +3,7 @@
 > 目的：闭合 STATUS §4-7（「交互写回路径尚未经人手验证」）。
 > 做法：**无头 Chrome 真点击**（裸 CDP，非只截图）→ 服务端收 → Prisma 落库 → 回读页面，三方对账。
 > 安全：全程打 `_scratch/acceptance.db`（dev.db 副本）；每个套件开跑前重灌副本；每套件收尾一条元断言「实库 md5 未变」。
-> 工具：`_scratch/accept/`（cdp.mjs / harness.mjs / runner.mjs / s*.mjs），不进生产代码。
+> 工具：`scripts/acceptance/`（cdp.mjs / harness.mjs / runner.mjs / s*.mjs），不进生产代码。
 
 ## A1 科目库增删改排序　·　PASS 27 / FAIL 0 / NOTE 0
 
