@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { ENTITY_KIND } from "@/core/domain/customField";
 import { CustomFieldError, saveEntityValues } from "@/core/domain/customFieldRepo";
+import { logAppError } from "@/core/domain/telemetry";
 
 /**
  * 项目「自定义字段」值录入的 Server Action（M9-c）。
@@ -19,6 +20,8 @@ export interface CustomValuesState {
 }
 
 const PREFIX = "cfv_";
+import { recordOperation } from "@/core/domain/operationLog";
+import prisma from "@/core/db";
 
 export async function saveCustomFieldValuesAction(
   projectId: string,
@@ -31,13 +34,26 @@ export async function saveCustomFieldValuesAction(
     inputs.push({ fieldId: name.slice(PREFIX.length), raw: String(value ?? "") });
   }
   try {
+    const valsOld = await prisma.customFieldValue.findMany({
+      where: { entityKind: ENTITY_KIND.project, entityId: projectId },
+      select: { fieldId: true, valueText: true, valueNumber: true, valueDate: true },
+    });
     await saveEntityValues(ENTITY_KIND.project, projectId, inputs);
+    await recordOperation({
+      action: "customValues.save",
+      entity: "project",
+      entityId: projectId,
+      projectId,
+      summary: `保存自定义字段值（提交 ${inputs.length} 项 · 原已填 ${valsOld.length} 项，未提交的按清空处理）`,
+      before: `${valsOld.length} 项`,
+      after: `${inputs.length} 项`,
+    });
     revalidatePath(`/projects/${projectId}`);
     revalidatePath("/projects");
     return { ok: true };
   } catch (e) {
     if (e instanceof CustomFieldError) return { error: e.message };
-    console.error("[saveCustomFieldValuesAction]", e);
+    logAppError("[saveCustomFieldValuesAction]", e);
     return { error: "保存失败，请稍后重试" };
   }
 }

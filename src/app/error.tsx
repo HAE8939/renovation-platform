@@ -2,9 +2,17 @@
 
 import Link from "next/link";
 import { useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { Button } from "@/core/ui";
 
-/** 根级错误边界（M8.5）：给恢复路径（重试）与可诊断编号（digest）。 */
+/**
+ * 根级错误边界（M8.5）：给恢复路径（重试）与可诊断编号（digest）。
+ *
+ * M10-a 备料一补的一刀：生产构建把 RSC 渲染错误详情只留在服务端 stdout，页面上只剩一个编号——
+ * 员工报「页面打不开，编号 xxx」时我们无从对照。这里把 digest + 出错路径 POST 回
+ * /api/client-errors，让它与服务端错误落进同一份 logs/app-errors.jsonl，编号即可查。
+ * 上报失败静默（错误边界里再抛错会把页面彻底搞死）。
+ */
 export default function Error({
   error,
   reset,
@@ -12,9 +20,26 @@ export default function Error({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const pathname = usePathname() ?? "/";
+
   useEffect(() => {
     console.error(error);
-  }, [error]);
+    try {
+      void fetch("/api/client-errors", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          digest: error.digest,
+          message: error.message,
+          path: pathname,
+          stack: error.stack?.slice(0, 2000),
+        }),
+        keepalive: true,
+      }).catch(() => {});
+    } catch {
+      /* 上报本身出错不影响兜底页 */
+    }
+  }, [error, pathname]);
 
   return (
     <div className="flex min-h-[50vh] items-center justify-center px-4">

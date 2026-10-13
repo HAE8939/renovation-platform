@@ -36,6 +36,12 @@ export interface ProjectManagementItem {
   quoteTax: number;
   /** 报价总价（直接费 + 税）。 */
   quoteGrand: number;
+  /**
+   * 未闭环事项（M10-c「归档允许但提示」，HAE 2026-10-13 拍板）：
+   * 归档一个还有问题没整改、款没收齐的项目是合法动作，但必须**知情**——
+   * 确认框里如实列出这些，归档后它们只是从待办视野消失，数据一律保留。
+   */
+  unclosed: { issues: number; unpaidSegs: number; unpaidAmount: number };
 }
 
 export interface ListProjectsFilter {
@@ -81,7 +87,7 @@ export async function listProjectsForManagement(
     orderBy: { updatedAt: "desc" },
   });
 
-  return projects.map((p) => {
+  const items = projects.map((p) => {
     const quote = p.quotes[0];
     let quoteSubtotal = 0;
     let quoteTax = 0;
@@ -126,4 +132,31 @@ export async function listProjectsForManagement(
       quoteGrand,
     };
   });
+
+  // 未闭环读数（M10-c「归档允许但提示」）：两条 groupBy 拿全部项目的计数与金额，
+  // 不做 N+1——一项目一查，30 个项目时就难看了。
+  const ids = items.map((i) => i.id);
+  const [issueGroups, payGroups] = await Promise.all([
+    prisma.issue.groupBy({
+      by: ["projectId"],
+      where: { projectId: { in: ids }, status: { not: "closed" } },
+      _count: { _all: true },
+    }),
+    prisma.paymentNode.groupBy({
+      by: ["projectId"],
+      where: { projectId: { in: ids }, paid: false },
+      _count: { _all: true },
+      _sum: { amountDue: true },
+    }),
+  ]);
+  const issuesById = new Map(issueGroups.map((g) => [g.projectId, g._count._all]));
+  const payById = new Map(payGroups.map((g) => [g.projectId, g]));
+  return items.map((i) => ({
+    ...i,
+    unclosed: {
+      issues: issuesById.get(i.id) ?? 0,
+      unpaidSegs: payById.get(i.id)?._count._all ?? 0,
+      unpaidAmount: Math.round((payById.get(i.id)?._sum.amountDue ?? 0) * 100) / 100,
+    },
+  }));
 }

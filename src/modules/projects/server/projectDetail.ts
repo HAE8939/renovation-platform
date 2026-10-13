@@ -130,6 +130,8 @@ export interface HubFinance {
 }
 
 export interface ProjectHub {
+  /** 未闭环事项（M10-c 归档确认框用）：未整改问题数 / 未收付款段数与金额 */
+  unclosed: { issues: number; unpaidSegs: number; unpaidAmount: number };
   id: string;
   code: string;
   name: string;
@@ -302,6 +304,12 @@ export async function getProjectHub(projectId: string): Promise<ProjectHub | nul
   const openIssues = await prisma.issue.count({
     where: { projectId, status: { not: "closed" } },
   });
+  // 未收付款段：直读共享表 paymentNodes（不 import finance 内部，同 §2 模块边界）
+  const unpaidAgg = await prisma.paymentNode.aggregate({
+    where: { projectId, paid: false },
+    _count: { _all: true },
+    _sum: { amountDue: true },
+  });
   const nodeCounts: Record<string, number> = {
     pending: 0,
     submitted: 0,
@@ -395,6 +403,11 @@ export async function getProjectHub(projectId: string): Promise<ProjectHub | nul
   const customFields: EntityFieldValue[] = await getEntityValues("project", project.id);
 
   return {
+    unclosed: {
+      issues: openIssues,
+      unpaidSegs: unpaidAgg._count._all,
+      unpaidAmount: Math.round((unpaidAgg._sum.amountDue ?? 0) * 100) / 100,
+    },
     id: project.id,
     code: project.code,
     name: project.name,

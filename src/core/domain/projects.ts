@@ -354,3 +354,37 @@ export async function updateProject(
     });
   });
 }
+
+/**
+ * 归档 / 恢复项目（M10-a 备料三 · 误操作可纠正）。
+ *
+ * 为什么是归档而不是删除：`status="archived"` 早就是主脊六态之一，且**全司读侧已经排除它**
+ * （驾驶舱 KPI 与健康矩阵、排程看板、质量问题/档案、付款计划与台账下拉都带 `status != archived`）。
+ * 也就是说"从统计里摘出去"这件事数据层早就成立，缺的只是**入口**。所以本函数只改 status，
+ * 不动任何行、不删任何数据——报价、台账、验收节点、流水全部原样留着，随时可恢复。
+ *
+ * 三条口径：
+ * ① 归档前记下原状态（`restoreTo` 语义）：恢复时回到归档前那一态，而不是一律塞回 draft。
+ *    实现上取当前 status 存进流水，恢复动作显式传回该值；本函数只负责写。
+ * ② 已归档项目再点归档 = 幂等返回，不报错（界面刷新竞态下常见）。
+ * ③ 归档不改 `actualEndDate` / 不改任何金额列——它是可见性开关，不是业务动作。
+ *
+ * 流水由调用方（动作层）写，服务层保持在事务内不多写别表（见 operationLog 头部纪律）。
+ */
+export async function setProjectArchived(
+  projectId: string,
+  archived: boolean,
+  restoreTo?: string
+): Promise<{ before: string; after: string } | null> {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { id: true, status: true, code: true, name: true },
+  });
+  if (!project) return null;
+
+  const next = archived ? "archived" : restoreTo && isProjectStatus(restoreTo) ? restoreTo : "draft";
+  if (project.status === next) return { before: project.status, after: next };
+
+  await prisma.project.update({ where: { id: projectId }, data: { status: next } });
+  return { before: project.status, after: next };
+}

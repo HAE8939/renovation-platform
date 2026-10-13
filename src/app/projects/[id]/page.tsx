@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Badge } from "@/core/ui";
 import { getProjectHub } from "@/modules/projects/server/projectDetail";
 import { ProjectTabs } from "./ProjectTabs";
+import { ArchiveButton } from "../ArchiveButton";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "项目详情" };
@@ -38,6 +39,21 @@ export default async function ProjectDetailPage({
           {hub.code}
           {hub.client ? ` · ${hub.client.name}` : ""}
         </p>
+        {/* M10-a 备料三：详情页也放归档/恢复入口。列表卡片视图整卡是链接（HTML 不允许
+            在 a 里嵌表单），所以那侧只有表格视图的行内按钮——两处都能操作才叫可纠正。 */}
+        <div className="mt-4 flex items-center justify-between gap-4">
+          <p className="text-[13px] leading-relaxed text-muted">
+            {hub.status === "archived"
+              ? "该项目已归档：不再计入驾驶舱、财务与质量口径，数据全部保留，可恢复。"
+              : "归档＝从全司口径里摘出去（可恢复），不是删除数据。"}
+          </p>
+          <ArchiveButton
+            projectId={hub.id}
+            projectName={hub.name}
+            archived={hub.status === "archived"}
+            unclosed={hub.unclosed}
+          />
+        </div>
       </header>
 
       <ProjectTabs hub={hub} initialTab={searchParams.tab} />

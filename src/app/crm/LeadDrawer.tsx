@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { Badge, Button, Card, Drawer, Field, Input, Table, Td, Textarea, Th } from "@/core/ui";
+import { LeadArchiveButton } from "./LeadArchiveButton";
 import {
   addFollowUpAction,
   getLeadDetailAction,
@@ -258,6 +259,7 @@ export function LeadsTable({ leads }: { leads: LeadListItem[] }) {
                 <Th align="right">最后跟进</Th>
                 <Th align="right">推进</Th>
                 <Th align="right">签约 / 项目</Th>
+                <Th align="right">操作</Th>
               </tr>
             </thead>
             <tbody>
@@ -312,6 +314,15 @@ export function LeadsTable({ leads }: { leads: LeadListItem[] }) {
                       ) : (
                         <span className="text-[13px] text-secondary">—</span>
                       )}
+                    </Td>
+                    {/* M10-a 备料三：作废＝从漏斗/看板/签约率摘出去，可恢复；已签约的走项目归档 */}
+                    <Td align="right" onClick={(e) => e.stopPropagation()}>
+                      <LeadArchiveButton
+                        leadId={l.id}
+                        leadName={l.name}
+                        archived={l.archived}
+                        signed={l.stage === "signed"}
+                      />
                     </Td>
                   </tr>
                 );

@@ -38,11 +38,18 @@ export interface LeadListItem {
   lastFollowAt: Date | null;
   projectId: string | null;
   updatedAt: Date;
+  /** 作废位（M10-a）：true = 不进漏斗/看板，可恢复 */
+  archived: boolean;
 }
 
-/** 列出全部线索（按更新时间倒序）。 */
-export async function listLeads(): Promise<LeadListItem[]> {
+/**
+ * 列出线索（按更新时间倒序）。
+ * M10-a 备料三：默认**不含已作废**——作废的语义就是"从漏斗与看板里摘出去"。
+ * 要恢复必须能看到，故留 `includeArchived` 开关给「已作废」筛选用，不做隐式全量返回。
+ */
+export async function listLeads(opts?: { includeArchived?: boolean; onlyArchived?: boolean }): Promise<LeadListItem[]> {
   const leads = await prisma.lead.findMany({
+    where: opts?.onlyArchived ? { archived: true } : opts?.includeArchived ? {} : { archived: false },
     orderBy: { updatedAt: "desc" },
   });
 
@@ -57,6 +64,7 @@ export async function listLeads(): Promise<LeadListItem[]> {
     intentLevel: l.intentLevel,
     stage: l.stage as LeadStage,
     assignee: l.assignee,
+    archived: l.archived,
     lastFollowAt: l.lastFollowAt,
     projectId: l.projectId,
     updatedAt: l.updatedAt,
@@ -301,4 +309,35 @@ export async function addFollowUp(leadId: string, input: AddFollowUpInput): Prom
       },
     });
   });
+}
+
+/**
+ * 作废 / 恢复线索（M10-a 备料三）。
+ *
+ * 为什么需要：签约不可逆（建出客户 + 项目 + 草稿报价单），而误建的线索会永久污染
+ * 商务漏斗的阶段存量与签约率——平台此前**没有任何**摘出去的手段。
+ * 为什么不做硬删：Lead.projectId 是项目↔线索的 1-1 溯源（AGENTS §4.1），删线索会把
+ * 已签约项目的来源查不到；且 SQLite 无回收站。故只置位、可恢复。
+ *
+ * 已签约（stage=signed 且已回写 projectId）的线索**不允许只作废线索**——那会让项目失去来源，
+ * 要清掉得走「项目归档」，两边状态保持一致。这条守卫是本函数唯一的业务规则。
+ */
+export async function setLeadArchived(
+  leadId: string,
+  archived: boolean
+): Promise<{ ok: true } | { error: string }> {
+  const lead = await prisma.lead.findUnique({
+    where: { id: leadId },
+    select: { id: true, stage: true, projectId: true, archived: true },
+  });
+  if (!lead) return { error: "线索不存在，请刷新页面后重试" };
+  if (archived && lead.stage === "signed") {
+    return { error: "该线索已签约，不能只作废线索——请到项目中心归档对应项目（否则项目会失去来源）" };
+  }
+  if (lead.archived === archived) return { ok: true };
+  await prisma.lead.update({
+    where: { id: leadId },
+    data: { archived, archivedAt: archived ? new Date() : null },
+  });
+  return { ok: true };
 }

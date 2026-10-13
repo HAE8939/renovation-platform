@@ -15,6 +15,9 @@ import {
   markPaid,
   unmarkPaid,
 } from "@/modules/finance/server/payments";
+import { logAppError } from "@/core/domain/telemetry";
+import { recordOperation, moneyText, diffText } from "@/core/domain/operationLog";
+import prisma from "@/core/db";
 
 /**
  * 财务管控 Server Action（M8-b，仿 quality/actions.ts）。
@@ -48,12 +51,21 @@ export async function createRecordAction(
   formData: FormData
 ): Promise<FinanceFormState> {
   try {
-    await createRecord(buildInput(formData));
+    const input = buildInput(formData);
+    const rec = await createRecord(input);
+    await recordOperation({
+      action: "record.create",
+      entity: "financeRecord",
+      entityId: rec?.id ?? null,
+      projectId: input.projectId ?? null,
+      summary: `记一笔${input.type === "income" ? "收入" : "支出"} ${moneyText(input.amount)}（${input.category}）：${input.description || "无摘要"}`,
+      after: `${input.type}/${input.category} ${moneyText(input.amount)}`,
+    });
     revalidatePath("/finance");
     return { ok: true };
   } catch (e) {
     if (e instanceof FinanceRecordError) return { error: e.message };
-    console.error("[createRecordAction]", e);
+    logAppError("[createRecordAction]", e);
     return { error: "操作失败，请稍后重试" };
   }
 }
@@ -67,12 +79,23 @@ export async function updateRecordAction(
     const id = String(formData.get("id") ?? "").trim();
     if (!id) return { error: "缺少记录标识，请刷新页面后重试" };
 
-    await updateRecord(id, buildInput(formData));
+    const oldRec = await prisma.financeRecord.findUnique({ where: { id }, select: { amount: true, type: true, category: true, description: true, projectId: true } });
+    const input = buildInput(formData);
+    await updateRecord(id, input);
+    await recordOperation({
+      action: "record.update",
+      entity: "financeRecord",
+      entityId: id,
+      projectId: oldRec?.projectId ?? input.projectId ?? null,
+      summary: `改收支记录：${diffText([["金额", oldRec?.amount, input.amount], ["类型", oldRec?.type, input.type], ["科目", oldRec?.category, input.category], ["摘要", oldRec?.description, input.description]])}`,
+      before: oldRec ? `${moneyText(oldRec.amount)} ${oldRec.category}` : null,
+      after: `${input.type}/${input.category} ${moneyText(input.amount)}`,
+    });
     revalidatePath("/finance");
     return { ok: true };
   } catch (e) {
     if (e instanceof FinanceRecordError) return { error: e.message };
-    console.error("[updateRecordAction]", e);
+    logAppError("[updateRecordAction]", e);
     return { error: "操作失败，请稍后重试" };
   }
 }
@@ -86,12 +109,21 @@ export async function deleteRecordAction(
     const id = String(formData.get("id") ?? "").trim();
     if (!id) return { error: "缺少记录标识，请刷新页面后重试" };
 
+    const oldRec = await prisma.financeRecord.findUnique({ where: { id }, select: { amount: true, type: true, category: true, description: true, projectId: true } });
     await deleteRecord(id);
+    await recordOperation({
+      action: "record.delete",
+      entity: "financeRecord",
+      entityId: id,
+      projectId: oldRec?.projectId ?? null,
+      summary: `删除收支记录 ${oldRec ? `${moneyText(oldRec.amount)}（${oldRec.category}）${oldRec.description || ""}` : id}`,
+      before: oldRec ? `${oldRec.type} ${moneyText(oldRec.amount)} ${oldRec.description ?? ""}` : null,
+    });
     revalidatePath("/finance");
     return { ok: true };
   } catch (e) {
     if (e instanceof FinanceRecordError) return { error: e.message };
-    console.error("[deleteRecordAction]", e);
+    logAppError("[deleteRecordAction]", e);
     return { error: "操作失败，请稍后重试" };
   }
 }
@@ -114,11 +146,23 @@ export async function generatePlanAction(
     if (!projectId) return { error: "缺少项目标识，请刷新页面后重试" };
 
     await generatePlan(projectId);
+    const plan = await prisma.paymentNode.findMany({
+      where: { projectId },
+      orderBy: { order: "asc" },
+      select: { name: true, amountDue: true },
+    });
+    await recordOperation({
+      action: "plan.generate",
+      entity: "paymentNode",
+      projectId,
+      summary: `生成付款计划 ${plan.length} 段，合计 ${moneyText(plan.reduce((t, p) => t + p.amountDue, 0))}`,
+      after: plan.map((p) => `${p.name} ${moneyText(p.amountDue)}`).join("；").slice(0, 480),
+    });
     revalidatePath("/finance/payments");
     return { ok: true };
   } catch (e) {
     if (e instanceof PaymentPlanError) return { error: e.message };
-    console.error("[generatePlanAction]", e);
+    logAppError("[generatePlanAction]", e);
     return { error: "操作失败，请稍后重试" };
   }
 }
@@ -132,12 +176,20 @@ export async function clearPlanAction(
     const projectId = String(formData.get("projectId") ?? "").trim();
     if (!projectId) return { error: "缺少项目标识，请刷新页面后重试" };
 
+    const planOld = await prisma.paymentNode.findMany({ where: { projectId }, select: { name: true, amountDue: true, paid: true } });
     await clearPlan(projectId);
+    await recordOperation({
+      action: "plan.clear",
+      entity: "paymentNode",
+      projectId,
+      summary: `清空付款计划（原 ${planOld.length} 段，合计 ${moneyText(planOld.reduce((t, p) => t + p.amountDue, 0))}）`,
+      before: planOld.map((p) => `${p.name} ${moneyText(p.amountDue)}${p.paid ? " 已付" : ""}`).join("；").slice(0, 480),
+    });
     revalidatePath("/finance/payments");
     return { ok: true };
   } catch (e) {
     if (e instanceof PaymentPlanError) return { error: e.message };
-    console.error("[clearPlanAction]", e);
+    logAppError("[clearPlanAction]", e);
     return { error: "操作失败，请稍后重试" };
   }
 }
@@ -151,12 +203,21 @@ export async function markPaidAction(
     const id = String(formData.get("id") ?? "").trim();
     if (!id) return { error: "缺少段标识，请刷新页面后重试" };
 
+    const seg = await prisma.paymentNode.findUnique({ where: { id }, select: { name: true, amountDue: true, projectId: true } });
     await markPaid(id);
+    await recordOperation({
+      action: "plan.markPaid",
+      entity: "paymentNode",
+      entityId: id,
+      projectId: seg?.projectId ?? null,
+      summary: `标记「${seg?.name ?? id}」已付 ${moneyText(seg?.amountDue)}（不自动生成收入台账，两本账分离）`,
+      after: seg ? `${seg.name} ${moneyText(seg.amountDue)}` : null,
+    });
     revalidatePath("/finance/payments");
     return { ok: true };
   } catch (e) {
     if (e instanceof PaymentPlanError) return { error: e.message };
-    console.error("[markPaidAction]", e);
+    logAppError("[markPaidAction]", e);
     return { error: "操作失败，请稍后重试" };
   }
 }
@@ -170,12 +231,21 @@ export async function unmarkPaidAction(
     const id = String(formData.get("id") ?? "").trim();
     if (!id) return { error: "缺少段标识，请刷新页面后重试" };
 
+    const seg = await prisma.paymentNode.findUnique({ where: { id }, select: { name: true, amountDue: true, projectId: true } });
     await unmarkPaid(id);
+    await recordOperation({
+      action: "plan.unmarkPaid",
+      entity: "paymentNode",
+      entityId: id,
+      projectId: seg?.projectId ?? null,
+      summary: `撤销「${seg?.name ?? id}」的已付标记`,
+      before: seg ? `${seg.name} ${moneyText(seg.amountDue)} 已付` : null,
+    });
     revalidatePath("/finance/payments");
     return { ok: true };
   } catch (e) {
     if (e instanceof PaymentPlanError) return { error: e.message };
-    console.error("[unmarkPaidAction]", e);
+    logAppError("[unmarkPaidAction]", e);
     return { error: "操作失败，请稍后重试" };
   }
 }

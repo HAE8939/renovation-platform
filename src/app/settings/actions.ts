@@ -8,6 +8,7 @@ import {
   setThemeKey,
 } from "@/core/domain/platformSettings";
 import { removeLogoFile, saveLogoFile } from "@/core/domain/branding";
+import { logAppError } from "@/core/domain/telemetry";
 
 /**
  * 平台设置 Server Actions（M9-d）：主题切换 + Logo 最简版。
@@ -38,7 +39,7 @@ export async function saveThemeAction(
     return { ok: true };
   } catch (e) {
     if (e instanceof Error) return { error: e.message };
-    console.error("[saveThemeAction]", e);
+    logAppError("[saveThemeAction]", e);
     return { error: "保存失败，请稍后重试" };
   }
 }
@@ -58,7 +59,7 @@ export async function uploadLogoAction(
     revalidatePlatformSurfaces();
     return { ok: true };
   } catch (e) {
-    console.error("[uploadLogoAction]", e);
+    logAppError("[uploadLogoAction]", e);
     return { error: "上传失败，请稍后重试" };
   }
 }
@@ -73,7 +74,7 @@ export async function removeLogoAction(
     revalidatePlatformSurfaces();
     return { ok: true };
   } catch (e) {
-    console.error("[removeLogoAction]", e);
+    logAppError("[removeLogoAction]", e);
     return { error: "移除失败，请稍后重试" };
   }
 }

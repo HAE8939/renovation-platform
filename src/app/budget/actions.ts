@@ -22,6 +22,9 @@ import {
   updateChange,
   type ChangeInput,
 } from "@/modules/budget/server/changes";
+import { logAppError } from "@/core/domain/telemetry";
+import { recordOperation, moneyText, diffText } from "@/core/domain/operationLog";
+import prisma from "@/core/db";
 
 /** Server Action 表单状态：客户端用 useFormState 读回。 */
 export interface ProjectFormState {
@@ -51,10 +54,18 @@ export async function createProjectAction(
     });
 
     revalidatePath("/budget");
+    await recordOperation({
+      action: "project.create",
+      entity: "project",
+      entityId: id,
+      projectId: id,
+      summary: `新建项目「${text("name")}」（编号 ${text("code") || "自动"}）`,
+      after: `面积 ${area}㎡`,
+    });
     return { ok: true, projectId: id };
   } catch (e) {
     if (e instanceof ValidationError) return { error: e.message };
-    console.error("[createProjectAction]", e);
+    logAppError("[createProjectAction]", e);
     return { error: "保存失败，请稍后重试" };
   }
 }
@@ -74,6 +85,10 @@ export async function updateProjectAction(
     const contractAmount =
       contractAmountRaw === "" ? undefined : Number(contractAmountRaw);
 
+    const before = await prisma.project.findUnique({
+      where: { id: projectId },
+      select: { name: true, code: true, area: true, status: true, contractAmount: true, designer: true, pm: true, address: true, startDate: true, endDate: true },
+    });
     await updateProject(projectId, {
       name: text("name"),
       code: text("code"),
@@ -91,10 +106,34 @@ export async function updateProjectAction(
 
     revalidatePath(`/budget/${projectId}`);
     revalidatePath(`/budget/${projectId}/settings`);
+    if (before) {
+      const changed = diffText([
+        ["名称", before.name, text("name")],
+        ["编号", before.code, text("code")],
+        ["面积", before.area, area],
+        ["状态", before.status, text("status")],
+        ["合同额", before.contractAmount, contractAmount],
+        ["设计师", before.designer, text("designer")],
+        ["项目经理", before.pm, text("pm")],
+        ["工期起", before.startDate, String(formData.get("startDate") ?? "")],
+        ["工期止", before.endDate, String(formData.get("endDate") ?? "")],
+      ]);
+      if (changed !== "（无字段变化）") {
+        await recordOperation({
+          action: "project.update",
+          entity: "project",
+          entityId: projectId,
+          projectId,
+          summary: `改项目基础信息：${changed}`,
+          before: `合同额 ${moneyText(before.contractAmount)} · 面积 ${before.area}㎡ · 状态 ${before.status}`,
+          after: `合同额 ${moneyText(contractAmount ?? before.contractAmount)} · 面积 ${area}㎡`,
+        });
+      }
+    }
     return { ok: true };
   } catch (e) {
     if (e instanceof ValidationError) return { error: e.message };
-    console.error("[updateProjectAction]", e);
+    logAppError("[updateProjectAction]", e);
     return { error: "保存失败，请稍后重试" };
   }
 }
@@ -111,14 +150,27 @@ export interface CatalogFormState {
 
 const CATALOG_PATH = "/budget/catalog";
 
-async function runCatalogWrite(task: () => Promise<unknown>): Promise<CatalogFormState> {
+async function runCatalogWrite(
+  task: () => Promise<unknown>,
+  audit?: { action: string; summary: string; entityId?: string; before?: string; after?: string },
+): Promise<CatalogFormState> {
   try {
     await task();
     revalidatePath(CATALOG_PATH);
+    if (audit) {
+      await recordOperation({
+        action: audit.action,
+        entity: audit.action.includes(".category.") ? "catalogCategory" : "catalogItem",
+        entityId: audit.entityId ?? null,
+        summary: audit.summary,
+        before: audit.before ?? null,
+        after: audit.after ?? null,
+      });
+    }
     return { ok: true };
   } catch (e) {
     if (e instanceof ValidationError) return { error: e.message };
-    console.error("[catalogAction]", e);
+    logAppError("[catalogAction]", e);
     return { error: "保存失败，请稍后重试" };
   }
 }
@@ -148,7 +200,7 @@ export async function createCategoryAction(
   formData: FormData
 ): Promise<CatalogFormState> {
   const name = String(formData.get("name") ?? "").trim();
-  return runCatalogWrite(() => createCategory(name));
+  return runCatalogWrite(() => createCategory(name), { action: "catalog.category.create", summary: `新增科目「${name}」`, after: name });
 }
 
 /** 重命名科目。 */
@@ -158,7 +210,7 @@ export async function updateCategoryAction(
 ): Promise<CatalogFormState> {
   const id = String(formData.get("id") ?? "").trim();
   const name = String(formData.get("name") ?? "").trim();
-  return runCatalogWrite(() => updateCategory(id, name));
+  return runCatalogWrite(() => updateCategory(id, name), { action: "catalog.category.rename", entityId: id, summary: `科目改名 → 「${name}」`, after: name });
 }
 
 /** 删除科目，连带删掉其下科目项；已生成的报价是快照，不受影响。 */
@@ -167,7 +219,13 @@ export async function deleteCategoryAction(
   formData: FormData
 ): Promise<CatalogFormState> {
   const id = String(formData.get("id") ?? "").trim();
-  return runCatalogWrite(() => deleteCategory(id));
+  const cat = await prisma.catalogCategory.findUnique({ where: { id }, select: { name: true, items: { select: { id: true } } } });
+  return runCatalogWrite(() => deleteCategory(id), {
+    action: "catalog.category.delete",
+    entityId: id,
+    summary: `删除科目「${cat?.name ?? id}」${cat ? `（连带删 ${cat.items.length} 个科目项）` : ""}`,
+    before: cat?.name ?? undefined,
+  });
 }
 
 /** 按 ids 顺序重排科目；界面提交全部顺序，避免残留行乱序。 */
@@ -178,7 +236,7 @@ export async function reorderCategoriesAction(
   const ids = Array.isArray(formData.getAll("ids"))
     ? (formData.getAll("ids") as string[]).filter((v) => typeof v === "string" && v !== "")
     : [];
-  return runCatalogWrite(() => setCategoryOrder(ids));
+  return runCatalogWrite(() => setCategoryOrder(ids), { action: "catalog.category.reorder", summary: `调整科目顺序（共 ${ids.length} 个）` });
 }
 
 /** 在某科目下新增科目项。 */
@@ -187,7 +245,13 @@ export async function createItemAction(
   formData: FormData
 ): Promise<CatalogFormState> {
   const categoryId = String(formData.get("categoryId") ?? "").trim();
-  return runCatalogWrite(() => createItem(categoryId, readItemInput(formData)));
+  const it = readItemInput(formData);
+  return runCatalogWrite(() => createItem(categoryId, it), {
+    action: "catalog.item.create",
+    entityId: categoryId,
+    summary: `新增科目项 ${it.code}「${it.name}」（默认单价 ${moneyText(it.defaultPrice)}/${it.unit}）`,
+    after: `${it.code} ${it.name}`,
+  });
 }
 
 /** 修改科目项模板；已选入报价的明细是快照，不回溯。 */
@@ -196,7 +260,15 @@ export async function updateItemAction(
   formData: FormData
 ): Promise<CatalogFormState> {
   const id = String(formData.get("id") ?? "").trim();
-  return runCatalogWrite(() => updateItem(id, readItemInput(formData)));
+  const it = readItemInput(formData);
+  const oldItem = await prisma.catalogItem.findUnique({ where: { id }, select: { code: true, name: true, defaultPrice: true } });
+  return runCatalogWrite(() => updateItem(id, it), {
+    action: "catalog.item.update",
+    entityId: id,
+    summary: `改科目项 ${it.code}「${it.name}」：${diffText([["默认单价", oldItem?.defaultPrice, it.defaultPrice], ["名称", oldItem?.name, it.name], ["编号", oldItem?.code, it.code]])}`,
+    before: oldItem ? `${oldItem.code} 单价 ${moneyText(oldItem.defaultPrice)}` : undefined,
+    after: `${it.code} 单价 ${moneyText(it.defaultPrice)}`,
+  });
 }
 
 /** 删除科目项。 */
@@ -205,7 +277,13 @@ export async function deleteItemAction(
   formData: FormData
 ): Promise<CatalogFormState> {
   const id = String(formData.get("id") ?? "").trim();
-  return runCatalogWrite(() => deleteItem(id));
+  const oldItem = await prisma.catalogItem.findUnique({ where: { id }, select: { code: true, name: true } });
+  return runCatalogWrite(() => deleteItem(id), {
+    action: "catalog.item.delete",
+    entityId: id,
+    summary: `删除科目项 ${oldItem ? `${oldItem.code}「${oldItem.name}」` : id}`,
+    before: oldItem?.name ?? undefined,
+  });
 }
 
 /** 在科目内按 ids 顺序重排科目项。 */
@@ -217,7 +295,7 @@ export async function setItemOrderAction(
   const ids = Array.isArray(formData.getAll("ids"))
     ? (formData.getAll("ids") as string[]).filter((v) => typeof v === "string" && v !== "")
     : [];
-  return runCatalogWrite(() => setItemOrder(categoryId, ids));
+  return runCatalogWrite(() => setItemOrder(categoryId, ids), { action: "catalog.item.reorder", summary: `调整科目项顺序（${ids.length} 项）` });
 }
 
 /* ── 报价明细（quote）──────────────────────────────────────────
@@ -237,9 +315,19 @@ export async function saveQuoteItemsAction(
   rows: QuoteItemPayload[]
 ): Promise<QuoteSaveState> {
   try {
+    const beforeCount = await prisma.quoteItem.count({ where: { quote: { projectId } } });
     const saved = await saveQuoteItems(projectId, rows);
     revalidatePath("/budget");
     revalidatePath(`/budget/${projectId}`);
+    const subtotal = saved.reduce((t, r) => t + Math.round(r.unitPrice * 100) * r.quantity, 0) / 100;
+    await recordOperation({
+      action: "quote.save",
+      entity: "quote",
+      projectId,
+      summary: `保存报价明细：${beforeCount} 行 → ${saved.length} 行，直接费 ${moneyText(subtotal)}`,
+      before: `${beforeCount} 行`,
+      after: `${saved.length} 行 · 直接费 ${moneyText(subtotal)}`,
+    });
     return {
       ok: true,
       items: saved.map((r) => ({
@@ -257,7 +345,7 @@ export async function saveQuoteItemsAction(
     };
   } catch (e) {
     if (e instanceof ValidationError) return { ok: false, error: e.message };
-    console.error("[saveQuoteItemsAction]", e);
+    logAppError("[saveQuoteItemsAction]", e);
     return { ok: false, error: "保存失败，请稍后重试" };
   }
 }
@@ -291,14 +379,22 @@ export async function createChangeAction(
   formData: FormData
 ): Promise<ChangeFormState> {
   try {
-    await createChange(projectId, readChangeInput(formData));
+    const ci = readChangeInput(formData);
+    await createChange(projectId, ci);
+    await recordOperation({
+      action: "change.create",
+      entity: "changeOrder",
+      projectId,
+      summary: `新建变更单「${ci.title}」 ${ci.amount >= 0 ? "+" : ""}${moneyText(ci.amount)}`,
+      after: `${ci.kind} ${moneyText(ci.amount)}`,
+    });
     revalidatePath(`/budget/${projectId}/changes`);
     revalidatePath(`/budget/${projectId}`);
     revalidatePath(`/projects/${projectId}`);
     return { ok: true };
   } catch (e) {
     if (e instanceof ChangeOrderError) return { error: e.message };
-    console.error("[createChangeAction]", e);
+    logAppError("[createChangeAction]", e);
     return { error: "操作失败，请稍后重试" };
   }
 }
@@ -311,14 +407,25 @@ export async function updateChangeAction(
   formData: FormData
 ): Promise<ChangeFormState> {
   try {
-    await updateChange(changeId, projectId, readChangeInput(formData));
+    const oldChange = await prisma.changeOrder.findUnique({ where: { id: changeId }, select: { title: true, amount: true, kind: true } });
+    const ci = readChangeInput(formData);
+    await updateChange(changeId, projectId, ci);
+    await recordOperation({
+      action: "change.update",
+      entity: "changeOrder",
+      entityId: changeId,
+      projectId,
+      summary: `改变更单：${diffText([["描述", oldChange?.title, ci.title], ["金额", oldChange?.amount, ci.amount], ["类型", oldChange?.kind, ci.kind]])}`,
+      before: oldChange ? `${oldChange.title} ${moneyText(oldChange.amount)}` : undefined,
+      after: `${ci.title} ${moneyText(ci.amount)}`,
+    });
     revalidatePath(`/budget/${projectId}/changes`);
     revalidatePath(`/budget/${projectId}`);
     revalidatePath(`/projects/${projectId}`);
     return { ok: true };
   } catch (e) {
     if (e instanceof ChangeOrderError) return { error: e.message };
-    console.error("[updateChangeAction]", e);
+    logAppError("[updateChangeAction]", e);
     return { error: "操作失败，请稍后重试" };
   }
 }
@@ -331,14 +438,23 @@ export async function deleteChangeAction(
   _formData: FormData
 ): Promise<ChangeFormState> {
   try {
+    const oldChange = await prisma.changeOrder.findUnique({ where: { id: changeId }, select: { title: true, amount: true } });
     await deleteChange(changeId);
+    await recordOperation({
+      action: "change.delete",
+      entity: "changeOrder",
+      entityId: changeId,
+      projectId,
+      summary: `删除变更单「${oldChange?.title ?? changeId}」${oldChange ? `（${moneyText(oldChange.amount)}）` : ""}`,
+      before: oldChange ? `${oldChange.title} ${moneyText(oldChange.amount)}` : undefined,
+    });
     revalidatePath(`/budget/${projectId}/changes`);
     revalidatePath(`/budget/${projectId}`);
     revalidatePath(`/projects/${projectId}`);
     return { ok: true };
   } catch (e) {
     if (e instanceof ChangeOrderError) return { error: e.message };
-    console.error("[deleteChangeAction]", e);
+    logAppError("[deleteChangeAction]", e);
     return { error: "操作失败，请稍后重试" };
   }
 }

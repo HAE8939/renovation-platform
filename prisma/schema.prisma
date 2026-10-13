@@ -188,6 +188,8 @@ model Lead {
   assignee     String?   // 负责人（本期文本）
   lastFollowAt DateTime?
   nextFollowAt DateTime?
+  archived     Boolean   @default(false) // 作废位：true=不进漏斗/看板/统计，可恢复（M10-a）
+  archivedAt   DateTime?                 // 作废时刻；null=未作废
   projectId    String?   @unique // 签约回写，1-1；未签为 null
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
@@ -560,3 +562,44 @@ model PlatformSetting {
 
   @@map("platform_settings")
 }
+
+// ─────────────────────────────────────────────────────────────
+// M10-a 备料一 · 操作流水（OperationLog）—— 「这个数是谁、什么时候、改成了什么」的可回放答案
+// 立表原因（2026-10-13 与 HAE 确认）：平台将交给内部员工真实使用，逻辑问题只能在使用过程中暴露；
+// 而员工口头描述「上周还不是这样」时，我们此前**没有任何办法**重建现场——只有 FinanceRecord.recordedBy、
+// AcceptanceNode.reviewedBy 这类零散字段，没有统一流水。本表是那条问题的总兜底，不是审批流（无审批语义）。
+// 纪律三条：
+// ① **best-effort 写入**：记流水失败绝不允许拖垮业务写入（服务层 try/catch 后转 telemetry 报错，不抛给调用方）。
+// ② **只在服务层单点写**（core/domain/operationLog.ts 唯一入口），模块与页面不得自行 insert——
+//    与 §4.2 自定义字段同一条思路：埋点散开就必然漏，漏了就等于没有。
+// ③ before/after 存**人话摘要文本**而非 JSON：本栈 SQLite 不支持 Json 类型（§1 实测更正），
+//    且这张表是给人读的账，不是给程序解析的账。结构化需求将来按需用列扩展，不塞 blob。
+// actor 现阶段是占位用户（免登录单用户，P4 接登录后换真 userId），保留列即为登录预留位。
+// ─────────────────────────────────────────────────────────────
+model OperationLog {
+  id        String   @id @default(cuid())
+  at        DateTime @default(now())
+  action    String   // 机器名：quote.save / record.create / plan.markPaid / lead.sign / node.review / project.archive …
+  entity    String   // 实体类型：project / quote / financeRecord / paymentNode / lead / node / issue / fieldDef / schedule …
+  entityId  String?  // 实体 id；模板类操作等无单行主体时可空
+  projectId String?  // ★ 尽量挂主脊：支撑「按项目看这一单都发生过什么」（不建外键——流水要能留住已删对象的记录）
+  summary   String   // 中文一句话，给业务同事看（不是给程序看）
+  before    String?  // 变更前关键值（纯文本；null=新建类操作）
+  after     String?  // 变更后关键值（纯文本；null=删除类操作）
+  actor     String   @default("user-local") // 占位用户；P4 换真 userId
+  actorName String?  // 展示名快照（人员改名后流水仍显示当时的名字）
+  error     String?  // 失败时记原因；成功为 null（失败的写操作同样值得留档）
+
+  @@index([projectId, at])
+  @@index([entity, entityId])
+  @@index([at])
+  @@map("operation_logs")
+}
+
+// ─────────────────────────────────────────────────────────────
+// M10-a 备料三 · 线索作废位（Lead.archived）
+// 与项目侧的区别：Project 早已有 status="archived"（全司口径本来就排除它），缺的只是入口；
+// Lead 只有 stage（商务阶段），没有「这条不做了/录错了」的位——签约不可逆 + 无删除入口，
+// 误建线索只能永久留在漏斗里污染阶段存量与签约率。故补作废位，语义＝**从漏斗与统计里摘出去、可恢复**。
+// 不做硬删：线索可能已回写 projectId（签约过），删线索会切断项目↔线索的 1-1 溯源（§4.1）。
+// ─────────────────────────────────────────────────────────────

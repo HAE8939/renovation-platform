@@ -17,6 +17,9 @@ import {
   ScheduleTemplateError,
 } from "./server/templates";
 import { AREA_TIERS, AREA_TIER_LABEL } from "./plan";
+import { logAppError } from "@/core/domain/telemetry";
+import { recordOperation } from "@/core/domain/operationLog";
+import prisma from "@/core/db";
 
 /**
  * 排程 Server Actions（M6-b）。
@@ -37,13 +40,20 @@ export async function generateScheduleAction(
   const projectId = String(formData.get("projectId") ?? "").trim();
   if (!projectId) return { error: "缺少项目标识，请刷新页面后重试" };
   try {
-    await generateSchedule(projectId);
+    const gen = await generateSchedule(projectId);
+    await recordOperation({
+      action: "schedule.generate",
+      entity: "schedule",
+      projectId,
+      summary: `一键生成排程 ${Array.isArray(gen) ? gen.length : ""} 道工序`,
+      after: Array.isArray(gen) ? gen.map((t) => t.name).join("→").slice(0, 480) : null,
+    });
     revalidatePath(`/schedule/${projectId}`);
     revalidatePath("/schedule");
     return { ok: true };
   } catch (e) {
     if (e instanceof ScheduleGenerateError) return { error: e.message };
-    console.error("[generateScheduleAction]", e);
+    logAppError("[generateScheduleAction]", e);
     return { error: "生成失败，请稍后重试" };
   }
 }
@@ -56,13 +66,21 @@ export async function clearScheduleAction(
   const projectId = String(formData.get("projectId") ?? "").trim();
   if (!projectId) return { error: "缺少项目标识，请刷新页面后重试" };
   try {
+    const oldTasks = await prisma.scheduleTask.findMany({ where: { projectId }, select: { name: true, progress: true } });
     await clearSchedule(projectId);
+    await recordOperation({
+      action: "schedule.clear",
+      entity: "schedule",
+      projectId,
+      summary: `清空排程（原 ${oldTasks.length} 道工序）`,
+      before: oldTasks.map((t) => `${t.name} ${t.progress}%`).join("；").slice(0, 480),
+    });
     revalidatePath(`/schedule/${projectId}`);
     revalidatePath("/schedule");
     return { ok: true };
   } catch (e) {
     if (e instanceof ScheduleGenerateError) return { error: e.message };
-    console.error("[clearScheduleAction]", e);
+    logAppError("[clearScheduleAction]", e);
     return { error: "清空失败，请稍后重试" };
   }
 }
@@ -90,7 +108,7 @@ export async function updateTaskInfoAction(
     return { ok: true };
   } catch (e) {
     if (e instanceof ScheduleUpdateError) return { error: e.message };
-    console.error("[updateTaskInfoAction]", e);
+    logAppError("[updateTaskInfoAction]", e);
     return { error: "保存失败，请稍后重试" };
   }
 }
@@ -109,13 +127,24 @@ export async function updateTaskProgressAction(
     return { error: "进度须为 0–100 的数字" };
   }
   try {
+    const taskOld = await prisma.scheduleTask.findUnique({ where: { id: taskId }, select: { name: true, progress: true, projectId: true } });
     await updateTaskProgress(taskId, progress);
+    const nodeNow = await prisma.acceptanceNode.findFirst({ where: { taskId }, select: { id: true, status: true } });
+    await recordOperation({
+      action: "schedule.progress",
+      entity: "scheduleTask",
+      entityId: taskId,
+      projectId: taskOld?.projectId ?? null,
+      summary: `工序「${taskOld?.name ?? taskId}」进度 ${taskOld?.progress ?? 0}% → ${progress}%${nodeNow ? `（验收节点 ${nodeNow.status}）` : ""}`,
+      before: `${taskOld?.progress ?? 0}%`,
+      after: `${progress}%`,
+    });
     revalidatePath(`/schedule/${projectId}`);
     revalidatePath("/schedule");
     return { ok: true };
   } catch (e) {
     if (e instanceof ScheduleUpdateError) return { error: e.message };
-    console.error("[updateTaskProgressAction]", e);
+    logAppError("[updateTaskProgressAction]", e);
     return { error: "更新失败，请稍后重试" };
   }
 }
@@ -140,7 +169,7 @@ export async function shiftTaskDatesAction(
     return { ok: true };
   } catch (e) {
     if (e instanceof ScheduleUpdateError) return { error: e.message };
-    console.error("[shiftTaskDatesAction]", e);
+    logAppError("[shiftTaskDatesAction]", e);
     return { error: "调期失败，请稍后重试" };
   }
 }
@@ -173,7 +202,7 @@ export async function updateTemplateDaysAction(
     return { ok: true };
   } catch (e) {
     if (e instanceof ScheduleTemplateError) return { error: e.message };
-    console.error("[updateTemplateDaysAction]", e);
+    logAppError("[updateTemplateDaysAction]", e);
     return { error: "保存失败，请稍后重试" };
   }
 }

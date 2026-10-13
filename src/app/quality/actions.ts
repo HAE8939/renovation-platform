@@ -10,6 +10,9 @@ import {
   recheckIssue,
 } from "@/modules/quality/server/issues";
 import type { IssueSeverity } from "@/modules/quality/types";
+import { logAppError } from "@/core/domain/telemetry";
+import { recordOperation } from "@/core/domain/operationLog";
+import prisma from "@/core/db";
 
 /**
  * 质量管控 Server Action（M7-b）。仿 design/actions.ts：
@@ -48,13 +51,22 @@ export async function submitNodeAction(
     }
 
     await submitNode(nodeId, { checks, submitNote: text("submitNote") });
+    const nodeSub = await prisma.acceptanceNode.findUnique({ where: { id: nodeId }, select: { name: true, projectId: true } });
+    await recordOperation({
+      action: "node.submit",
+      entity: "acceptanceNode",
+      entityId: nodeId,
+      projectId: nodeSub?.projectId ?? null,
+      summary: `提交验收「${nodeSub?.name ?? nodeId}」，检查项 ${checks.length} 条`,
+      after: text("submitNote") || "（无提交说明）",
+    });
 
     revalidatePath("/quality");
     revalidatePath(`/quality/nodes/${nodeId}`);
     return { ok: true };
   } catch (e) {
     if (e instanceof QualityNodeError) return { error: e.message };
-    console.error("[submitNodeAction]", e);
+    logAppError("[submitNodeAction]", e);
     return { error: "提交失败，请稍后重试" };
   }
 }
@@ -85,10 +97,30 @@ export async function reviewNodeAction(
 
     revalidatePath("/quality");
     revalidatePath(`/quality/nodes/${nodeId}`);
+    const nodeRev = await prisma.acceptanceNode.findUnique({
+      where: { id: nodeId },
+      select: { name: true, projectId: true, status: true },
+    });
+    const issueRev = nodeRev ? await prisma.issue.findFirst({
+      where: { nodeId, status: "open" },
+      orderBy: { createdAt: "desc" },
+      select: { title: true },
+    }) : null;
+    await recordOperation({
+      action: "node.review",
+      entity: "acceptanceNode",
+      entityId: nodeId,
+      projectId: nodeRev?.projectId ?? null,
+      summary: approve
+        ? `验收通过「${nodeRev?.name ?? nodeId}」`
+        : `验收退回「${nodeRev?.name ?? nodeId}」：${text("reason") || "未填原因"}（严重度 ${text("severity") || "normal"}${issueRev ? `，已建问题「${issueRev.title}」` : ""}）`,
+      before: "submitted",
+      after: nodeRev?.status ?? (approve ? "passed" : "returned"),
+    });
     return { ok: true };
   } catch (e) {
     if (e instanceof QualityReviewError) return { error: e.message };
-    console.error("[reviewNodeAction]", e);
+    logAppError("[reviewNodeAction]", e);
     return { error: "审核失败，请稍后重试" };
   }
 }
@@ -112,13 +144,22 @@ export async function rectifyIssueAction(
     if (!issueId) return { error: "缺少问题标识，请刷新页面后重试" };
 
     await rectifyIssue(issueId, note);
+    const iss = await prisma.issue.findUnique({ where: { id: issueId }, select: { title: true, projectId: true, status: true } });
+    await recordOperation({
+      action: "issue.rectify",
+      entity: "issue",
+      entityId: issueId,
+      projectId: iss?.projectId ?? null,
+      summary: `标记问题「${iss?.title ?? issueId}」已整改：${note || "未填说明"}`,
+      after: iss?.status ?? null,
+    });
 
     revalidatePath("/quality/issues");
     revalidatePath("/quality");
     return { ok: true };
   } catch (e) {
     if (e instanceof QualityIssueError) return { error: e.message };
-    console.error("[rectifyIssueAction]", e);
+    logAppError("[rectifyIssueAction]", e);
     return { error: "整改提交失败，请稍后重试" };
   }
 }
@@ -146,10 +187,24 @@ export async function recheckIssueAction(
 
     revalidatePath("/quality/issues");
     revalidatePath("/quality");
+    const issRe = await prisma.issue.findUnique({
+      where: { id: issueId },
+      select: { title: true, projectId: true, status: true },
+    });
+    await recordOperation({
+      action: "issue.recheck",
+      entity: "issue",
+      entityId: issueId,
+      projectId: issRe?.projectId ?? null,
+      summary: pass
+        ? `复验通过并关闭问题「${issRe?.title ?? issueId}」${note ? `：${note}` : ""}`
+        : `复验退回问题「${issRe?.title ?? issueId}」：${note || "未填意见"}`,
+      after: issRe?.status ?? (pass ? "closed" : "open"),
+    });
     return { ok: true };
   } catch (e) {
     if (e instanceof QualityIssueError) return { error: e.message };
-    console.error("[recheckIssueAction]", e);
+    logAppError("[recheckIssueAction]", e);
     return { error: "复验提交失败，请稍后重试" };
   }
 }
@@ -179,10 +234,17 @@ export async function createIssueAction(
 
     revalidatePath("/quality/issues");
     revalidatePath("/quality");
+    await recordOperation({
+      action: "issue.create",
+      entity: "issue",
+      projectId,
+      summary: `手工新建问题「${title}」（严重度 ${severity}）`,
+      after: desc || "（无详细描述）",
+    });
     return { ok: true };
   } catch (e) {
     if (e instanceof QualityIssueError) return { error: e.message };
-    console.error("[createIssueAction]", e);
+    logAppError("[createIssueAction]", e);
     return { error: "新建问题失败，请稍后重试" };
   }
 }

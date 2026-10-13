@@ -14,6 +14,7 @@ import { buildFiltersFromParams, listDefs } from "@/core/domain/customFieldRepo"
 import { describeFilter } from "@/core/domain/customField";
 import { ViewToggle } from "./ViewToggle";
 import { StatusFilter } from "./StatusFilter";
+import { ArchiveButton } from "./ArchiveButton";
 import { CustomFieldFilter } from "./CustomFieldFilter";
 
 export const dynamic = "force-dynamic";
@@ -206,6 +207,7 @@ export default async function ProjectsListPage({
                   <Th>进度</Th>
                   <Th align="right">最近更新</Th>
                   <Th>详情</Th>
+                  <Th align="right">操作</Th>
                 </tr>
               </thead>
               <tbody>
@@ -250,6 +252,15 @@ export default async function ProjectsListPage({
                       >
                         查看 →
                       </Link>
+                    </Td>
+                    {/* M10-a 备料三：归档＝从全司口径摘出去（可恢复），不是删数据 */}
+                    <Td align="right">
+                      <ArchiveButton
+                        projectId={p.id}
+                        projectName={p.name}
+                        archived={p.status === "archived"}
+                        unclosed={p.unclosed}
+                      />
                     </Td>
                   </tr>
                 ))}

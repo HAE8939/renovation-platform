@@ -10,6 +10,9 @@ import {
   CustomFieldError,
   type DefInput,
 } from "@/core/domain/customFieldRepo";
+import { logAppError } from "@/core/domain/telemetry";
+import { recordOperation } from "@/core/domain/operationLog";
+import prisma from "@/core/db";
 
 /**
  * 自定义字段定义的 Server Actions（M9-c）。路由层薄：只收 FormData、调 core 服务、
@@ -54,7 +57,7 @@ export async function createFieldAction(
     return { ok: true, id: created.id };
   } catch (e) {
     if (e instanceof CustomFieldError) return { error: e.message };
-    console.error("[createFieldAction]", e);
+    logAppError("[createFieldAction]", e);
     return { error: "操作失败，请稍后重试" };
   }
 }
@@ -86,7 +89,7 @@ export async function saveFieldAction(
     return { ok: true, id };
   } catch (e) {
     if (e instanceof CustomFieldError) return { error: e.message };
-    console.error("[saveFieldAction]", e);
+    logAppError("[saveFieldAction]", e);
     return { error: "操作失败，请稍后重试" };
   }
 }
@@ -109,7 +112,7 @@ export async function updateFieldAction(
     return { ok: true, id };
   } catch (e) {
     if (e instanceof CustomFieldError) return { error: e.message };
-    console.error("[updateFieldAction]", e);
+    logAppError("[updateFieldAction]", e);
     return { error: "操作失败，请稍后重试" };
   }
 }
@@ -120,12 +123,23 @@ export async function deleteFieldAction(
   _formData?: FormData,
 ): Promise<FieldFormState> {
   try {
+    const defOld = await prisma.customFieldDef.findUnique({
+      where: { id },
+      select: { label: true, key: true, _count: { select: { values: true } } },
+    });
     await deleteDef(id);
+    await recordOperation({
+      action: "field.delete",
+      entity: "fieldDef",
+      entityId: id,
+      summary: `删除自定义字段「${defOld?.label ?? id}」${defOld ? `，连带硬删 ${defOld._count.values} 条已录值` : ""}`,
+      before: defOld ? `${defOld.key} · 已填 ${defOld._count.values} 条` : null,
+    });
     revalidateFieldSurfaces();
     return { ok: true };
   } catch (e) {
     if (e instanceof CustomFieldError) return { error: e.message };
-    console.error("[deleteFieldAction]", e);
+    logAppError("[deleteFieldAction]", e);
     return { error: "操作失败，请稍后重试" };
   }
 }
@@ -138,11 +152,19 @@ export async function toggleFieldActiveAction(
 ): Promise<FieldFormState> {
   try {
     await setDefActive(id, nextActive);
+    const defT = await prisma.customFieldDef.findUnique({ where: { id }, select: { label: true } });
+    await recordOperation({
+      action: "field.toggle",
+      entity: "fieldDef",
+      entityId: id,
+      summary: `${nextActive ? "启用" : "停用"}自定义字段「${defT?.label ?? id}」`,
+      after: nextActive ? "active" : "inactive",
+    });
     revalidateFieldSurfaces();
     return { ok: true };
   } catch (e) {
     if (e instanceof CustomFieldError) return { error: e.message };
-    console.error("[toggleFieldActiveAction]", e);
+    logAppError("[toggleFieldActiveAction]", e);
     return { error: "操作失败，请稍后重试" };
   }
 }
@@ -162,7 +184,7 @@ export async function reorderFieldsAction(
     return { ok: true };
   } catch (e) {
     if (e instanceof CustomFieldError) return { error: e.message };
-    console.error("[reorderFieldsAction]", e);
+    logAppError("[reorderFieldsAction]", e);
     return { error: "操作失败，请稍后重试" };
   }
 }

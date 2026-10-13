@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createSubmission, DesignSubmissionError } from "./server/submissions";
 import { reviewSubmission, DesignReviewError } from "./server/review";
+import { logAppError } from "@/core/domain/telemetry";
 
 export interface SubmitTaskFormState {
   error?: string;
@@ -31,7 +32,7 @@ export async function submitDesignTaskAction(
     return { ok: true };
   } catch (e) {
     if (e instanceof DesignSubmissionError) return { error: e.message };
-    console.error("[submitDesignTaskAction]", e);
+    logAppError("[submitDesignTaskAction]", e);
     return { error: "提交失败，请稍后重试" };
   }
 }
@@ -70,7 +71,7 @@ export async function reviewDesignTaskAction(
     return { ok: true };
   } catch (e) {
     if (e instanceof DesignReviewError) return { error: e.message };
-    console.error("[reviewDesignTaskAction]", e);
+    logAppError("[reviewDesignTaskAction]", e);
     return { error: "审核失败，请稍后重试" };
   }
 }
