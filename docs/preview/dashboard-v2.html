@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>数据驾驶舱 · 改版样张 v2</title>
+<style>
+  /* 令牌逐字取自 src/styles/tokens.css（钴蓝插槽默认值），样张即真色，不另调 */
+  :root{
+    --canvas:#F4F1EA; --surface:#FAF8F3; --surface-sunken:#EDEAE2;
+    --text-primary:#2B2A26; --text-secondary:#6E6A5E; --text-disabled:#A8A294;
+    --accent:#3368A0; --accent-ink:#2A4E7A; --accent-tint:#DCE8F4; --accent-fg:#FFFFFF;
+    --border:#E7E1D6; --success:#3E7C5B; --warning:#8A5F1B; --danger:#A32821;
+    --radius-card:10px; --radius-inner:6px;
+    --font-sans:"Inter","PingFang SC","Microsoft YaHei","HarmonyOS Sans SC","Noto Sans SC",system-ui,sans-serif;
+    --font-mono:"JetBrains Mono","Maple Mono",ui-monospace,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--canvas);color:var(--text-primary);font-family:var(--font-sans);font-size:15px;line-height:1.6}
+  .num{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+  .wrap{max-width:1200px;margin:0 auto;padding:40px 24px 96px}
+
+  /* ── 改版说明条（不是界面的一部分，判完可无视）──────────────── */
+  .brief{border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:var(--radius-inner);
+    background:var(--surface);padding:16px 20px;margin-bottom:40px}
+  .brief h2{margin:0 0 8px;font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--accent-ink)}
+  .brief ol{margin:0;padding-left:20px;font-size:13px;color:var(--text-secondary);line-height:1.9}
+  .brief b{color:var(--text-primary);font-weight:600}
+
+  /* ── 页头 ─────────────────────────────────────────────────── */
+  .page-head{display:flex;align-items:baseline;justify-content:space-between;gap:16px;
+    border-bottom:1px solid var(--border);padding-bottom:16px;margin-bottom:32px}
+  .page-head h1{margin:0;font-size:28px;font-weight:600;letter-spacing:-.01em}
+  .page-head .meta{font-size:12px;color:var(--text-secondary)}
+
+  .eyebrow{font-size:12px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--text-secondary);margin:0 0 12px}
+  .eyebrow b{color:var(--accent-ink);font-weight:600}
+
+  /* ── 1. 主指标带：签单额独占，其余三格降次级 ───────────────── */
+  .hero-band{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:48px;align-items:center;
+    padding-bottom:32px;border-bottom:1px solid var(--border);margin-bottom:32px}
+  .hero-figure{font-size:28px;font-weight:600;letter-spacing:-.02em;line-height:1.2}
+  .hero-delta{margin-top:8px;font-size:13px;color:var(--success);font-weight:500}
+  .hero-delta.flat{color:var(--text-secondary)}
+  .hero-compare{margin-top:16px;display:flex;align-items:center;gap:12px;font-size:12px;color:var(--text-secondary)}
+  .bar-pair{display:flex;align-items:flex-end;gap:4px;height:32px}
+  .bar-pair i{display:block;width:26px;background:var(--surface-sunken);border-radius:2px 2px 0 0}
+  .bar-pair i.cur{background:var(--accent)}
+  .sub-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:var(--border);
+    border:1px solid var(--border);border-radius:var(--radius-card);overflow:hidden}
+  .sub-cell{background:var(--surface);padding:16px 20px}
+  .sub-cell .lb{font-size:12px;color:var(--text-secondary);display:flex;align-items:center;gap:6px}
+  .sub-cell .vl{font-size:20px;font-weight:600;margin-top:4px;letter-spacing:-.01em}
+  .sub-cell .hint{font-size:12px;color:var(--text-secondary);margin-top:4px}
+  .dot{width:7px;height:7px;border-radius:50%;display:inline-block;flex:none}
+  .dot.ok{background:var(--success)} .dot.warn{background:var(--warning)} .dot.bad{background:var(--danger)} .dot.none{background:var(--text-disabled)}
+  .meter{height:3px;background:var(--surface-sunken);border-radius:2px;margin-top:8px;overflow:hidden}
+  .meter i{display:block;height:100%;background:var(--accent)}
+
+  /* ── 2. 需要你处理：横向清单，风险优先 ─────────────────────── */
+  .act{border:1px solid var(--border);border-radius:var(--radius-card);background:var(--surface);margin-bottom:40px;overflow:hidden}
+  .act-head{display:flex;align-items:baseline;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border)}
+  .act-head h2{margin:0;font-size:15px;font-weight:600}
+  .act-head span{font-size:12px;color:var(--text-secondary)}
+  .act-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:0}
+  .act-item{padding:16px 20px;border-right:1px solid var(--border);text-decoration:none;color:inherit;display:block}
+  .act-item:last-child{border-right:0}
+  .act-item .top{display:flex;align-items:baseline;gap:8px}
+  .act-item .cnt{font-size:20px;font-weight:600;letter-spacing:-.01em}
+  .act-item .ttl{font-size:13px;font-weight:500;white-space:nowrap}
+  .act-item .who{margin-top:6px;font-size:12px;color:var(--text-secondary);line-height:1.7}
+  .act-item.urgent .cnt{color:var(--danger)}
+  .act-item.plain .cnt{color:var(--text-primary)}
+
+  /* ── 3. 项目健康度：密集表取代两张大卡 ─────────────────────── */
+  section{margin-bottom:40px}
+  .sec-head{display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin-bottom:12px}
+  .sec-head h2{margin:0;font-size:17px;font-weight:600}
+  .sec-head .note{font-size:12px;color:var(--text-secondary)}
+  table{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--border);
+    border-radius:var(--radius-card);overflow:hidden;font-size:13px}
+  thead th{text-align:left;font-weight:500;font-size:12px;color:var(--text-secondary);padding:12px 14px;white-space:nowrap}
+    border-bottom:1px solid var(--border);background:var(--surface-sunken);white-space:nowrap}
+  tbody td{padding:12px 14px;border-bottom:1px solid var(--border);vertical-align:middle}
+  td:last-child,th:last-child{white-space:nowrap}
+  td:first-child,th:first-child{white-space:nowrap}
+  tbody tr:last-child td{border-bottom:0}
+  tbody tr:hover{background:var(--accent-tint)}
+  td.r,th.r{text-align:right}
+  .pname{font-weight:500;white-space:nowrap}
+  .pcode{font-size:12px;color:var(--text-disabled);margin-left:8px}
+  .tag{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:2px 8px;border:1px solid var(--border);border-radius:999px;background:var(--canvas);white-space:nowrap}
+  .prog{display:flex;align-items:center;gap:8px;min-width:120px}
+  .prog .track{flex:1;height:4px;background:var(--surface-sunken);border-radius:2px;overflow:hidden}
+  .prog .track i{display:block;height:100%;background:var(--accent)}
+  .prog .pv{font-size:12px;width:34px;text-align:right;color:var(--text-secondary)}
+  .lights{display:flex;gap:8px;white-space:nowrap}
+  .lights span{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--text-secondary)}
+  .muted{color:var(--text-disabled)}
+  .flag{color:var(--danger);font-weight:500}
+  .flag.w{color:var(--warning)}
+
+  /* ── 4. 现金与毛利并排 ───────────────────────────────────── */
+  .two{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:32px;align-items:start}
+  .panel{border:1px solid var(--border);border-radius:var(--radius-card);background:var(--surface);padding:20px}
+  .panel h3{margin:0 0 4px;font-size:15px;font-weight:600}
+  .panel .sub{font-size:12px;color:var(--text-secondary);margin:0 0 16px}
+  .rank{display:flex;flex-direction:column;gap:12px}
+  .rank-row{display:grid;grid-template-columns:minmax(0,1fr) 56px;gap:12px;align-items:center}
+  .rank-row .nm{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rank-row .bar{height:6px;background:var(--surface-sunken);border-radius:3px;overflow:hidden;margin-top:4px}
+  .rank-row .bar i{display:block;height:100%;background:var(--accent)}
+  .rank-row .pc{font-size:13px;text-align:right;font-weight:500}
+  .rank-row.dim .nm,.rank-row.dim .pc{color:var(--text-disabled)}
+  .cash-legend{display:flex;gap:16px;font-size:12px;color:var(--text-secondary);margin-top:8px}
+  .cash-legend i{width:14px;height:2px;display:inline-block;vertical-align:middle;margin-right:6px}
+  .cash-table{width:100%;border:0;margin-top:16px;font-size:12px}
+  .cash-table th{background:transparent;border-bottom:1px solid var(--border);padding:6px 8px;font-size:12px}
+  .cash-table td{padding:6px 8px;border-bottom:0}
+  .cash-table tbody tr:hover{background:transparent}
+  .neg{color:var(--warning)}
+
+  /* ── 5. 漏斗 ─────────────────────────────────────────────── */
+  .funnel{display:flex;flex-direction:column;gap:8px}
+  .fn-row{display:grid;grid-template-columns:72px minmax(0,1fr) 88px;gap:12px;align-items:center;font-size:13px}
+  .fn-bar{height:20px;background:var(--accent-tint);border-radius:var(--radius-inner);position:relative;overflow:hidden}
+  .fn-bar i{position:absolute;inset:0 auto 0 0;background:var(--accent);opacity:.85;border-radius:var(--radius-inner)}
+  .fn-val{font-size:12px;color:var(--text-secondary);text-align:right}
+  .placeholder{border:1px dashed var(--border);border-radius:var(--radius-card);padding:20px;background:var(--surface)}
+  .placeholder .t{font-size:13px;font-weight:500}
+  .placeholder .d{font-size:12px;color:var(--text-disabled);margin-top:4px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="brief">
+    <h2>这版改了什么（对照现在的驾驶舱）</h2>
+    <ol>
+      <li><b>四张等大 KPI 卡拆成主次</b>：本月签单额独占主级带（含上月对比条），在建/回款率/风险降为一条次级三格——同 /finance 毛利卡已定的阶梯做法，不再四张卡抢视觉。</li>
+      <li><b>"需要你处理"提到第二屏</b>：待审核、未关闭问题、超期工序、待收付款段做成一条横向清单，每项带具体项目名和入口。老板开驾驶舱第一问是"哪儿要出事"，不是"总数多少"。</li>
+      <li><b>健康矩阵从两张大卡改成密集表</b>：8 个项目一行一个，进度条 + 三灯 + 合同/已收/毛利/风险同屏可比；项目名不再被截成"云栖名…"，30 个项目也不崩。</li>
+      <li><b>现金与毛利并排、漏斗收在一屏内</b>：原来左右高度差一大截、下方大片空白。</li>
+      <li>字号只用 12/13/15/17/20/28、间距只用 4/8/12/16/24/32/48；层级靠字重与留白，不靠更多灰阶，也不动用阴影。</li>
+    </ol>
+  </div>
+
+  <div class="page-head">
+    <div>
+      <h1>数据驾驶舱</h1>
+      <p class="eyebrow" style="margin:8px 0 0">口径范围 全部未归档项目 · 生成于 <span class="num">2026-10-13 17:29</span></p>
+    </div>
+    <div class="meta">钱 → 风险 → 哪个项目 → 点进去</div>
+  </div>
+
+  <!-- 1. 主指标带 -->
+  <div class="hero-band">
+    <div>
+      <p class="eyebrow">本月签单额</p>
+      <div class="hero-figure num">¥698,000.00</div>
+      <div class="hero-delta">较上月 +296.6%（上月 ¥176,000.00）</div>
+      <div class="hero-compare">
+        <span class="bar-pair"><i style="height:25%"></i><i class="cur" style="height:100%"></i></span>
+        <span>近两月签单对比 · 本月含 3 单</span>
+      </div>
+    </div>
+    <div class="sub-grid">
+      <div class="sub-cell">
+        <div class="lb">在建项目数</div>
+        <div class="vl num">2</div>
+        <div class="hint">设计中 / 施工中 / 验收中 · 共 8 个在册</div>
+      </div>
+      <div class="sub-cell">
+        <div class="lb"><i class="dot warn"></i>全司回款率</div>
+        <div class="vl num">9.2%</div>
+        <div class="meter"><i style="width:9.2%"></i></div>
+        <div class="hint">已收 ¥136,600 / 应收 ¥1,490,000 · <a href="#" style="color:var(--accent-ink)">财务总览</a></div>
+      </div>
+      <div class="sub-cell">
+        <div class="lb"><i class="dot bad"></i>风险项数</div>
+        <div class="vl num">5</div>
+        <div class="hint">工期 1 · 质量 2 · 预算 2 · 变更 0</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. 需要你处理 -->
+  <div class="act">
+    <div class="act-head">
+      <h2>需要你处理</h2>
+      <span>共 22 项 · 按紧急度排</span>
+    </div>
+    <div class="act-list">
+      <a class="act-item urgent" href="#">
+        <div class="top"><span class="cnt num">1</span><span class="ttl">超期未完工工序</span></div>
+        <div class="who">RP-2026-002 金域蓝湾 · 泥工工程<br>超计划 7 天 · <b>打开排程 →</b></div>
+      </a>
+      <a class="act-item urgent" href="#">
+        <div class="top"><span class="cnt num">3</span><span class="ttl">未关闭质量问题</span></div>
+        <div class="who">RP-2026-002 天花（待整改）· RP-2026-003 泥工、手工新建<br><b>问题台账 →</b></div>
+      </a>
+      <a class="act-item plain" href="#">
+        <div class="top"><span class="cnt num">1</span><span class="ttl">待审核验收节点</span></div>
+        <div class="who">RP-2026-003 防水工程 已提交待审<br><b>去审核 →</b></div>
+      </a>
+      <a class="act-item plain" href="#">
+        <div class="top"><span class="cnt num">1</span><span class="ttl">待审设计任务</span></div>
+        <div class="who">RP-2026-001 平面布置深化<br><b>去审核 →</b></div>
+      </a>
+      <a class="act-item plain" href="#">
+        <div class="top"><span class="cnt num">16</span><span class="ttl">待收付款段</span></div>
+        <div class="who">其中 4 段已解锁可收款<br><b>付款计划 →</b></div>
+      </a>
+    </div>
+  </div>
+
+  <!-- 3. 项目健康度：密集表 -->
+  <section>
+    <div class="sec-head">
+      <h2>项目健康度</h2>
+      <span class="note">8 个在册项目 · 点行进入项目中心</span>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>项目</th><th>状态</th><th>整体进度</th><th>三灯</th>
+          <th class="r">合同额</th><th class="r">已收</th><th class="r">毛利</th><th class="r">毛利率</th><th>风险</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="pname">云栖名邸 3 栋 1602</span><span class="pcode num">RP-2026-001</span></td>
+          <td><span class="tag">施工中</span></td>
+          <td><div class="prog"><div class="track"><i style="width:49%"></i></div><span class="pv num">49%</span></div></td>
+          <td><div class="lights"><span><i class="dot ok"></i>工期</span><span><i class="dot ok"></i>质量</span><span><i class="dot warn"></i>预算</span></div></td>
+          <td class="r num">¥62,000</td><td class="r num">¥21,800</td><td class="r num">¥22,900</td><td class="r num">35.1%</td>
+          <td class="muted">—</td>
+        </tr>
+        <tr>
+          <td><span class="pname">金域蓝湾 2 栋 802</span><span class="pcode num">RP-2026-002</span></td>
+          <td><span class="tag">施工中</span></td>
+          <td><div class="prog"><div class="track"><i style="width:64%"></i></div><span class="pv num">64%</span></div></td>
+          <td><div class="lights"><span><i class="dot bad"></i>工期</span><span><i class="dot bad"></i>质量</span><span><i class="dot warn"></i>预算</span></div></td>
+          <td class="r num">¥320,000</td><td class="r num">¥50,800</td><td class="r num">¥222,800</td><td class="r num">69.0%</td>
+          <td><span class="flag">超期 1 · 问题 1</span></td>
+        </tr>
+        <tr>
+          <td><span class="pname">老街 21 号院</span><span class="pcode num">RP-2026-003</span></td>
+          <td><span class="tag">已竣工</span></td>
+          <td><div class="prog"><div class="track"><i style="width:100%"></i></div><span class="pv num">100%</span></div></td>
+          <td><div class="lights"><span><i class="dot ok"></i>工期</span><span><i class="dot bad"></i>质量</span><span><i class="dot ok"></i>预算</span></div></td>
+          <td class="r num">¥128,000</td><td class="r num">¥64,000</td><td class="r num">¥29,000</td><td class="r num">22.7%</td>
+          <td><span class="flag">问题 2 · 节点待提交 8</span></td>
+        </tr>
+        <tr>
+          <td><span class="pname">湖畔名庭 8 栋 501</span><span class="pcode num">RP-2026-004</span></td>
+          <td><span class="tag">筹备中</span></td>
+          <td><span class="muted">未排程</span></td>
+          <td><div class="lights"><span><i class="dot none"></i>工期</span><span><i class="dot ok"></i>质量</span><span><i class="dot none"></i>预算</span></div></td>
+          <td class="r num">¥100,000</td><td class="r num muted">¥0</td><td class="r muted">—</td><td class="r muted">—</td>
+          <td><span class="muted">未排程 · 无支出记录</span></td>
+        </tr>
+        <tr>
+          <td><span class="pname">溪上和园 6 栋 1201</span><span class="pcode num">RP-2026-005</span></td>
+          <td><span class="tag">筹备中</span></td>
+          <td><span class="muted">未排程</span></td>
+          <td><div class="lights"><span><i class="dot none"></i>工期</span><span><i class="dot ok"></i>质量</span><span><i class="dot none"></i>预算</span></div></td>
+          <td class="r num">¥218,000</td><td class="r num muted">¥0</td><td class="r muted">—</td><td class="r muted">—</td>
+          <td><span class="muted">未录入支出</span></td>
+        </tr>
+        <tr>
+          <td><span class="pname">云锦雅舍 3 栋 1606</span><span class="pcode num">RP-2026-006</span></td>
+          <td><span class="tag">筹备中</span></td>
+          <td><span class="muted">未排程</span></td>
+          <td><div class="lights"><span><i class="dot none"></i>工期</span><span><i class="dot ok"></i>质量</span><span><i class="dot none"></i>预算</span></div></td>
+          <td class="r num">¥176,000</td><td class="r num muted">¥0</td><td class="r muted">—</td><td class="r muted">—</td>
+          <td><span class="muted">未录入支出</span></td>
+        </tr>
+        <tr>
+          <td><span class="pname">王先生·锦绣花园 5 栋 901</span><span class="pcode num">RP-2026-007</span></td>
+          <td><span class="tag">筹备中</span></td>
+          <td><span class="muted">未排程</span></td>
+          <td><div class="lights"><span><i class="dot none"></i>工期</span><span><i class="dot ok"></i>质量</span><span><i class="dot none"></i>预算</span></div></td>
+          <td class="r num">¥380,000</td><td class="r num muted">¥0</td><td class="r muted">—</td><td class="r muted">—</td>
+          <td><span class="muted">未录入支出</span></td>
+        </tr>
+        <tr>
+          <td><span class="pname">同号客户·同号楼盘</span><span class="pcode num">RP-2026-008</span></td>
+          <td><span class="tag">筹备中</span></td>
+          <td><span class="muted">未排程</span></td>
+          <td><div class="lights"><span><i class="dot none"></i>工期</span><span><i class="dot ok"></i>质量</span><span><i class="dot none"></i>预算</span></div></td>
+          <td class="r num">¥100,000</td><td class="r num muted">¥0</td><td class="r muted">—</td><td class="r muted">—</td>
+          <td><span class="muted">面积未填 · 可归档</span></td>
+        </tr>
+      </tbody>
+    </table>
+    <p style="font-size:12px;color:var(--text-secondary);margin:12px 0 0">
+      毛利 = 合同额 + 累计变更 − 支出；<b>只录了合同额、还没录支出的项目不显示 100%</b>（那是没数据不是高利润），故置「—」。
+    </p>
+  </section>
+
+  <!-- 4. 现金 + 毛利排行 -->
+  <section>
+    <div class="two">
+      <div class="panel">
+        <h3>月度现金收付</h3>
+        <p class="sub">近 6 个月 · 单位元 · 收 与 支 各一条线</p>
+        <svg viewBox="0 0 620 180" width="100%" height="180" role="img" aria-label="月度现金收付折线">
+          <g stroke="var(--border)" stroke-width="1">
+            <line x1="40" y1="20" x2="600" y2="20"/><line x1="40" y1="65" x2="600" y2="65"/>
+            <line x1="40" y1="110" x2="600" y2="110"/><line x1="40" y1="155" x2="600" y2="155"/>
+          </g>
+          <text x="34" y="24" font-size="10" fill="var(--text-disabled)" text-anchor="end">120k</text>
+          <text x="34" y="114" font-size="10" fill="var(--text-disabled)" text-anchor="end">60k</text>
+          <text x="34" y="159" font-size="10" fill="var(--text-disabled)" text-anchor="end">0</text>
+          <!-- 收款 -->
+          <polyline fill="none" stroke="var(--accent)" stroke-width="2"
+            points="60,155 150,155 240,155 330,33 420,136 510,151"/>
+          <!-- 支出 -->
+          <polyline fill="none" stroke="var(--text-secondary)" stroke-width="1.5" stroke-dasharray="4 3"
+            points="60,155 150,152 240,155 330,20 420,36 510,133"/>
+          <g fill="var(--accent)">
+            <circle cx="330" cy="33" r="3"/><circle cx="420" cy="136" r="3"/><circle cx="510" cy="151" r="3"/>
+          </g>
+          <g font-size="10" fill="var(--text-secondary)" text-anchor="middle">
+            <text x="60" y="172">05</text><text x="150" y="172">06</text><text x="240" y="172">07</text>
+            <text x="330" y="172">08</text><text x="420" y="172">09</text><text x="510" y="172">10</text>
+          </g>
+        </svg>
+        <div class="cash-legend"><span><i style="background:var(--accent)"></i>收款</span><span><i style="background:var(--text-secondary)"></i>支出（虚线）</span></div>
+        <table class="cash-table">
+          <thead><tr><th>月份</th><th class="r">收款</th><th class="r">支出</th><th class="r">净现金</th></tr></thead>
+          <tbody>
+            <tr><td class="num">2026-05</td><td class="r num">¥0.00</td><td class="r num">¥0.00</td><td class="r num">¥0.00</td></tr>
+            <tr><td class="num">2026-06</td><td class="r num">¥0.00</td><td class="r num">¥2,000.00</td><td class="r num neg">−¥2,000.00</td></tr>
+            <tr><td class="num">2026-07</td><td class="r num">¥0.00</td><td class="r num">¥0.00</td><td class="r num">¥0.00</td></tr>
+            <tr><td class="num">2026-08</td><td class="r num">¥112,000.00</td><td class="r num">¥120,000.00</td><td class="r num neg">−¥8,000.00</td></tr>
+            <tr><td class="num">2026-09</td><td class="r num">¥21,400.00</td><td class="r num">¥101,500.00</td><td class="r num neg">−¥80,100.00</td></tr>
+            <tr><td class="num">2026-10</td><td class="r num">¥3,200.00</td><td class="r num">¥17,800.00</td><td class="r num neg">−¥14,600.00</td></tr>
+          </tbody>
+        </table>
+        <p style="font-size:12px;color:var(--text-secondary);margin:12px 0 0">
+          5~7 月是<b>真实现金流空白</b>（演示项目最早 2026-08-02 开工），不是数据缺失，故如实显示 ¥0.00 而非「—」。
+        </p>
+      </div>
+
+      <div class="panel">
+        <h3>项目毛利率排行</h3>
+        <p class="sub">口径：合同额 + 变更 − 支出 · 仅列已录入支出的项目</p>
+        <div class="rank">
+          <div class="rank-row"><div><div class="nm">金域蓝湾 2 栋 802 · RP-2026-002</div><div class="bar"><i style="width:69%"></i></div></div><div class="pc num">69.0%</div></div>
+          <div class="rank-row"><div><div class="nm">云栖名邸 3 栋 1602 · RP-2026-001</div><div class="bar"><i style="width:35.1%"></i></div></div><div class="pc num">35.1%</div></div>
+          <div class="rank-row"><div><div class="nm">老街 21 号院 · RP-2026-003</div><div class="bar"><i style="width:22.7%;background:var(--warning)"></i></div></div><div class="pc num">22.7%</div></div>
+          <div class="rank-row dim"><div><div class="nm">其余 5 个项目</div><div class="bar"><i style="width:0"></i></div></div><div class="pc num">—</div></div>
+        </div>
+        <p style="font-size:12px;color:var(--text-disabled);margin:16px 0 0;line-height:1.8">
+          未录入支出的 5 个项目按公式恰得 100%，摆榜首必误导，故不入榜、置末、率显「—」。<br>
+          毛利率 15%~25% 归黄档，低于 15% 归红档。
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5. 漏斗 + 占位 -->
+  <section style="margin-bottom:0">
+    <div class="two">
+      <div class="panel">
+        <h3>商务漏斗</h3>
+        <p class="sub">各阶段<b>当前存量</b>（非累计流量）· 已作废线索不计入</p>
+        <div class="funnel">
+          <div class="fn-row"><span>线索</span><div class="fn-bar"><i style="width:40%"></i></div><span class="fn-val num">2 · 22%</span></div>
+          <div class="fn-row"><span>已联系</span><div class="fn-bar"><i style="width:40%"></i></div><span class="fn-val num">2 · 22%</span></div>
+          <div class="fn-row"><span>已确认</span><div class="fn-bar"><i style="width:40%"></i></div><span class="fn-val num">2 · 22%</span></div>
+          <div class="fn-row"><span>已报价</span><div class="fn-bar"><i style="width:40%"></i></div><span class="fn-val num">2 · 22%</span></div>
+          <div class="fn-row"><span>已签约</span><div class="fn-bar"><i style="width:80%"></i></div><span class="fn-val num">4 · 44%</span></div>
+        </div>
+        <p style="font-size:12px;color:var(--text-secondary);margin:16px 0 0">签约率 <b class="num">44.4%</b>（12 条线索中 4 条已签约）· 阶段存量分布，不代表历史转化</p>
+      </div>
+      <div class="placeholder">
+        <div class="t">人效排行 · 未接入</div>
+        <div class="d">依赖「人员管控」模块（人员档案 / 绩效算法 / 考核看板），尚未上线，故此处不显示任何数字，也不造演示数据。</div>
+        <div class="d" style="margin-top:12px">同处留位的还有：项目回款账龄、班组成本对比。三者都需要人员与工时数据才能算，缺数据时诚实空着比画个假图表有用。</div>
+      </div>
+    </div>
+  </section>
+
+</div>
+</body>
+</html>
