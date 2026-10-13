@@ -41,7 +41,9 @@ export default async function RootLayout({
       <body>
         <div className="flex min-h-screen flex-col bg-canvas md:flex-row">
           {/* 桌面侧栏 */}
-          <aside className="hidden w-60 shrink-0 flex-col border-r border-line bg-surface md:flex">
+          {/* M10-a UI-6：侧栏 sticky 固定——长页面滚动时导航不该跟着走（HAE 意见 6）。
+              自身超高时内部滚（overflow-y-auto），不影响主内容区滚动。 */}
+          <aside className="hidden w-60 shrink-0 flex-col border-r border-line bg-surface md:sticky md:top-0 md:flex md:h-screen md:max-h-screen md:overflow-y-auto">
             <Link href="/" className="block border-b border-line px-5 py-5">
               {logoSrc ? (
                 <img

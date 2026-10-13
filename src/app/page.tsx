@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Badge } from "@/core/ui";
 import { PLATFORM } from "@/core/platform";
 import { deferredModules, modules } from "@/modules/registry";
+import { HeroSplash } from "./HeroSplash";
 
 export const metadata = { title: "平台首页" };
 // 外壳现在每次渲染读 PlatformSetting（主题/Logo，M9-d）；首页保持静态会把构建当时的插槽色
@@ -14,6 +15,17 @@ export const dynamic = "force-dynamic";
  * 版式走"编辑式索引"而非等宽卡片网格 —— 避免千篇一律的圆角大卡片堆叠。
  */
 export default function HomePage() {
+  return (
+    <>
+      {/* 启动页首屏（M10-b · V0.3 成文例外，见 AGENTS §6.3）：fixed 覆盖层，滚轮/按钮/Esc 收起，
+          收起后就是下面的模块索引原样——不改既有页面结构，零回归面。 */}
+      <HeroSplash moduleNameCount={modules.length} />
+      <ModuleIndex />
+    </>
+  );
+}
+
+function ModuleIndex() {
   return (
     <div className="grid gap-12 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-16">
       {/* 左：定位 */}
@@ -53,7 +65,8 @@ export default function HomePage() {
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-2 text-base font-semibold leading-snug">
-                    {m.icon && <span className="num text-sm text-accent-ink">{m.icon}</span>}
+                    {/* M10-a UI-3：图标列去掉——原来是「舱/线/目/笔/期…」汉字与符号混排，
+                        形态不统一反而添噪（HAE 2026-10-13 意见 3）。编号 + 名称已足够定位。 */}
                     <span className="transition-colors duration-[120ms] group-hover:text-accent-ink">
                       {m.name}
                     </span>

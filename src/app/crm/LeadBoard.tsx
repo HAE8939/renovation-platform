@@ -161,8 +161,10 @@ export function LeadBoard({ leads }: { leads: LeadListItem[] }) {
   return (
     <>
       {advanceError && <p className="mb-3 text-[13px] text-danger">推进失败：{advanceError}</p>}
-      <div className="-mx-4 overflow-x-auto px-4 pb-2">
-        <div className="flex min-w-max gap-4">
+      {/* M10-a UI-7：原为「横向滚动 + 每列固定 280px」，五列并排必然出底部滑块、
+          看不全全部内容（HAE 意见 7）。改为响应式网格：窄屏两列换行、宽屏五列并排且列宽自适应。 */}
+      <div className="mt-3 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <div className="contents">
           {LEAD_STAGE_ORDER.map((stage) => {
             const items = byStage.get(stage) ?? [];
             const isDropTarget = dropStage === stage && dragFrom !== null;
@@ -170,7 +172,7 @@ export function LeadBoard({ leads }: { leads: LeadListItem[] }) {
             return (
               <div
                 key={stage}
-                className="flex w-[280px] shrink-0 flex-col"
+                className="flex min-w-0 flex-col"
                 onDragOver={(e) => {
                   if (allowDrop) {
                     e.preventDefault();

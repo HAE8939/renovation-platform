@@ -56,6 +56,44 @@
    外壳读 PlatformSetting.themeKey 后打在 <html data-theme="...">（M9-d）。
    无属性时落 :root 的钴蓝回落；脏键在 normalizeThemeKey 处即被归一，不会命中不到。 */
 
+/* ── 主题插槽：每套只重写 --accent 一族四值，其余 token 一律不动 ──
+   外壳读 PlatformSetting.themeKey 后打在 <html data-theme="...">（M9-d）。
+
+   M10-a 补的一条（HAE 意见 4「四份主题色现在是单一颜色」实见）：
+   根元素那条选择器只匹配 html，所以**组件内嵌的 data-theme 预览块拿不到插槽色**——
+   设置页四张主题卡过去全都渲染成当前主题的同一套颜色，看起来"四套没区别"。
+   下面把同一批值再声明一遍为元素级 data-theme 选择器（匹配任意带该属性的元素），
+   让局部预览能作用域换色。**两处必须同集合同值**，由 scripts/verify-theme.mjs 的漂移锁钉死；
+   只改一处 = 全站换肤与设置页预览分叉，比原来的 bug 更糟。 */
+[data-theme="cobalt"] {
+  --accent: #3368A0;
+  --accent-ink: #2A4E7A;
+  --accent-tint: #DCE8F4;
+  --accent-fg: #FFFFFF;
+}
+
+[data-theme="rust"] {
+  --accent: #B7472A;
+  --accent-ink: #7A2E1A;
+  --accent-tint: #F3E3DB;
+  --accent-fg: #FFFFFF;
+}
+
+[data-theme="emerald"] {
+  --accent: #009473;
+  --accent-ink: #0B5C47;
+  --accent-tint: #DBF0EB;
+  --accent-fg: #FFFFFF;
+}
+
+[data-theme="teal"] {
+  /* 浅青底上白字「发飘」（≈1.6:1），主按钮前景改用深墨＝同套 --accent-ink。 */
+  --accent: #81D8D0;
+  --accent-ink: #0A7680;
+  --accent-tint: #E2F2F0;
+  --accent-fg: #0A7680;
+}
+
 :root[data-theme="cobalt"] {
   --accent: #3368A0;
   --accent-ink: #2A4E7A;

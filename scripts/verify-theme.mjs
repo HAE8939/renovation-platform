@@ -104,6 +104,28 @@ const J = (x) => JSON.stringify(x);
       block ? "" : "未找到插槽块");
   }
 
+  /* M10-a 双声明锁：:root[data-theme] 管全站换肤，[data-theme]（任意元素）管组件内局部预览
+     （设置页四张主题卡必须各自显色，否则 HAE 看到的"四套没区别"会复发）。
+     两套必须同键集合同值——只写一处 = 全站与预览分叉，比没修更糟。 */
+  {
+    const rootKeys = [...css.matchAll(/:root\[data-theme="([^"]+)"\]/g)].map((m) => m[1]).sort();
+    const anyKeys = [...css.matchAll(/(?<!root)\[data-theme="([^"]+)"\]/g)].map((m) => m[1]).sort();
+    check("双声明锁: 每个插槽都有 :root[data-theme] 与元素级 [data-theme] 两份（局部预览可用）",
+      J(rootKeys) === J(anyKeys) && anyKeys.length === THEME_KEYS.length,
+      `root=[${rootKeys.join(",")}] any=[${anyKeys.join(",")}]`);
+    for (const k of THEME_KEYS) {
+      const grab = (re) => {
+        const b = css.match(re);
+        const body = b ? b[1] : "";
+        const v = (t) => (body.match(new RegExp(`--${t}:\\s*([^;]+);`)) || [])[1]?.trim().toUpperCase() ?? null;
+        return [v("accent"), v("accent-ink"), v("accent-tint"), v("accent-fg")].join("|");
+      };
+      const a = grab(new RegExp(`:root\\[data-theme="${k}"\\]\\s*\\{([^}]*)\\}`));
+      const b = grab(new RegExp(`(?<!root)\\[data-theme="${k}"\\]\\s*\\{([^}]*)\\}`));
+      check(`双声明锁: 插槽 ${k} 两份四值逐字相同`, !!a && a === b, `${a} vs ${b}`);
+    }
+  }
+
   // 现状基线：cobalt 三元组必须等于 V0.3 落地值（防止有人误改 :root 默认或插槽）。
   check("插槽 cobalt: accent 族 == V0.3 落地钴蓝（#3368A0 / #2A4E7A / #DCE8F4）",
     /:root\[data-theme="cobalt"\]\s*\{[^}]*--accent:\s*#3368A0/i.test(css) &&

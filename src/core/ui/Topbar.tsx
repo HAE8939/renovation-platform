@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { PLATFORM } from "@/core/platform";
+import { NotificationBell } from "@/core/ui/NotificationBell";
 import type { ModuleManifest } from "@/modules/types";
 
 interface TopbarProps {
@@ -41,6 +42,9 @@ export function Topbar({ modules }: TopbarProps) {
       </div>
       <div className="flex items-center gap-4">
         <span className="hidden text-xs text-muted sm:inline">{PLATFORM.status}</span>
+        {/* 通知中心（M10-a UI-12，HAE 意见 12）：与「设置」并列的平台级入口，
+            不进模块 registry——它不是业务模块，是全平台状态的聚合视图。 */}
+        <NotificationBell />
         {/* 平台设置入口（M9-d）：主题 + Logo，属平台工具，不进业务模块导航，故放顶栏。 */}
         <Link
           href="/settings"

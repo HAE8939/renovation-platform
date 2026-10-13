@@ -280,6 +280,14 @@ export function CatalogEditor({ catalog }: { catalog: CatalogCategoryRow[] }) {
                             size="sm"
                             variant="ghost"
                             disabled={pending}
+                            onClick={() => setDrawer({ categoryId: c.id, item: null })}
+                          >
+                            新增科目项
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={pending}
                             onClick={() => setRenamingId(c.id)}
                           >
                             重命名

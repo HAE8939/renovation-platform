@@ -12,9 +12,11 @@ type ViewMode = "board" | "list";
 export default async function CrmListPage({
   searchParams,
 }: {
-  searchParams: { view?: string };
+  searchParams: { view?: string; archived?: string };
 }) {
-  const leads = await listLeads();
+  // M10-a 备料三：默认只看在用线索；?archived=1 切到「已作废」视图，用来恢复误作废的单子。
+  const onlyArchived = searchParams?.archived === "1";
+  const leads = await listLeads(onlyArchived ? { onlyArchived: true } : undefined);
   const view: ViewMode = searchParams?.view === "list" ? "list" : "board";
 
   return (
@@ -35,15 +37,27 @@ export default async function CrmListPage({
       <NewLeadForm />
 
       <section>
-        <div className="flex items-baseline justify-between">
+        <div className="flex items-baseline justify-between gap-4">
           <h2 className="text-[15px] font-semibold">
-            {view === "board" ? "线索看板" : "线索列表"}
+            {onlyArchived ? "已作废线索" : view === "board" ? "线索看板" : "线索列表"}
           </h2>
-          <span className="text-[13px] text-secondary">共 {leads.length} 条</span>
+          <div className="flex items-baseline gap-4">
+            <span className="text-[13px] text-secondary">共 {leads.length} 条</span>
+            <a
+              href={onlyArchived ? "/crm" : "/crm?view=list&archived=1"}
+              className="text-[13px] text-accent-ink hover:underline underline-offset-4 whitespace-nowrap"
+            >
+              {onlyArchived ? "返回在用线索" : "查看已作废"}
+            </a>
+          </div>
         </div>
 
         {leads.length === 0 ? (
-          <p className="mt-3 text-[15px] text-secondary">还没有线索，先用上面的表单创建一条。</p>
+          <p className="mt-3 text-[15px] text-secondary">
+            {onlyArchived
+              ? "没有已作废的线索。作废一条后会出现在这里，可随时恢复。"
+              : "还没有线索，先用上面的表单创建一条。"}
+          </p>
         ) : view === "board" ? (
           <LeadBoard leads={leads} />
         ) : (

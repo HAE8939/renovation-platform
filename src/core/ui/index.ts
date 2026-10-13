@@ -7,3 +7,5 @@ export { Drawer, type DrawerProps } from "./Drawer";
 export { Badge, type BadgeProps, type BadgeVariant } from "./Badge";
 export { Nav } from "./Nav";
 export { Topbar } from "./Topbar";
+
+export { NotificationBell } from "./NotificationBell";

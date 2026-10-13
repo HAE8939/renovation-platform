@@ -63,3 +63,181 @@ button {
     scroll-behavior: auto !important;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   启动页首屏（/ · M10-b）
+   —— 这里是 V0.3 的**成文例外**（HAE 2026-10-13 拍板「启动页完全例外，不受 V0.3 管」）：
+      允许展示级字号、深色主按钮、径向柔光、滚动入场动画。见 AGENTS §6.3。
+      例外**只限 .splash-* 作用域**：业务页一律不得引用这些类，也不得把字号/深色块带进内页。
+      配色仍全部取本仓 CSS 变量（纸底 + 钴蓝），不引入新色值——换主题时首屏跟着一起换。
+   运动逻辑取自 codex 模板的拆解表：120ms 起、600ms 主入场、cubic-bezier(.22,.61,.36,1)、
+   副标题 470ms 起逐字 42ms、CTA 980ms 后进入、底部提示 1.5s 脉冲。
+   prefers-reduced-motion 由上面的全局规则把动画压到近零 + 脚本跳过逐字写入，两处都兜。
+   ═══════════════════════════════════════════════════════════════ */
+.splash {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background:
+    radial-gradient(120% 90% at 50% 12%, color-mix(in srgb, var(--accent-tint) 62%, transparent) 0%, transparent 58%),
+    var(--canvas);
+  transition: opacity 420ms ease, transform 420ms ease;
+}
+.splash[data-leaving="1"] {
+  opacity: 0;
+  transform: translateY(-16px);
+  pointer-events: none;
+}
+/* 底部那条 1px 边界：模板的「首屏底缘」层级关系 */
+.splash::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 1px;
+  background: var(--border);
+}
+.splash-eyebrow {
+  font-size: 12px;
+  letter-spacing: 0.28em;
+  color: var(--text-secondary);
+  opacity: 0;
+  transform: translateY(10px);
+  animation: splash-in 600ms cubic-bezier(0.22, 0.61, 0.36, 1) 120ms forwards;
+}
+.splash-title {
+  margin: 16px 0 0;
+  font-size: clamp(40px, 7.2vw, 76px);
+  font-weight: 600;
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+  text-align: center;
+  color: var(--text-primary);
+  opacity: 0;
+  transform: translateY(18px);
+  animation: splash-in 720ms cubic-bezier(0.22, 0.61, 0.36, 1) 240ms forwards;
+}
+.splash-title em {
+  font-style: normal;
+  color: var(--accent-ink);
+}
+.splash-sub {
+  margin-top: 24px;
+  min-height: 1.8em;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text-secondary);
+  text-align: center;
+  letter-spacing: 0.02em;
+}
+.splash-caret {
+  display: inline-block;
+  width: 1px;
+  height: 1.1em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background: var(--accent-ink);
+  animation: splash-blink 700ms steps(1, end) infinite;
+}
+.splash-cta {
+  margin-top: 40px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  opacity: 0;
+  transform: translateY(12px);
+  animation: splash-in 600ms ease-out 1180ms forwards;
+}
+.splash-enter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 24px;
+  border: 0;
+  border-radius: var(--radius-inner);
+  background: var(--text-primary);
+  color: var(--canvas);
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+.splash-enter:hover {
+  opacity: 0.88;
+  transform: translateY(-1px);
+}
+.splash-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 44px;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: color 120ms ease;
+}
+.splash-ghost:hover {
+  color: var(--accent-ink);
+}
+.splash-note {
+  margin: 16px 24px 0;
+  max-width: 34em;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-secondary);
+  text-align: center;
+  opacity: 0;
+  animation: splash-in 300ms ease-out forwards;
+}
+.splash-hint {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  color: var(--text-disabled);
+  opacity: 0;
+  animation: splash-in 600ms ease-out 1500ms forwards;
+}
+.splash-hint i {
+  display: block;
+  width: 1px;
+  height: 24px;
+  background: linear-gradient(to bottom, var(--text-disabled), transparent);
+  animation: splash-bob 1500ms ease-in-out infinite;
+}
+@keyframes splash-in {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes splash-blink {
+  50% {
+    opacity: 0;
+  }
+}
+@keyframes splash-bob {
+  0%, 100% {
+    transform: translateY(0);
+    opacity: 0.55;
+  }
+  50% {
+    transform: translateY(6px);
+    opacity: 1;
+  }
+}

@@ -23,7 +23,9 @@ export function Nav({ modules, compact = false }: NavProps) {
 
   if (compact) {
     return (
-      <nav className="flex items-center gap-1 overflow-x-auto border-t border-line bg-canvas">
+      /* md:hidden 是必须的：桌面端已有左侧栏，这条横向模块栏只给窄屏用。
+         此前它没有响应式隐藏，1440 宽下**侧栏与横条两套导航同时出现**（M10-a 截图复查实见）。 */
+      <nav className="flex items-center gap-1 overflow-x-auto border-t border-line bg-canvas md:hidden">
         {modules.map((m) => {
           const active = isActive(m);
           return (

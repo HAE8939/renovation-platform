@@ -60,11 +60,9 @@ function ThemePicker({ initial }: { initial: ThemeKey }) {
 
   return (
     <section>
-      <h2 className="text-[17px] font-semibold">强调色主题</h2>
-      <p className="mt-1 text-xs text-secondary">
-        只替换那一处强调色（色块 / 深墨 / 浅晕 / 主按钮字色），纸底、灰阶、描边、圆角一律不动。
-        选定的主题全站即时生效。
-      </p>
+      {/* M10-a UI-4（HAE 意见 4）：标题就叫「主题」，技术口径的说明文字去掉——
+          设置页是给老板点的，不是给设计系统作者看的。四色含义已由色块下方标签承担。 */}
+      <h2 className="text-[17px] font-semibold">主题</h2>
 
       <form onSubmit={onSubmit} className="mt-4">
         <div className="grid gap-4 sm:grid-cols-2">
@@ -118,20 +116,49 @@ function ThemePicker({ initial }: { initial: ThemeKey }) {
 
 /** 用 data-theme 作用域取 CSS 变量，杜绝在 TSX 里硬写色值。 */
 function ThemeSwatch({ theme }: { theme: ThemeKey }) {
+  // M10-a UI-4（HAE 意见 4）：原来只给一块主色 + 一块浅晕，四套主题的差别看不出来。
+  // 改为把这一套插槽的**四个值逐个摆出来**，与 tokens.css 的四值一一对应
+  // （accent / ink / tint / fg）。仍走 data-theme 作用域吃 CSS 变量，不写死 hex——
+  // 写死就和 verify-theme 锁的两处口径分叉了。
+  const chips: Array<{ label: string; token: string; text?: string; wide?: boolean }> = [
+    { label: "强调", token: "var(--accent)", text: "A", wide: true },
+    { label: "深墨", token: "var(--accent-ink)", text: "A" },
+    { label: "浅晕", token: "var(--accent-tint)" },
+    { label: "按钮", token: "var(--accent-fg)" },
+  ];
   return (
     <span
       data-theme={theme}
-      aria-hidden
-      className="flex shrink-0 flex-col items-center gap-1.5 pt-0.5"
+      className="flex shrink-0 flex-col gap-1.5 pt-0.5"
+      role="img"
+      aria-label={`${THEME_LABEL[theme]}主题：强调色、深墨字、浅晕底、按钮字色四色预览`}
     >
       <span className="flex overflow-hidden rounded-inner border border-line">
-        <span className="flex h-8 w-6 items-center justify-center" style={{ background: "var(--accent)" }}>
-          <span className="text-[13px] font-semibold" style={{ color: "var(--accent-fg)" }}>A</span>
-        </span>
-        <span className="h-8 w-6" style={{ background: "var(--accent-tint)" }} />
+        {chips.map((c) => (
+          <span
+            key={c.label}
+            className={`flex h-8 items-center justify-center border-r border-line last:border-r-0 ${
+              c.wide ? "w-8" : "w-6"
+            }`}
+            style={{ background: c.token }}
+          >
+            {c.text && (
+              <span
+                className="text-[12px] font-semibold"
+                style={{ color: c.label === "强调" ? "var(--accent-fg)" : c.token }}
+              >
+                {c.text}
+              </span>
+            )}
+          </span>
+        ))}
       </span>
-      <span className="text-[12px] font-semibold" style={{ color: "var(--accent-ink)" }}>
-        强调文字
+      <span className="flex gap-1 text-[12px] text-muted">
+        {chips.map((c) => (
+          <span key={c.label} className={c.wide ? "w-8 text-center" : "w-6 text-center"}>
+            {c.label}
+          </span>
+        ))}
       </span>
     </span>
   );

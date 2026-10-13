@@ -22,7 +22,7 @@ export default async function SettingsPage() {
       <section>
         <h1 className="text-[28px] font-semibold leading-[1.3]">平台设置</h1>
         <p className="mt-2 text-xs text-secondary">
-          强调色主题与品牌标识 · 改动全站生效 · 单用户免登录（P4 接入登录后归管理员）
+          主题与品牌标识 · 改动全站生效 · 单用户免登录（P4 接入登录后归管理员）
         </p>
       </section>
 

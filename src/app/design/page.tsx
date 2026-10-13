@@ -273,13 +273,13 @@ export default async function DesignBoardPage({
             )}
           </div>
         ) : (
-          /* 看板：5 列水平排布，窄屏横向滚动不破版（375 适配同 crm 看板） */
-          <div className="-mx-4 mt-3 overflow-x-auto px-4 pb-2">
-            <div className="flex min-w-max gap-4">
+          /* 看板：M10-a UI-8 由「横向滚动 + 固定 280px 列」改为响应式网格（HAE 意见 8） */
+          <div className="mt-3 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="contents">
               {DESIGN_TASK_STATUS_ORDER.map((status) => {
                 const items = byStatus.get(status) ?? [];
                 return (
-                  <div key={status} className="flex w-[280px] shrink-0 flex-col">
+                  <div key={status} className="flex min-w-0 flex-col">
                     {/* 列头：状态名 + 计数 */}
                     <div className="flex items-center justify-between border-b-2 border-line px-1 pb-2">
                       <span className="text-[13px] font-semibold text-primary whitespace-nowrap">
