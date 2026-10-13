@@ -81,13 +81,28 @@ export interface DashboardKpi {
   collectionLight: CollectionLight;
   /** 回款率进度条的 CSS 宽度（>1 钳满 100%）；rate 为 null → null（页面不渲条、显「—」）。算式只在此处一次。 */
   collectionBar: string | null;
+  /**
+   * 本月 vs 上月的对比条高度（CSS 百分比串，以两者较大者为 100%）。
+   * 与 collectionBar 同一条纪律：几何换算在服务层做一次，页面不出现算式。
+   * 上月为 0 时 prev=null（页面只画本月一根，不画"零高度的幽灵条"）。
+   */
+  momBar: { cur: string; prev: string | null } | null;
   risk: RiskCounts & { total: number };
 }
 
+/**
+ * 项目健康度行（M10-b 起：从「只列在建」改为「列全部未归档项目」）。
+ *
+ * 为什么扩范围：原来这里只给在建项目（实测 2 条），页面右半因此大片空白，
+ * 而老板看驾驶舱要的是"每一单现在怎样"，筹备中/已竣工同样是账上的一部分。
+ * 排序＝在建优先、其余按编号，KPI「在建项目数」口径不变（仍 isInProgress 计数）。
+ */
 export interface HealthRow {
   id: string;
   code: string;
   name: string;
+  /** 项目状态机器值（中文标签在页面经 core 的 PROJECT_STATUS_LABEL 映射） */
+  status: string;
   clientName: string | null;
   pm: string | null;
   /** 计划完工日（zh-CN 三位）；null → 页面显「—」 */
@@ -98,6 +113,20 @@ export interface HealthRow {
   lights: { schedule: Light; quality: Light; budget: Light };
   /** 累计变更预警（changeWatch.warn，用带符号变更原值判定） */
   changeWarn: boolean;
+  /** 密集表列：合同额 / 已收 / 毛利 / 毛利率 / 风险计数（口径全部沿用 ledger，页面不算数） */
+  contractAmount: number;
+  incomeAmount: number;
+  expenseAmount: number;
+  changeAmount: number;
+  profit: number;
+  margin: number | null;
+  marginLight: MarginLight;
+  /** 未录入支出 ⇒ 毛利率不可算（决策 15 同族），页面显「—」而非 100% */
+  rankable: boolean;
+  openIssues: number;
+  pendingNodes: number;
+  nodesTotal: number;
+  overdueTasks: number;
 }
 
 export interface TodoItem {
@@ -116,8 +145,17 @@ export interface TodoGroup {
   placeholder?: boolean;
 }
 
+/** 归档参与量：页面据此出「哪些格子含它、为什么含」的说明行（M10-c）。 */
+export interface ArchivedFacts {
+  projectCount: number;
+  income: number;
+  expense: number;
+}
+
 export interface DashboardOverview {
   kpi: DashboardKpi;
+  /** 已归档项目的历史事实量（0 个归档 → projectCount 0，页面不加任何说明） */
+  archivedFacts: ArchivedFacts;
   health: HealthRow[];
   todos: TodoGroup[];
   funnel: DashboardFunnel;
@@ -241,6 +279,13 @@ interface CalcRow {
   expenseAmount: number;
   margin: number | null;
   marginLight: MarginLight;
+  /** M10-b 密集健康表所需：合同额 / 已收 / 未关闭问题 / 未通过节点 / 超期工序 */
+  contractAmount: number;
+  incomeAmount: number;
+  openIssues: number;
+  pendingNodes: number;
+  nodesTotal: number;
+  overdueTasks: number;
 }
 
 export async function getDashboardOverview(
@@ -258,13 +303,15 @@ export async function getDashboardOverview(
     payList,
     leads,
   ] = await Promise.all([
-    // 主查询：全部非 archived 项目，一次带齐矩阵与 KPI 原料
+    // 主查询：全部项目（**含已归档**）。M10-c 口径「钱按事实 · 事按可见性」——
+    // 已发生的（已收/支出/合同额/变更/毛利/毛利率）不因归档而消失，否则归档一次，
+    // 历史月份的现金线与回款率会凭空少一截，已经交付出去的对账数字变得不可信。
+    // 「还要做什么」（风险、待办、健康表）另用 liveRows 收窄。
     prisma.project.findMany({
-      where: { status: { not: "archived" } },
       include: {
         client: { select: { name: true } },
         lead: { select: { id: true } },
-        scheduleTasks: { select: { progress: true } },
+        scheduleTasks: { select: { progress: true, endDate: true } },
         acceptanceNodes: { select: { status: true } },
         issues: { select: { status: true } },
         financeRecords: { select: { type: true, amount: true, date: true } },
@@ -310,11 +357,14 @@ export async function getDashboardOverview(
       take: 3,
     }),
     // 商务漏斗：全部线索的 stage 分布（单条查询，不进 N+1；单 org 部署，不设 org 过滤）
-    prisma.lead.findMany({ select: { stage: true } }),
+    // M10-a：排除已作废线索——作废＝从漏斗摘出去，否则阶段存量与签约率被死数据污染
+    prisma.lead.findMany({ where: { archived: false }, select: { stage: true } }),
   ]);
 
   let receivedSum = 0;
   let receivableSum = 0;
+  // 超期基准＝今天零点（未完工 且 计划结束日早于今天，与 health.scheduleLight 同口径）
+  const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
   const rows: CalcRow[] = projects.map((p) => {
     const changeAmount = changeTotal(p.quotes.flatMap((q) => q.changes));
@@ -361,10 +411,28 @@ export async function getDashboardOverview(
       expenseAmount,
       margin,
       marginLight: marginLight(margin),
+      contractAmount: p.contractAmount,
+      incomeAmount: paidTotal,
+      openIssues,
+      pendingNodes,
+      nodesTotal: p.acceptanceNodes.length,
+      overdueTasks: p.scheduleTasks.filter(
+        (t) => t.progress < 100 && t.endDate !== null && t.endDate < dayStart
+      ).length,
     };
   });
 
-  const activeRows = rows.filter((r) => isInProgress(r.status));
+  // 事按可见性：风险计数、待办、项目健康表只看未归档项目
+  const liveRows = rows.filter((r) => r.status !== "archived");
+  const activeRows = liveRows.filter((r) => isInProgress(r.status));
+
+  // 归档参与量（页面据此出说明行；无归档时 projectCount=0，页面一个字都不加）
+  const archivedOnly = rows.filter((r) => r.status === "archived");
+  const archivedFacts = {
+    projectCount: archivedOnly.length,
+    income: Math.round(archivedOnly.reduce((t, r) => t + r.incomeAmount, 0) * 100) / 100,
+    expense: Math.round(archivedOnly.reduce((t, r) => t + r.expenseAmount, 0) * 100) / 100,
+  };
 
   const signed = signedAmountAt(
     projects.map((p) => ({
@@ -378,29 +446,50 @@ export async function getDashboardOverview(
   const rate = collectionRate(receivedSum, receivableSum);
 
   const risk: RiskCounts & { total: number } = {
-    scheduleRed: rows.filter((r) => r.schedule === "red").length,
-    qualityRed: rows.filter((r) => r.quality === "red").length,
-    budgetRed: rows.filter((r) => r.budget === "red").length,
-    changeWarn: rows.filter((r) => r.changeWarn).length,
+    scheduleRed: liveRows.filter((r) => r.schedule === "red").length,
+    qualityRed: liveRows.filter((r) => r.quality === "red").length,
+    budgetRed: liveRows.filter((r) => r.budget === "red").length,
+    changeWarn: liveRows.filter((r) => r.changeWarn).length,
     total: 0,
   };
   risk.total = riskItemCount(risk);
 
-  const health: HealthRow[] = activeRows.map((r) => ({
-    id: r.id,
-    code: r.code,
-    name: r.name,
-    clientName: r.clientName,
-    pm: r.pm,
-    plannedEnd: r.endDate ? fmtDate(r.endDate) : null,
-    progress: r.progress,
-    hasSchedule: r.hasSchedule,
-    lights: { schedule: r.schedule, quality: r.quality, budget: r.budget },
-    changeWarn: r.changeWarn,
-  }));
+  // 项目健康度表＝运营视野，只看未归档（归档的单子不再挂在待管清单里）；
+  // 它的历史钱仍体现在上方签单额/回款率/现金线与右侧毛利排行中。
+  const health: HealthRow[] = [...liveRows]
+    .sort((a, b) => {
+      const ai = isInProgress(a.status) ? 0 : 1;
+      const bi = isInProgress(b.status) ? 0 : 1;
+      return ai !== bi ? ai - bi : a.code.localeCompare(b.code);
+    })
+    .map((r) => ({
+      id: r.id,
+      code: r.code,
+      name: r.name,
+      status: r.status,
+      clientName: r.clientName,
+      pm: r.pm,
+      plannedEnd: r.endDate ? fmtDate(r.endDate) : null,
+      progress: r.progress,
+      hasSchedule: r.hasSchedule,
+      lights: { schedule: r.schedule, quality: r.quality, budget: r.budget },
+      changeWarn: r.changeWarn,
+      contractAmount: r.contractAmount,
+      incomeAmount: r.incomeAmount,
+      expenseAmount: r.expenseAmount,
+      changeAmount: r.changeAmount,
+      profit: Math.round((r.contractAmount + r.changeAmount - r.expenseAmount) * 100) / 100,
+      margin: r.margin,
+      marginLight: r.marginLight,
+      rankable: r.expenseAmount > 0,
+      openIssues: r.openIssues,
+      pendingNodes: r.pendingNodes,
+      nodesTotal: r.nodesTotal,
+      overdueTasks: r.overdueTasks,
+    }));
 
-  const warnRows = rows.filter((r) => r.changeWarn);
-  const redRows = rows.filter((r) => r.schedule === "red");
+  const warnRows = liveRows.filter((r) => r.changeWarn);
+  const redRows = liveRows.filter((r) => r.schedule === "red");
 
   // 商务漏斗：funnelCounts + leadConversion（纯函数口径，stage 串回传，页面本地映射中文）
   const leadStages = leads.map((l) => ({ stage: l.stage }));
@@ -591,7 +680,19 @@ export async function getDashboardOverview(
     },
   ];
 
+  // 对比条几何（M10-b）：以两值较大者为 100%，另一个按比例；两者皆 0 → 不画条。
+  // 与 collectionBar 同一条纪律——换算在服务层做一次，页面不出现算式。
+  const barMax = Math.max(signed.month, signed.prevMonth);
+  const momBar: DashboardKpi["momBar"] =
+    barMax > 0
+      ? {
+          cur: `${Math.round((signed.month / barMax) * 100)}%`,
+          prev: signed.prevMonth > 0 ? `${Math.round((signed.prevMonth / barMax) * 100)}%` : null,
+        }
+      : null;
+
   return {
+    archivedFacts,
     kpi: {
       activeProjects: activeRows.length,
       signedThisMonth: signed.month,
@@ -601,6 +702,7 @@ export async function getDashboardOverview(
       collectionLight: collectionLight(rate),
       // 进度条宽度换算唯一一次：rate > 1 钳满 100%；两位小数消浮点尾差（CSS 里不出现 15.620000000000001%）
       collectionBar: rate === null ? null : `${Math.round(Math.min(1, rate) * 10000) / 100}%`,
+      momBar,
       risk,
     },
     health,
