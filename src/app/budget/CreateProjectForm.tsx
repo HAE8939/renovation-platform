@@ -59,12 +59,14 @@ export function CreateProjectForm({ suggestedCode }: Props) {
             <Field label="项目编号" hint="留空自动生成">
               <Input name="code" value={code} onChange={(e) => setCode(e.target.value)} />
             </Field>
+            {/* step 必须到 0.01：面积与单方造价按两位小数记账，
+                step="0.1" 会让浏览器以 step mismatch 静默拦下 89.55 这类合法值（表单根本不提交）。 */}
             <Field label="建筑面积（㎡）" required>
               <Input
                 name="area"
                 type="number"
                 min="0"
-                step="0.1"
+                step="0.01"
                 placeholder="如：128.6"
                 required
               />

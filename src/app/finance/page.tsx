@@ -66,10 +66,24 @@ export default async function FinanceLedgerPage({
   const projectId = searchParams?.projectId || undefined;
 
   const data = await listRecords({ projectId, view });
-  const { rows, projectOptions, summary } = data;
+  const { rows, projectOptions, summary, archivedFacts, filteredArchived } = data;
 
   const marginText =
     summary.marginRate === null ? "—" : formatPercent(summary.marginRate);
+
+  /**
+   * 归档口径说明（M10-c）：只在真有归档项目参与本页时出现，无归档时一个字都不加。
+   * 说的是「哪些格子含它、哪些不含、为什么」——不写这句，员工只会看到
+   * 待收款莫名比已收款少一截，然后开始怀疑整本账。
+   */
+  const archivedNote = filteredArchived
+    ? "该项目已归档：历史已收、支出与毛利照计入上方各格（钱是发生过的事实，不因归档消失）；" +
+      "待收款与计划未付合计不含它——归档即经营事项收场，不再挂账催收。"
+    : archivedFacts.projectCount > 0
+      ? `上方已收、支出、合同额与毛利含 ${archivedFacts.projectCount} 个已归档项目的历史事实` +
+        `（其已收 ${formatCny(archivedFacts.receivedTotal)} · 支出 ${formatCny(archivedFacts.expenseTotal)}）；` +
+        "待收款与计划未付合计不含已归档项目。恢复归档即一并回到前瞻视野。"
+      : null;
 
   return (
     <div className="space-y-8">
@@ -163,15 +177,23 @@ export default async function FinanceLedgerPage({
           <StatBox
             label="待收款"
             value={formatCny(summary.pendingTotal)}
-            hint="合同额 − 已收"
+            hint="合同额 − 已收（不含已归档）"
           />
           <StatBox
             label="计划未付合计"
             value={formatCny(summary.unpaidPlanTotal)}
-            hint="付款段未标记已付"
+            hint="付款段未标记已付（不含已归档）"
           />
           <StatBox label="总支出" value={formatCny(summary.expenseTotal)} />
         </div>
+        {/* 归档口径说明（M10-c「钱按事实 · 事按可见性」）：
+            上方已收/支出/合同额/毛利含已归档项目的历史事实，
+            待收款与计划未付不含。两格口径不同必须说出来，不能让数字自己圆谎。 */}
+        {archivedNote ? (
+          <p className="max-w-prose text-[13px] leading-relaxed text-secondary">
+            {archivedNote}
+          </p>
+        ) : null}
       </section>
 
       <section>

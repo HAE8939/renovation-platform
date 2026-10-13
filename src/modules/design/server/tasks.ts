@@ -39,13 +39,19 @@ export interface ListDesignTasksOpts {
 export async function listDesignTasks(
   opts: ListDesignTasksOpts = {}
 ): Promise<DesignTaskListItem[]> {
-  const where: { status?: string; assigneeId?: string } = {};
+  const where: {
+    status?: string;
+    assigneeId?: string;
+    /** 归档项目的设计任务不进任务池（M10-c「事按可见性」，与驾驶舱「设计待审」同口径）。 */
+    project?: { status: { not: string } };
+  } = {};
   if (opts.status) where.status = opts.status;
   if (opts.scope === "mine") {
     const me = await getPlaceholderUser();
     // 无占位用户（如未 seed designer）→ 过滤成空集，页面走诚实空态，不造假数据。
     where.assigneeId = me?.id ?? "__no_placeholder_user__";
   }
+  where.project = { status: { not: "archived" } };
 
   const rows = await prisma.designTask.findMany({
     where,
@@ -82,9 +88,14 @@ export async function listDesignTasks(
   }));
 }
 
-/** 任务总数（页头统计用；取 DB 真值，不抄常量）。 */
+/**
+ * 任务总数（页头统计用；取 DB 真值，不抄常量）。
+ * 与 listDesignTasks 同口径排掉已归档项目，否则页头计数会比看板多出一截。
+ */
 export async function getDesignTaskCount(): Promise<number> {
-  return prisma.designTask.count();
+  return prisma.designTask.count({
+    where: { project: { status: { not: "archived" } } },
+  });
 }
 
 /** 日历色片视图模型：仅含日历所需字段。 */
@@ -123,7 +134,10 @@ export async function listDesignTasksForCalendar(
 
   const [rows, undatedCount] = await Promise.all([
     prisma.designTask.findMany({
-      where: { deadline: { gte: start, lt: end } },
+      where: {
+        deadline: { gte: start, lt: end },
+        project: { status: { not: "archived" } },
+      },
       orderBy: { deadline: "asc" },
       select: {
         id: true,
@@ -135,7 +149,9 @@ export async function listDesignTasksForCalendar(
         projectId: true,
       },
     }),
-    prisma.designTask.count({ where: { deadline: null } }),
+    prisma.designTask.count({
+      where: { deadline: null, project: { status: { not: "archived" } } },
+    }),
   ]);
 
   return {

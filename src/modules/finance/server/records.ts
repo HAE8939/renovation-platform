@@ -10,6 +10,16 @@
  * 真值（按筛选范围：单项目→该项目变更和；全量→全部变更）；pendingTotal 分母改
  * max(0, contractAmount + changeTotal − received)（变更后应收含变更）。
  * 直读 ChangeOrder（budget 私有表经 quote→project），不 import budget 模块内部。
+ *
+ * 归档口径（M10-c，HAE 2026-10-13 拍板「钱按事实 · 事按可见性」）：
+ * - **事实类一律照算**——已收、支出、合同额、变更、毛利/毛利率含已归档项目。
+ *   归档只是可见性开关（AGENTS §4.3），不该回溯改写已经交付出去的对账数字：
+ *   八月实收的五万，不会因为十一月点了「归档」而在报表里凭空消失。
+ * - **前瞻类排除已归档**——待收款与计划未付合计只算未归档项目。归档＝这个项目
+ *   的经营事项已收场，不再挂账催收、不再出现在催款视野里。
+ * - 两者口径不同是**有意**的，故必须让页面把它说清楚：结果带 `archivedFacts`
+ *   （归档项目的历史已收/支出）与 `filteredArchived`（正筛着一个归档项目），
+ *   页面据此出说明行。沉默地少一个数字，比数字小更糟。
  */
 
 import prisma from "@/core/db";
@@ -49,9 +59,12 @@ export interface FinanceRecordRow {
 export interface FinanceSummary {
   contractAmount: number;
   receivedTotal: number;
-  /** 待收款 = round2(max(0, 合同额 − 已收))（收款缺口口径，与计划段解耦，§7-12） */
+  /**
+   * 待收款 = round2(max(0, 合同额 + 变更 − 已收))，**只算未归档项目**
+   * （收款缺口是前瞻数，归档即从催款视野摘出，M10-c）。
+   */
   pendingTotal: number;
-  /** 计划未付合计 = Σ PaymentNode.amountDue(paid=false)（与待收款不同不合并） */
+  /** 计划未付合计 = Σ PaymentNode.amountDue(paid=false 且项目未归档)（与待收款不同不合并） */
   unpaidPlanTotal: number;
   expenseTotal: number;
   grossProfit: number;
@@ -61,10 +74,26 @@ export interface FinanceSummary {
   marginLight: "green" | "yellow" | "red" | "neutral";
 }
 
+/**
+ * 已归档项目仍计入汇总的「历史事实」（M10-c）——供页面出一行诚实说明。
+ * 不说明就等于让「待收款比已收款小得说不清」这种问题静默存在。
+ */
+export interface ArchivedFacts {
+  /** 当前筛选范围内已归档项目数（0 → 页面不出说明行） */
+  projectCount: number;
+  /** 这些项目的历史已收（已计入上方「已收款」格） */
+  receivedTotal: number;
+  /** 这些项目的历史支出（已计入上方「总支出」格） */
+  expenseTotal: number;
+}
+
 export interface ListRecordsResult {
   rows: FinanceRecordRow[];
   projectOptions: ProjectOption[];
   summary: FinanceSummary;
+  archivedFacts: ArchivedFacts;
+  /** 单项目筛选且该项目已归档 → true（页面据此说明「前瞻数不计入」）。 */
+  filteredArchived: boolean;
 }
 
 export interface ListRecordsFilters {
@@ -106,16 +135,17 @@ export async function listRecords(
     }),
     prisma.project.findMany({
       where: projectId ? { id: projectId } : {},
-      select: { id: true, contractAmount: true },
+      // status 必带：它是「事实照算 / 前瞻隐身」二分的分区依据（M10-c）
+      select: { id: true, contractAmount: true, status: true },
     }),
     prisma.paymentNode.findMany({
       where: projectId ? { projectId } : {},
-      select: { amountDue: true, paid: true },
+      select: { amountDue: true, paid: true, projectId: true },
     }),
     // 变更单按筛选范围读（projectId 给定 → 该项目变更；否则全量），口径走 ledger.changeTotal
     prisma.changeOrder.findMany({
       where: projectId ? { quote: { projectId } } : {},
-      select: { amount: true },
+      select: { amount: true, quote: { select: { project: { select: { id: true } } } } },
     }),
   ]);
 
@@ -145,28 +175,45 @@ export async function listRecords(
 
   // ── 汇总（口径来自 ledger.ts 纯函数，禁第二处算式）──
   // 取该筛选范围（含全部 type）的记录做汇总：若 view 限定了 type，需另查全部 type。
-  let allTypeRecords: { type: string; amount: number }[] = [];
+  let allTypeRecords: { type: string; amount: number; projectId: string }[] = [];
   if (view) {
     allTypeRecords = await prisma.financeRecord.findMany({
       where: { ...(projectId ? { projectId } : {}) },
-      select: { type: true, amount: true },
+      select: { type: true, amount: true, projectId: true },
     });
   } else {
-    allTypeRecords = records.map((r) => ({ type: r.type, amount: r.amount }));
+    allTypeRecords = records.map((r) => ({
+      type: r.type,
+      amount: r.amount,
+      projectId: r.projectId,
+    }));
   }
 
-  const ledgerRecords = allTypeRecords.map(toLedderRecord);
-  const contractAmount = round2(
-    projects.reduce((s, p) => s + (p.contractAmount ?? 0), 0)
+  // ── 归档分区（M10-c「钱按事实 · 事按可见性」）──
+  // 已归档项目的 id 集合：事实类（已收/支出/合同/变更/毛利）不看它，
+  // 前瞻类（待收款、计划未付）只看非归档那一半。
+  const archivedIds = new Set(
+    projects.filter((p) => p.status === "archived").map((p) => p.id)
   );
+  const activeProjects = projects.filter((p) => !archivedIds.has(p.id));
+  const sumContract = (list: { contractAmount: number | null }[]) =>
+    round2(list.reduce((s, p) => s + (p.contractAmount ?? 0), 0));
+
+  const ledgerRecords = allTypeRecords.map(toLedderRecord);
+  const activeLedger = allTypeRecords
+    .filter((r) => !archivedIds.has(r.projectId))
+    .map(toLedderRecord);
+  const archivedLedger = allTypeRecords
+    .filter((r) => archivedIds.has(r.projectId))
+    .map(toLedderRecord);
+
+  // 事实类：含已归档项目（历史现金事实不因归档消失）
+  const contractAmount = sumContract(projects);
   const received = receivedTotal(ledgerRecords);
   const expense = expenseTotal(ledgerRecords);
   // 变更额按筛选范围聚合（ledger.changeTotal 单一真源，带符号）
   const changeRows: ChangeRow[] = changeOrders.map((c) => ({ amount: c.amount }));
   const changeTotalVal = changeTotal(changeRows);
-  const unpaidPlanTotal = round2(
-    paymentNodes.filter((n) => !n.paid).reduce((s, n) => s + (n.amountDue ?? 0), 0)
-  );
   const profit = grossProfit({
     contractAmount,
     changeTotal: changeTotalVal,
@@ -178,11 +225,26 @@ export async function listRecords(
     expenseTotal: expense,
   });
 
+  // 前瞻类：排除已归档项目（同一批 ledger 纯函数，只是喂非归档子集，不另立算式）
+  const activeContract = sumContract(activeProjects);
+  const activeChangeRows: ChangeRow[] = changeOrders
+    .filter((c) => !archivedIds.has(c.quote.project.id))
+    .map((c) => ({ amount: c.amount }));
+  const activeChangeTotal = changeTotal(activeChangeRows);
+  const activeReceived = receivedTotal(activeLedger);
+  const unpaidPlanTotal = round2(
+    paymentNodes
+      .filter((n) => !n.paid && !archivedIds.has(n.projectId))
+      .reduce((s, n) => s + (n.amountDue ?? 0), 0)
+  );
+
   const summary: FinanceSummary = {
     contractAmount,
     receivedTotal: round2(received),
-    // 待收款 = max(0, 合同额 + 变更 − 已收)（变更后应收口径，M9-a）
-    pendingTotal: round2(Math.max(0, contractAmount + changeTotalVal - received)),
+    // 待收款 = max(0, 合同额 + 变更 − 已收)，**限未归档项目**（M9-a 公式 + M10-c 范围）
+    pendingTotal: round2(
+      Math.max(0, activeContract + activeChangeTotal - activeReceived)
+    ),
     unpaidPlanTotal,
     expenseTotal: round2(expense),
     grossProfit: profit,
@@ -190,7 +252,20 @@ export async function listRecords(
     marginLight: marginLight(rate),
   };
 
-  return { rows, projectOptions, summary };
+  const archivedFacts: ArchivedFacts = {
+    projectCount: archivedIds.size,
+    receivedTotal: round2(receivedTotal(archivedLedger)),
+    expenseTotal: round2(expenseTotal(archivedLedger)),
+  };
+
+  return {
+    rows,
+    projectOptions,
+    summary,
+    archivedFacts,
+    // 单项目筛选时 projects 只含被筛的那一个 → 它归档即 filteredArchived
+    filteredArchived: !!projectId && archivedIds.size > 0,
+  };
 }
 
 // ── 写操作（M8-b）──────────────────────────────────────────────

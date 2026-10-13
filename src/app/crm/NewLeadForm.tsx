@@ -50,7 +50,9 @@ export function NewLeadForm() {
               <Input name="estate" placeholder="选填，如：云栖名邸" />
             </Field>
             <Field label="面积（㎡）">
-              <Input name="area" type="number" min="0" step="0.1" placeholder="选填" />
+              {/* step 与另两处面积框同为 0.01：签约时会把此面积写进项目并参与单方造价计算，
+                  0.1 会让浏览器静默拦下两位小数的合法值 */}
+              <Input name="area" type="number" min="0" step="0.01" placeholder="选填" />
             </Field>
             <div className="sm:col-span-2">
               <Field label="负责人">

@@ -86,12 +86,14 @@ export function ProjectSettingsForm({ values }: { values: ProjectSettingsValues 
         <Field label="客户电话" hint="同样写入共享的客户记录">
           <Input name="clientPhone" defaultValue={values.clientPhone ?? ""} placeholder="选填" />
         </Field>
+        {/* step 必须到 0.01：面积与单方造价按两位小数记账，
+            step="0.1" 会让浏览器以 step mismatch 静默拦下 89.55 这类合法值 */}
         <Field label="建筑面积（㎡）" required>
           <Input
             name="area"
             type="number"
             min="0"
-            step="0.1"
+            step="0.01"
             defaultValue={values.area}
             required
           />

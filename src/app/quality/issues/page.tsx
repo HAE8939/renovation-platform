@@ -147,6 +147,18 @@ export default async function QualityIssuesPage({
         </div>
       </form>
 
+      {/* 深链指到一个已归档项目：台账按口径不含它的问题，必须说清楚为什么是空的，
+          否则用户只会以为记录被删了（M10-c「事按可见性」）。 */}
+      {data.archivedProjectName ? (
+        <div className="rounded-card border border-line bg-surface px-4 py-3">
+          <p className="text-[13px] leading-relaxed text-secondary">
+            「{data.archivedProjectName}」已归档，问题台账默认不显示已归档项目的问题
+            （驾驶舱的「未整改问题」同样不计）。记录并未删除：在项目中心恢复归档，
+            其问题即回到台账与待办视野。
+          </p>
+        </div>
+      ) : null}
+
       <section>
         <div className="flex items-baseline justify-between">
           <h2 className="text-[15px] font-semibold">问题列表</h2>

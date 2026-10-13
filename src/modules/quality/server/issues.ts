@@ -66,11 +66,18 @@ export interface IssueRow {
   closedAt: Date | null;
 }
 
-/** listIssues 返回：问题行 + 筛选项（非 archived 项目 / 用户列表）。 */
+/**
+ * listIssues 返回：问题行 + 筛选项（非 archived 项目 / 用户列表）+ 归档提示。
+ *
+ * `archivedProjectName` 非空 = 用户正用 `?projectId=` 深链访问一个**已归档**项目。
+ * 列表按口径不显示归档项目的问题，若不把这句递给页面，用户看到的是
+ * 「明明有记录却一片空白」，只会以为数据丢了（本仓一贯的诚实降级要求）。
+ */
 export interface IssueListResult {
   issues: IssueRow[];
   projects: ProjectOption[];
   users: UserOption[];
+  archivedProjectName: string | null;
 }
 
 /** 筛选入参（三态均可空）。 */
@@ -85,7 +92,9 @@ export interface IssueListFilters {
  * 报告人 / 责任人名（逻辑引用拆名仿 nodes.ts 的 nameById 做法）。
  *
  * 排序：状态 rank（open=0 → rectified=1 → closed=2）升序，同 rank 按 createdAt 降序
- * （最待办的问题在前，同态内最新优先）。项目列表取非 archived；用户列表全量供责任人下拉。
+ * （最待办的问题在前，同态内最新优先）。**问题本体与项目下拉都取非 archived**
+ * （M10-c：归档＝从待办视野摘出，与驾驶舱「未整改问题」计数同口径）；
+ * 用户列表全量供责任人下拉。
  */
 export async function listIssues(
   filters: IssueListFilters = {}
@@ -94,10 +103,16 @@ export async function listIssues(
     projectId?: string;
     status?: string;
     severity?: string;
+    /** 归档项目的问题不进全司台账视野（M10-c「事按可见性」，见下注释）。 */
+    project?: { status: { not: string } };
   } = {};
   if (filters.projectId) where.projectId = filters.projectId;
   if (filters.status) where.status = filters.status;
   if (filters.severity) where.severity = filters.severity;
+  // 列表本体排除已归档项目的问题。此前只排了下拉、本体没排，于是
+  // 「问题台账里数得到、驾驶舱待办里数不到」——同一时刻两个未整改数对不上。
+  // 归档项目的历史问题并未删除：恢复归档即回到台账，单项目页也照读得到。
+  where.project = { status: { not: "archived" } };
 
   const issues = await prisma.issue.findMany({
     where,
@@ -151,7 +166,7 @@ export async function listIssues(
     return b.createdAt.getTime() - a.createdAt.getTime();
   });
 
-  const [projects, allUsers] = await Promise.all([
+  const [projects, allUsers, archivedHit] = await Promise.all([
     prisma.project.findMany({
       where: { status: { not: "archived" } },
       select: { id: true, name: true, code: true },
@@ -161,12 +176,20 @@ export async function listIssues(
       select: { id: true, name: true },
       orderBy: { name: "asc" },
     }),
+    // 深链正指一个已归档项目 → 带回项目名，让页面说明「为什么是空的」
+    filters.projectId
+      ? prisma.project.findFirst({
+          where: { id: filters.projectId, status: "archived" },
+          select: { name: true },
+        })
+      : Promise.resolve(null),
   ]);
 
   return {
     issues: rows,
     projects: projects.map((p) => ({ id: p.id, name: p.name, code: p.code })),
     users: allUsers.map((u) => ({ id: u.id, name: u.name })),
+    archivedProjectName: archivedHit?.name ?? null,
   };
 }
 
