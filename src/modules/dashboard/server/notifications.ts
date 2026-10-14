@@ -79,7 +79,7 @@ export async function getNotificationSummary(): Promise<NotificationSummary> {
     }),
     prisma.project.findMany({
       where: { ...notArchived, contractAmount: { gt: 0 } },
-      select: { id: true, code: true, name: true, contractAmount: true, quotes: { select: { id: true, changes: { select: { amount: true } } } } },
+      select: { id: true, code: true, name: true, contractAmount: true, quotes: { select: { id: true, changes: { where: { status: "client_confirmed" }, select: { amount: true } } } } },
     }),
   ]);
 

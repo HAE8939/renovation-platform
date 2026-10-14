@@ -26,7 +26,8 @@ export default async function ChangesPage({ params }: PageProps) {
   ]);
   if (!detail) notFound();
 
-  const changeRows: ChangeRow[] = rows.map((r) => ({ amount: r.amount }));
+  const changeRows: ChangeRow[] = rows.filter((r) => r.status === "client_confirmed").map((r) => ({ amount: r.amount }));
+  const pendingTotal = rows.filter((r) => r.status !== "client_confirmed").reduce((sum, r) => sum + r.amount, 0);
   const total = changeTotal(changeRows);
   const contractAmount = detail.contractAmount ?? 0;
   const { warn, ratio } = changeWatch(contractAmount, total);
@@ -56,6 +57,7 @@ export default async function ChangesPage({ params }: PageProps) {
           value={formatSignedCny(total)}
           tone={warn ? "warning" : "neutral"}
         />
+        <SummaryCard label="待确认金额" value={formatSignedCny(pendingTotal)} />
         <SummaryCard label="变更后总额" value={formatCny(afterChange)} accent />
       </section>
 

@@ -1761,6 +1761,7 @@ async function seedFinance() {
 async function seedChanges() {
   const existing = await prisma.changeOrder.count();
   if (existing > 0) {
+    await prisma.changeOrder.updateMany({ where: { status: "draft" }, data: { status: "client_confirmed", confirmedAt: new Date() } });
     console.log(`已存在 ${existing} 条变更单，M9-a 变更单 seed 跳过。`);
     return;
   }
@@ -1850,6 +1851,9 @@ async function seedChanges() {
           date,
           note: c.note,
           createdBy: uid,
+          status: "client_confirmed",
+          confirmedAt: new Date(),
+          confirmedBy: uid,
         },
       });
     })

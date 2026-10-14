@@ -19,6 +19,7 @@
  *    规则压到近零——这条是本仓硬要求，例外作用域也不豁免它。
  */
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 
 const SUB_PHRASE = "9 个功能模块 · 线索 / 设计 / 排程 / 质量 / 财务 / 驾驶舱，全挂在同一套主数据上。";
 const TYPE_MS = 42;
@@ -27,7 +28,6 @@ const TYPE_START_MS = 470;
 export function HeroSplash({ moduleNameCount }: { moduleNameCount: number }) {
   const [visible, setVisible] = useState(true);
   const [leaving, setLeaving] = useState(false);
-  const [aboutOpen, setAboutOpen] = useState(false);
   const [typed, setTyped] = useState("");
   const [reduced, setReduced] = useState(false);
   const timer = useRef<number | null>(null);
@@ -106,22 +106,11 @@ export function HeroSplash({ moduleNameCount }: { moduleNameCount: number }) {
           进入平台
           <span aria-hidden>↗</span>
         </button>
-        {/* 「平台说明」详情页 HAE 定为后期再做，现阶段不挂链接：点了不给 404、也不给死按钮，
-            只就地回一句实话。等详情页做出来，这里换成 <Link href="/about">。 */}
-        <button
-          type="button"
-          className="splash-ghost"
-          aria-expanded={aboutOpen}
-          onClick={() => setAboutOpen((v) => !v)}
-        >
+        <Link href="/about" className="splash-ghost">
           平台说明
-          <span aria-hidden>{aboutOpen ? "↑" : "↓"}</span>
-        </button>
+          <span aria-hidden>↗</span>
+        </Link>
       </div>
-
-      {aboutOpen && (
-        <p className="splash-note">平台说明页尚未上线，后期补充；现在可直接进入平台查看各模块。</p>
-      )}
 
       <div className="splash-hint" aria-hidden>
         <span>SCROLL</span>

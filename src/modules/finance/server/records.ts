@@ -144,7 +144,7 @@ export async function listRecords(
     }),
     // 变更单按筛选范围读（projectId 给定 → 该项目变更；否则全量），口径走 ledger.changeTotal
     prisma.changeOrder.findMany({
-      where: projectId ? { quote: { projectId } } : {},
+      where: projectId ? { quote: { projectId }, status: "client_confirmed" } : { status: "client_confirmed" },
       select: { amount: true, quote: { select: { project: { select: { id: true } } } } },
     }),
   ]);

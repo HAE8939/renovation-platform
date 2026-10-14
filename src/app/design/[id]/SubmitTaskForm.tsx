@@ -30,13 +30,16 @@ export function SubmitTaskForm({
   );
 
   return (
-    <form action={formAction} className="mt-4 space-y-4">
+    <form action={formAction} className="mt-4 space-y-4" encType="multipart/form-data">
       <input type="hidden" name="taskId" value={taskId} />
       <Field label="提交说明" required>
         <Textarea name="note" rows={3} placeholder="本次交付的内容要点、相对上一版的调整…" required />
       </Field>
-      <Field label="交付物链接" hint="本期占位，文件上传待后续版本">
-        <Input name="assetRef" placeholder="粘贴成果链接（https:// 开头，可留空）" />
+      <Field label="交付物文件" hint="最多 5 个文件，单个不超过 20 MB；PDF、图片、Word、Excel、ZIP">
+        <Input name="files" type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.docx,.xlsx,.zip" />
+      </Field>
+      <Field label="外部交付物链接" hint="已有云盘或在线文档可继续粘贴">
+        <Input name="assetRef" placeholder="https:// 开头，可留空" />
       </Field>
 
       {state.error && <p className="text-[13px] text-danger">{state.error}</p>}

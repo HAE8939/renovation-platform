@@ -16,6 +16,7 @@ import {
   updateChangeAction,
   type ChangeFormState,
 } from "@/app/budget/actions";
+import { changeStatusFormAction } from "@/app/budget/actions";
 
 /** 仅日期（展示用）。 */
 function formatDate(d: Date | null): string {
@@ -181,6 +182,7 @@ function ChangeRow({
       <span className="w-20 shrink-0 text-[13px] text-primary whitespace-nowrap">
         {row.kindLabel}
       </span>
+      <span className="w-20 shrink-0 text-[12px] text-secondary whitespace-nowrap">{row.status === "client_confirmed" ? "客户已确认" : row.status === "pending" ? "待客户确认" : row.status === "rejected" ? "已驳回" : "草稿"}</span>
       <div className="min-w-0 flex-1">
         <p className="truncate text-[13px] text-primary">{row.title}</p>
         {row.note && (
@@ -190,7 +192,10 @@ function ChangeRow({
       <span className="num w-28 shrink-0 text-right text-[15px] font-medium text-primary whitespace-nowrap">
         {formatSignedCny(row.amount)}
       </span>
+      {row.attachments.length > 0 && <ul className="w-full text-[12px] text-secondary">{row.attachments.map((a) => <li key={a.id}><a href={`/${a.storageKey}`} target="_blank" rel="noreferrer" className="text-accent-ink hover:underline">附件：{a.originalName}</a></li>)}</ul>}
       <div className="flex shrink-0 items-center gap-2">
+        {row.status === "draft" || row.status === "rejected" ? <form action={changeStatusFormAction}><input type="hidden" name="projectId" value={projectId} /><input type="hidden" name="changeId" value={row.id} /><input type="hidden" name="status" value="pending" /><Button size="sm" variant="ghost" type="submit">提交确认</Button></form> : null}
+        {row.status === "pending" ? <><form action={changeStatusFormAction}><input type="hidden" name="projectId" value={projectId} /><input type="hidden" name="changeId" value={row.id} /><input type="hidden" name="status" value="client_confirmed" /><Button size="sm" type="submit">客户确认</Button></form><form action={changeStatusFormAction}><input type="hidden" name="projectId" value={projectId} /><input type="hidden" name="changeId" value={row.id} /><input type="hidden" name="status" value="rejected" /><Button size="sm" variant="danger" type="submit">驳回</Button></form></> : null}
         <Button size="sm" variant="ghost" onClick={onEdit}>
           编辑
         </Button>
@@ -322,7 +327,7 @@ function ChangeModal({
       onClose={onClose}
       title={isEdit ? "编辑变更单" : "新建变更单"}
     >
-      <form action={formAction} className="space-y-4">
+      <form action={formAction} className="space-y-4" encType="multipart/form-data">
         <Field label="变更描述" required>
           <Input
             name="title"
@@ -390,6 +395,9 @@ function ChangeModal({
             defaultValue={change?.note ?? ""}
             placeholder="如：业主升级为全屋定制柜体，含五金与安装"
           />
+        </Field>
+        <Field label="附件" hint="最多 5 个文件，单个不超过 20 MB">
+          <Input name="attachments" type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.zip" />
         </Field>
 
         {state.error && (

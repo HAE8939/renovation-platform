@@ -1,5 +1,6 @@
 import prisma from "@/core/db";
 import { getPlaceholderUser } from "../currentUser";
+import { saveUploadedFile, StorageError } from "@/core/storage/storage";
 import {
   canSubmit,
   DESIGN_TASK_STATUS_LABEL,
@@ -28,6 +29,7 @@ export interface TaskSubmissionItem {
   reviewedByName: string | null;
   reviewedAt: Date | null;
   createdAt: Date;
+  files: { id: string; originalName: string; mimeType: string; size: number; storageKey: string }[];
 }
 
 /** 任务详情视图模型：基础字段 + 倒序提交历史。 */
@@ -62,7 +64,7 @@ export async function getTaskDetail(id: string): Promise<DesignTaskDetail | null
     where: { id },
     include: {
       project: { select: { code: true, name: true } },
-      submissions: { orderBy: { version: "desc" } },
+    submissions: { orderBy: { version: "desc" } },
     },
   });
   if (!task) return null;
@@ -84,6 +86,9 @@ export async function getTaskDetail(id: string): Promise<DesignTaskDetail | null
     : [];
   const nameById = new Map(users.map((u) => [u.id, u.name]));
 
+  const files = await prisma.fileAsset.findMany({ where: { ownerType: "design_submission", ownerId: { in: task.submissions.map((s) => s.id) } }, orderBy: { createdAt: "asc" } });
+  const filesByOwner = new Map<string, typeof files>();
+  for (const file of files) filesByOwner.set(file.ownerId, [...(filesByOwner.get(file.ownerId) ?? []), file]);
   return {
     id: task.id,
     code: task.code,
@@ -112,6 +117,7 @@ export async function getTaskDetail(id: string): Promise<DesignTaskDetail | null
       reviewedByName: s.reviewedBy ? (nameById.get(s.reviewedBy) ?? null) : null,
       reviewedAt: s.reviewedAt,
       createdAt: s.createdAt,
+      files: (filesByOwner.get(s.id) ?? []).map((f) => ({ id: f.id, originalName: f.originalName, mimeType: f.mimeType, size: f.size, storageKey: f.storageKey })),
     })),
   };
 }
@@ -121,6 +127,7 @@ export interface CreateSubmissionInput {
   note: string;
   /** 交付物链接占位（可空，本期无上传）。 */
   assetRef?: string | null;
+  files?: File[];
 }
 
 export interface CreatedSubmission {
@@ -160,7 +167,7 @@ export async function createSubmission(
   return prisma.$transaction(async (tx) => {
     const task = await tx.designTask.findUnique({
       where: { id: taskId },
-      select: { id: true, status: true },
+      select: { id: true, status: true, projectId: true },
     });
     if (!task) throw new DesignSubmissionError("设计任务不存在");
 
@@ -186,6 +193,11 @@ export async function createSubmission(
         result: "pending",
       },
     });
+
+    for (const file of (input.files ?? []).slice(0, 5)) {
+      const saved = await saveUploadedFile(file, "delivery", submission.id);
+      await tx.fileAsset.create({ data: { projectId: task.projectId, ownerType: "design_submission", ownerId: submission.id, category: "delivery", ...saved, uploadedBy: me.id, uploaderName: me.name } });
+    }
 
     await tx.designTask.update({
       where: { id: taskId },

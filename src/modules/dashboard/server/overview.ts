@@ -315,7 +315,7 @@ export async function getDashboardOverview(
         acceptanceNodes: { select: { status: true } },
         issues: { select: { status: true } },
         financeRecords: { select: { type: true, amount: true, date: true } },
-        quotes: { select: { status: true, changes: { select: { amount: true } } } },
+        quotes: { select: { status: true, changes: { where: { status: "client_confirmed" }, select: { amount: true } } } },
       },
       orderBy: { code: "asc" },
     }),

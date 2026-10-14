@@ -42,6 +42,7 @@ model User {
 
   org            Organization    @relation(fields: [orgId], references: [id])
   projectMembers ProjectMember[]
+  workLogs       WorkLog[]
 
   @@map("users")
 }
@@ -93,6 +94,8 @@ model Project {
   financeRecords  FinanceRecord[] // 反向：收支台账（M8-a，真源在 FinanceRecord.projectId）
   paymentNodes    PaymentNode[] // 反向：付款段（M8-a，真源在 PaymentNode.projectId）
   members         ProjectMember[] // 人员工控：项目责任关系（M12-a）
+  workLogs        WorkLog[]
+  fileAssets      FileAsset[]
 
   @@map("projects")
 }
@@ -289,6 +292,52 @@ model TaskSubmission {
 
   @@unique([taskId, version])
   @@map("task_submissions")
+}
+
+// 统一文件资产：业务表只保存 ownerType/ownerId，文件元数据与存储键集中管理。
+// 首期 provider 写本地 public/uploads/files，后续可无缝切换 OSS。
+model FileAsset {
+  id           String   @id @default(cuid())
+  projectId    String?
+  ownerType    String
+  ownerId      String
+  category     String
+  storageKey   String
+  originalName String
+  mimeType     String
+  size         Int
+  uploadedBy   String
+  uploaderName String?
+  createdAt    DateTime @default(now())
+
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([ownerType, ownerId, createdAt])
+  @@index([projectId, category])
+  @@map("file_assets")
+}
+
+// 人员工作记录：记录事实，不直接生成绩效分数。
+model WorkLog {
+  id          String   @id @default(cuid())
+  projectId   String
+  userId      String
+  workDate    DateTime
+  category    String
+  title       String
+  description String   @default("")
+  minutes     Int?
+  outputNote  String   @default("")
+  archived    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, workDate])
+  @@index([userId, workDate])
+  @@map("work_logs")
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -531,6 +580,13 @@ model ChangeOrder {
   amount    Float // 金额变化：正=增加、负=减少；拒 0
   date      DateTime // 变更日期
   note      String   @default("") // 原因说明
+  status       String   @default("draft") // draft | pending | client_confirmed | rejected
+  submittedAt  DateTime?
+  submittedBy  String?
+  confirmedAt  DateTime?
+  confirmedBy  String?
+  confirmNote  String   @default("")
+  rejectReason String?
   createdBy String? // ★ userId 占位（P4 接登录）
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

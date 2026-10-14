@@ -32,6 +32,12 @@ export interface ChangeOrderRow {
   date: Date;
   note: string;
   createdByName: string | null;
+  status: string;
+  submittedAt: Date | null;
+  confirmedAt: Date | null;
+  confirmNote: string;
+  rejectReason: string | null;
+  attachments: { id: string; originalName: string; storageKey: string; size: number }[];
 }
 
 /** 新建/编辑变更单的公共入参（全字段覆盖式编辑）。 */
@@ -116,6 +122,9 @@ export async function listChanges(
     where: { quoteId: quote.id },
     orderBy: [{ date: "desc" }, { createdAt: "desc" }],
   });
+  const assets = await prisma.fileAsset.findMany({ where: { ownerType: "change_order", ownerId: { in: rows.map((r) => r.id) } }, orderBy: { createdAt: "asc" } });
+  const assetsByOwner = new Map<string, typeof assets>();
+  for (const a of assets) assetsByOwner.set(a.ownerId, [...(assetsByOwner.get(a.ownerId) ?? []), a]);
 
   const userIds = Array.from(
     new Set(rows.map((r) => r.createdBy).filter((v): v is string => v !== null))
@@ -138,6 +147,12 @@ export async function listChanges(
     date: r.date,
     note: r.note,
     createdByName: r.createdBy ? userNameById.get(r.createdBy) ?? null : null,
+    status: r.status,
+    submittedAt: r.submittedAt,
+    confirmedAt: r.confirmedAt,
+    confirmNote: r.confirmNote,
+    rejectReason: r.rejectReason,
+    attachments: (assetsByOwner.get(r.id) ?? []).map((a) => ({ id: a.id, originalName: a.originalName, storageKey: a.storageKey, size: a.size })),
   }));
 }
 
@@ -167,7 +182,7 @@ export async function createChange(
   return prisma.$transaction(async (tx) => {
     const quote = await tx.budgetQuote.findUnique({
       where: { projectId },
-      select: { id: true },
+      select: { id: true, status: true },
     });
     if (!quote) {
       throw new ChangeOrderError("未找到报价单，请先在报价编辑器保存");
@@ -205,9 +220,10 @@ export async function updateChange(
   return prisma.$transaction(async (tx) => {
     const existing = await tx.changeOrder.findUnique({
       where: { id: changeId },
-      select: { id: true, quoteId: true },
+      select: { id: true, quoteId: true, status: true },
     });
     if (!existing) throw new ChangeOrderError("变更单不存在");
+    if (existing.status === "client_confirmed") throw new ChangeOrderError("客户已确认的变更不能直接编辑");
 
     // 归属校验：quoteId 必须指向该 projectId 的报价单
     const quote = await tx.budgetQuote.findUnique({
@@ -232,6 +248,17 @@ export async function updateChange(
   });
 }
 
+export async function setChangeStatus(changeId: string, status: "pending" | "client_confirmed" | "rejected", note = "") {
+  const me = await getBudgetUser();
+  if (!me) throw new ChangeOrderError("未找到操作人，请先运行 seed 初始化用户");
+  const row = await prisma.changeOrder.findUnique({ where: { id: changeId } });
+  if (!row) throw new ChangeOrderError("变更单不存在");
+  if (status === "pending" && row.status !== "draft" && row.status !== "rejected") throw new ChangeOrderError("当前状态不能提交确认");
+  if (status === "client_confirmed" && row.status !== "pending") throw new ChangeOrderError("只有待确认的变更才能确认");
+  if (status === "rejected" && row.status !== "pending") throw new ChangeOrderError("只有待确认的变更才能驳回");
+  return prisma.changeOrder.update({ where: { id: changeId }, data: status === "pending" ? { status, submittedAt: new Date(), submittedBy: me.id, rejectReason: null } : status === "client_confirmed" ? { status, confirmedAt: new Date(), confirmedBy: me.id, confirmNote: note.trim(), rejectReason: null } : { status, rejectReason: note.trim() || "客户未确认" } });
+}
+
 /**
  * 删除变更单（硬删——单用户无回收站，TASK §4-M9-a）。
  * id 不存在 → 「变更单不存在」。删除不需要 getBudgetUser。
@@ -242,9 +269,10 @@ export async function deleteChange(changeId: string): Promise<void> {
   return prisma.$transaction(async (tx) => {
     const existing = await tx.changeOrder.findUnique({
       where: { id: changeId },
-      select: { id: true },
+      select: { id: true, status: true },
     });
     if (!existing) throw new ChangeOrderError("变更单不存在");
+    if (existing.status === "client_confirmed") throw new ChangeOrderError("客户已确认的变更不能删除");
 
     await tx.changeOrder.delete({ where: { id: changeId } });
   });

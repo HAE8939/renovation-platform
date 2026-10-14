@@ -25,7 +25,8 @@ export async function submitDesignTaskAction(
     const taskId = text("taskId");
     if (!taskId) return { error: "缺少任务标识，请刷新页面后重试" };
 
-    await createSubmission(taskId, { note: text("note"), assetRef: text("assetRef") });
+    const files = formData.getAll("files").filter((v): v is File => v instanceof File && v.size > 0);
+    await createSubmission(taskId, { note: text("note"), assetRef: text("assetRef"), files });
 
     revalidatePath("/design");
     revalidatePath("/design/[id]", "page");

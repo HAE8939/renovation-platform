@@ -22,9 +22,12 @@ import {
   updateChange,
   type ChangeInput,
 } from "@/modules/budget/server/changes";
+import { setChangeStatus } from "@/modules/budget/server/changes";
 import { logAppError } from "@/core/domain/telemetry";
+import { saveUploadedFile } from "@/core/storage/storage";
 import { recordOperation, moneyText, diffText } from "@/core/domain/operationLog";
 import prisma from "@/core/db";
+import { getBudgetUser } from "@/modules/budget/currentUser";
 
 /** Server Action 表单状态：客户端用 useFormState 读回。 */
 export interface ProjectFormState {
@@ -360,6 +363,24 @@ export interface ChangeFormState {
   ok?: boolean;
 }
 
+export async function setChangeStatusAction(projectId: string, changeId: string, status: "pending" | "client_confirmed" | "rejected", note = "") {
+  try {
+    const row = await setChangeStatus(changeId, status, note);
+    await recordOperation({ action: `change.${status}`, entity: "changeOrder", entityId: changeId, projectId, summary: status === "pending" ? "提交变更单供客户确认" : status === "client_confirmed" ? "登记客户已确认变更" : "登记客户驳回变更", after: status });
+    revalidatePath(`/budget/${projectId}/changes`); revalidatePath(`/budget/${projectId}`); revalidatePath(`/projects/${projectId}`);
+    return { ok: true } as ChangeFormState;
+  } catch (e) { if (e instanceof ChangeOrderError) return { error: e.message }; logAppError("[setChangeStatusAction]", e); return { error: "操作失败，请稍后重试" }; }
+}
+
+export async function changeStatusFormAction(formData: FormData) {
+  const projectId = String(formData.get("projectId") ?? "");
+  const changeId = String(formData.get("changeId") ?? "");
+  const status = String(formData.get("status") ?? "") as "pending" | "client_confirmed" | "rejected";
+  const note = String(formData.get("note") ?? "");
+  const result = await setChangeStatusAction(projectId, changeId, status, note);
+  if (result.error) throw new Error(result.error);
+}
+
 /** 从 FormData 构造 ChangeInput（amount 用 Number(...) 让服务层做 isFinite 校验）。 */
 function readChangeInput(formData: FormData): ChangeInput {
   const text = (key: string) => String(formData.get(key) ?? "").trim();
@@ -380,7 +401,8 @@ export async function createChangeAction(
 ): Promise<ChangeFormState> {
   try {
     const ci = readChangeInput(formData);
-    await createChange(projectId, ci);
+    const created = await createChange(projectId, ci);
+    await saveChangeAttachments(projectId, created.id, formData);
     await recordOperation({
       action: "change.create",
       entity: "changeOrder",
@@ -410,6 +432,7 @@ export async function updateChangeAction(
     const oldChange = await prisma.changeOrder.findUnique({ where: { id: changeId }, select: { title: true, amount: true, kind: true } });
     const ci = readChangeInput(formData);
     await updateChange(changeId, projectId, ci);
+    await saveChangeAttachments(projectId, changeId, formData);
     await recordOperation({
       action: "change.update",
       entity: "changeOrder",
@@ -427,6 +450,16 @@ export async function updateChangeAction(
     if (e instanceof ChangeOrderError) return { error: e.message };
     logAppError("[updateChangeAction]", e);
     return { error: "操作失败，请稍后重试" };
+  }
+}
+
+async function saveChangeAttachments(projectId: string, changeId: string, formData: FormData) {
+  const me = await getBudgetUser();
+  if (!me) return;
+  const files = formData.getAll("attachments").filter((v): v is File => v instanceof File && v.size > 0).slice(0, 5);
+  for (const file of files) {
+    const saved = await saveUploadedFile(file, "change_attachment", changeId);
+    await prisma.fileAsset.create({ data: { projectId, ownerType: "change_order", ownerId: changeId, category: "change_attachment", ...saved, uploadedBy: me.id, uploaderName: me.name } });
   }
 }
 

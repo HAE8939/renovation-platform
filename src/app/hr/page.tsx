@@ -1,7 +1,8 @@
-import { Badge, Card, Field, Select, Table, Td, Th } from "@/core/ui";
-import { getHrPageData } from "@/modules/hr/server/people";
+import { Badge, Card, Field, Input, Select, Table, Td, Th } from "@/core/ui";
+import { getWorkLogPageData } from "@/modules/hr/server/worklogs";
 import { PROJECT_MEMBER_ROLE, PROJECT_MEMBER_ROLE_LABEL } from "@/modules/hr/roles";
-import { addProjectMember, removeProjectMember } from "./actions";
+import { addProjectMember, removeProjectMember, createWorkLogAction, archiveWorkLogAction } from "./actions";
+import { WORKLOG_CATEGORY, WORKLOG_CATEGORY_LABEL } from "@/modules/hr/worklogs";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "人员工控" };
@@ -11,7 +12,7 @@ function formatDate(value: Date | null) {
 }
 
 export default async function HrPage() {
-  const data = await getHrPageData();
+  const data = await getWorkLogPageData();
 
   return (
     <div className="space-y-8">
@@ -81,6 +82,32 @@ export default async function HrPage() {
             </Table>
           </Card>
         )}
+      </section>
+
+      <section>
+        <div className="flex items-baseline justify-between gap-4">
+          <div>
+            <h2 className="text-[17px] font-semibold">人员工作记录</h2>
+            <p className="mt-1 text-[13px] text-secondary">记录拜访、设计、现场和沟通事实，后续可按项目与人员汇总。</p>
+          </div>
+          <span className="num text-[13px] text-muted">{data.logs.length} 条</span>
+        </div>
+        <Card className="mt-4" padded>
+          <form action={createWorkLogAction} className="grid gap-4 md:grid-cols-4 md:items-end">
+            <Field label="日期" required><Input name="workDate" type="date" required defaultValue={new Date().toISOString().slice(0, 10)} /></Field>
+            <Field label="项目" required><Select name="projectId" required defaultValue=""><option value="" disabled>请选择项目</option>{data.projects.map((p) => <option key={p.id} value={p.id}>{p.code} · {p.name}</option>)}</Select></Field>
+            <Field label="人员" required><Select name="userId" required defaultValue=""><option value="" disabled>请选择人员</option>{data.users.map((u) => <option key={u.id} value={u.id}>{u.name} · {u.roleLabel}</option>)}</Select></Field>
+            <Field label="类型" required><Select name="category" defaultValue="site">{Object.values(WORKLOG_CATEGORY).map((c) => <option key={c} value={c}>{WORKLOG_CATEGORY_LABEL[c]}</option>)}</Select></Field>
+            <Field label="工作事项" required><Input name="title" required maxLength={120} placeholder="如：现场复核水电点位" /></Field>
+            <Field label="工时（分钟）"><Input name="minutes" type="number" min="0" max="1440" step="15" placeholder="可留空" /></Field>
+            <Field label="工作说明"><Input name="description" maxLength={240} placeholder="过程记录" /></Field>
+            <Field label="产出说明"><Input name="outputNote" maxLength={240} placeholder="形成了什么结果" /></Field>
+            <button type="submit" className="h-9 border border-accent bg-accent px-4 text-[13px] font-medium text-accent-fg transition-colors duration-[120ms] hover:bg-accent-ink md:col-span-4 md:justify-self-end">保存工作记录</button>
+          </form>
+        </Card>
+        <Card className="mt-4" padded={false}>
+          {data.logs.length === 0 ? <p className="px-5 py-10 text-center text-[15px] text-secondary">还没有工作记录。</p> : <Table><thead><tr><Th>日期</Th><Th>项目</Th><Th>人员</Th><Th>事项</Th><Th>类型</Th><Th>工时</Th><Th align="right">操作</Th></tr></thead><tbody>{data.logs.map((l) => <tr key={l.id}><Td className="num text-[13px] text-secondary">{formatDate(l.workDate)}</Td><Td><span className="num text-[13px] text-secondary">{l.project.code}</span><span className="ml-2">{l.project.name}</span></Td><Td>{l.user.name}</Td><Td><p className="font-medium">{l.title}</p>{l.outputNote && <p className="mt-1 text-[12px] text-secondary">{l.outputNote}</p>}</Td><Td><Badge variant="outline">{l.categoryLabel}</Badge></Td><Td className="num text-[13px] text-secondary">{l.minutes ? `${l.minutes} 分钟` : "—"}</Td><Td align="right"><form action={archiveWorkLogAction}><input type="hidden" name="id" value={l.id} /><button type="submit" className="text-[13px] text-secondary hover:text-danger">归档</button></form></Td></tr>)}</tbody></Table>}
+        </Card>
       </section>
 
       <section>

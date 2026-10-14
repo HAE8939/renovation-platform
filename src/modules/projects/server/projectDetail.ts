@@ -354,7 +354,7 @@ export async function getProjectHub(projectId: string): Promise<ProjectHub | nul
       select: { type: true, amount: true },
     }),
     prisma.changeOrder.findMany({
-      where: { quote: { projectId } },
+      where: { quote: { projectId }, status: "client_confirmed" },
       select: { amount: true },
     }),
   ]);

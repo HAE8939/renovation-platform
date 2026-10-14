@@ -87,6 +87,11 @@ function SubmissionEntry({
           "—"
         )}
       </p>
+      {s.files.length > 0 && (
+        <ul className="mt-2 space-y-1 text-[13px]">
+          {s.files.map((file) => <li key={file.id}><a href={`/${file.storageKey}`} target="_blank" rel="noreferrer" className="text-accent-ink hover:underline">{file.originalName}</a><span className="ml-2 text-muted">({(file.size / 1024 / 1024).toFixed(1)} MB)</span></li>)}
+        </ul>
+      )}
       {s.result === "rejected" && s.rejectReason && (
         <p className="mt-2 text-[13px] leading-relaxed text-danger">
           退回原因：{s.rejectReason}

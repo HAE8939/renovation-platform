@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import prisma from "@/core/db";
 import { recordOperation } from "@/core/domain/operationLog";
 import { isProjectMemberRole } from "@/modules/hr/roles";
+import { archiveWorkLog, createWorkLog, WorkLogError } from "@/modules/hr/server/worklogs";
 
 export async function addProjectMember(formData: FormData) {
   const projectId = String(formData.get("projectId") ?? "").trim();
@@ -46,5 +47,20 @@ export async function removeProjectMember(formData: FormData) {
     summary: "移除项目责任关系",
     before: row.role,
   });
+  revalidatePath("/hr");
+}
+
+export async function createWorkLogAction(formData: FormData) {
+  try {
+    await createWorkLog({ projectId: String(formData.get("projectId") ?? ""), userId: String(formData.get("userId") ?? ""), workDate: String(formData.get("workDate") ?? ""), category: String(formData.get("category") ?? ""), title: String(formData.get("title") ?? ""), description: String(formData.get("description") ?? ""), minutes: String(formData.get("minutes") ?? ""), outputNote: String(formData.get("outputNote") ?? "") });
+    revalidatePath("/hr");
+  } catch (e) {
+    if (e instanceof WorkLogError) throw e;
+    throw new Error("保存工作记录失败，请稍后重试");
+  }
+}
+
+export async function archiveWorkLogAction(formData: FormData) {
+  await archiveWorkLog(String(formData.get("id") ?? ""));
   revalidatePath("/hr");
 }
