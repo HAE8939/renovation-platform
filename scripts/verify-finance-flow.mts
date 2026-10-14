@@ -37,6 +37,7 @@ import {
   createChange,
   updateChange,
   deleteChange,
+  setChangeStatus,
 } from "@/modules/budget/server/changes";
 import { getProjectHub } from "@/modules/projects/server/projectDetail";
 import { buildPaymentPlan, PAYMENT_STAGE_DEFS } from "@/modules/finance/payment";
@@ -133,6 +134,17 @@ async function main() {
    * 再经 ledger.changeTotal 复算。供 baseline 与联动断言交叉比对（不抄被测算式）。
    */
   async function dbChangeTotal(projectId: string): Promise<number> {
+    // 与读侧同源口径：只有客户已确认的变更进金额（M13 四段确认流 / AGENTS §5）。
+    const rows = await prisma.changeOrder.findMany({
+      where: { quote: { projectId }, status: "client_confirmed" },
+      select: { amount: true },
+    });
+    const changeRows: ChangeRow[] = rows.map((r) => ({ amount: r.amount }));
+    return changeTotal(changeRows);
+  }
+
+  /** 全量口径（含草稿/待确认/已驳回）——只用于证明"草稿确实写进库了、只是不进金额"。 */
+  async function dbChangeTotalAll(projectId: string): Promise<number> {
     const rows = await prisma.changeOrder.findMany({
       where: { quote: { projectId } },
       select: { amount: true },
@@ -524,7 +536,10 @@ async function main() {
     `${hubBaseline?.finance.changeWarn}`
   );
 
-  // ── 7) createChange → changeTotal 增加 / getProjectHub 联动 ─────
+  // ── 7) createChange → 落 draft，草稿不进金额口径（M13 四段确认流）──
+  // 口径：变更单须【客户已确认】才计入累计变更/毛利/应收分母（AGENTS §5）。
+  // 两头都得钉住——既锁"草稿不算钱"，也锁"确认后即刻算钱"。
+  // 001 seed 基线：合同额 62000 · 已确认变更 +3200（warn=true，3200>3100）。
   const changeAdd = 1000;
   const { id: changeId } = await createChange(p1.id, {
     kind: "add",
@@ -533,38 +548,45 @@ async function main() {
     dateIso: "2026-10-15",
     note: "  flow 测试增项  ",
   });
-  const afterCreateChange = await dbChangeTotal(p1.id);
-  chk(
-    "createChange add → changeTotal +1000（3200→4200）",
-    centEq(afterCreateChange, 3200 + changeAdd),
-    `${afterCreateChange}`
-  );
-  // 联动：getProjectHub(p1).finance.changeTotal 反映新值
-  const hubAfterCreate = await getProjectHub(p1.id);
-  chk(
-    "联动：createChange → getProjectHub.finance.changeTotal === 4200",
-    hubAfterCreate !== null && centEq(hubAfterCreate.finance.changeTotal, 4200),
-    `${hubAfterCreate?.finance.changeTotal}`
-  );
-  // 仍 warn（4200 > 3100）
-  chk(
-    "联动：createChange → changeWarn 仍 true",
-    hubAfterCreate !== null && hubAfterCreate.finance.changeWarn === true,
-    `${hubAfterCreate?.finance.changeWarn}`
-  );
-  // note 去空白 + createdBy = 占位用户
-  const changeRow = await prisma.changeOrder.findUnique({
+  const rowAfterCreate = await prisma.changeOrder.findUnique({
     where: { id: changeId },
-    select: { note: true, createdBy: true, amount: true },
+    select: { note: true, status: true },
   });
   chk(
+    "createChange → 新单落 draft（未确认）",
+    rowAfterCreate?.status === "draft",
+    rowAfterCreate?.status ?? "空"
+  );
+  const allAfterCreate = await dbChangeTotalAll(p1.id);
+  const okAfterCreate = await dbChangeTotal(p1.id);
+  chk(
+    "createChange → 全量口径 +1000（3200→4200，证明行确实写进库了）",
+    centEq(allAfterCreate, 4200),
+    `${allAfterCreate}`
+  );
+  chk(
+    "createChange → 已确认口径不变（仍 3200）",
+    centEq(okAfterCreate, 3200),
+    `${okAfterCreate}`
+  );
+  const hubDraft = await getProjectHub(p1.id);
+  chk(
+    "联动：draft 不进 getProjectHub.finance.changeTotal（仍 3200）",
+    hubDraft !== null && centEq(hubDraft.finance.changeTotal, 3200),
+    `${hubDraft?.finance.changeTotal}`
+  );
+  chk(
+    "联动：draft 期 changeWarn 按 3200>3100 仍 true",
+    hubDraft !== null && hubDraft.finance.changeWarn === true,
+    `${hubDraft?.finance.changeWarn}`
+  );
+  chk(
     "createChange → note 去空白",
-    changeRow?.note === "flow 测试增项",
-    changeRow?.note ?? "空"
+    rowAfterCreate?.note === "flow 测试增项",
+    rowAfterCreate?.note ?? "空"
   );
 
-  // ── 8) updateChange → amount 变更联动 ────────────────────────
-  // 1000 → 2000（仍 add 正数）；changeTotal 4200 → 5200
+  // ── 8) draft 下 updateChange 可改金额，但仍不进口径 ─────────────
   await updateChange(changeId, p1.id, {
     kind: "add",
     title: "测试增项改后",
@@ -572,40 +594,164 @@ async function main() {
     dateIso: "2026-10-15",
     note: "改后",
   });
-  const afterUpdateChange = await dbChangeTotal(p1.id);
+  const allAfterUpdate = await dbChangeTotalAll(p1.id);
+  const okAfterUpdateDraft = await dbChangeTotal(p1.id);
   chk(
-    "updateChange add 1000→2000 → changeTotal 4200→5200",
-    centEq(afterUpdateChange, 3200 + 2000),
-    `${afterUpdateChange}`
+    "updateChange（draft）1000→2000 → 全量口径 5200",
+    centEq(allAfterUpdate, 5200),
+    `${allAfterUpdate}`
   );
-  const hubAfterUpdate = await getProjectHub(p1.id);
   chk(
-    "联动：updateChange → getProjectHub.finance.changeTotal === 5200",
-    hubAfterUpdate !== null && centEq(hubAfterUpdate.finance.changeTotal, 5200),
-    `${hubAfterUpdate?.finance.changeTotal}`
+    "updateChange（draft）→ 已确认口径仍 3200（改草稿不动钱）",
+    centEq(okAfterUpdateDraft, 3200),
+    `${okAfterUpdateDraft}`
   );
 
-  // ── 9) deleteChange → changeTotal 回落 ───────────────────────
-  await deleteChange(changeId);
-  const afterDeleteChange = await dbChangeTotal(p1.id);
+  // ── 9) 状态守卫：不可跳级确认，必须先提交 ──────────────────────
+  try {
+    await setChangeStatus(changeId, "client_confirmed");
+    chk("守卫：draft 直接确认 → 抛错", false, "未抛错");
+  } catch (e) {
+    chk(
+      "守卫：draft 直接确认 → 「只有待确认的变更才能确认」",
+      e instanceof ChangeOrderError &&
+        e.message === "只有待确认的变更才能确认",
+      e instanceof Error ? e.message : "非 Error"
+    );
+  }
+
+  // ── 10) draft → pending → client_confirmed：确认瞬间金额进口径 ───
+  await setChangeStatus(changeId, "pending");
+  const okAfterPending = await dbChangeTotal(p1.id);
   chk(
-    "deleteChange → changeTotal 回到 3200（基线）",
+    "提交 pending → 已确认口径仍 3200（待确认不算钱）",
+    centEq(okAfterPending, 3200),
+    `${okAfterPending}`
+  );
+  await setChangeStatus(changeId, "client_confirmed", "  客户口头确认  ");
+  const okAfterConfirm = await dbChangeTotal(p1.id);
+  chk(
+    "客户确认 → 已确认口径 3200→5200",
+    centEq(okAfterConfirm, 5200),
+    `${okAfterConfirm}`
+  );
+  const hubConfirmed = await getProjectHub(p1.id);
+  chk(
+    "联动：确认后 getProjectHub.finance.changeTotal === 5200",
+    hubConfirmed !== null && centEq(hubConfirmed.finance.changeTotal, 5200),
+    `${hubConfirmed?.finance.changeTotal}`
+  );
+  chk(
+    "联动：确认后 changeWarn 仍 true（5200>3100）",
+    hubConfirmed !== null && hubConfirmed.finance.changeWarn === true,
+    `${hubConfirmed?.finance.changeWarn}`
+  );
+  const confirmedRow = await prisma.changeOrder.findUnique({
+    where: { id: changeId },
+    select: { confirmedAt: true, confirmNote: true },
+  });
+  chk(
+    "客户确认 → confirmedAt 落时间戳",
+    confirmedRow?.confirmedAt instanceof Date,
+    String(confirmedRow?.confirmedAt)
+  );
+  chk(
+    "客户确认 → confirmNote 去空白",
+    confirmedRow?.confirmNote === "客户口头确认",
+    confirmedRow?.confirmNote ?? "空"
+  );
+
+  // ── 11) 已确认后禁止直接编辑（金额不得绕过确认流被改）───────────
+  try {
+    await updateChange(changeId, p1.id, {
+      kind: "add",
+      title: "偷改",
+      amount: 9999,
+      dateIso: "2026-10-15",
+      note: "",
+    });
+    chk("守卫：已确认后编辑 → 抛错", false, "未抛错");
+  } catch (e) {
+    chk(
+      "守卫：已确认后编辑 → 「客户已确认的变更不能直接编辑」",
+      e instanceof ChangeOrderError &&
+        e.message === "客户已确认的变更不能直接编辑",
+      e instanceof Error ? e.message : "非 Error"
+    );
+  }
+
+  // ── 12) 驳回路径：rejected 不进口径，但行保留可追溯 ─────────────
+  const { id: rejectedId } = await createChange(p1.id, {
+    kind: "add",
+    title: "测试驳回",
+    amount: 1500,
+    dateIso: "2026-10-15",
+    note: "",
+  });
+  await setChangeStatus(rejectedId, "pending");
+  await setChangeStatus(rejectedId, "rejected", "客户未认可该增项");
+  const okAfterReject = await dbChangeTotal(p1.id);
+  const allAfterReject = await dbChangeTotalAll(p1.id);
+  chk(
+    "驳回 → 已确认口径仍 5200（rejected 不算钱）",
+    centEq(okAfterReject, 5200),
+    `${okAfterReject}`
+  );
+  chk(
+    "驳回 → 全量口径 6700（行仍在、可追溯）",
+    centEq(allAfterReject, 6700),
+    `${allAfterReject}`
+  );
+
+  // ── 13) 删除守卫：已确认的变更不能删（钱按事实，金额不得被无痕抹掉）──
+  try {
+    await deleteChange(changeId);
+    chk("守卫：已确认后删除 → 抛错", false, "未抛错");
+  } catch (e) {
+    chk(
+      "守卫：已确认后删除 → 「客户已确认的变更不能删除」",
+      e instanceof ChangeOrderError &&
+        e.message === "客户已确认的变更不能删除",
+      e instanceof Error ? e.message : "非 Error"
+    );
+  }
+  // 驳回行从未进过口径，删掉不留痕——与上面构成有意的不对称
+  await deleteChange(rejectedId);
+  const allAfterRejectDelete = await dbChangeTotalAll(p1.id);
+  chk(
+    "deleteChange（rejected）→ 全量口径回到 5200",
+    centEq(allAfterRejectDelete, 5200),
+    `${allAfterRejectDelete}`
+  );
+
+  // 测试收尾：已确认行经服务层不可删（正是上面那条守卫），故直接清库回到 seed 基线，
+  // 让"金额口径能回落"这一联动断言仍然测得到。
+  await prisma.changeOrder.delete({ where: { id: changeId } });
+  const afterDeleteChange = await dbChangeTotal(p1.id);
+  const allAfterDelete = await dbChangeTotalAll(p1.id);
+  chk(
+    "收尾清库 → 已确认口径回到 3200（基线）",
     centEq(afterDeleteChange, 3200),
     `${afterDeleteChange}`
   );
+  chk(
+    "收尾清库 → 全量口径同回到 3200（测试数据不留残）",
+    centEq(allAfterDelete, 3200),
+    `${allAfterDelete}`
+  );
   const hubAfterDelete = await getProjectHub(p1.id);
   chk(
-    "联动：deleteChange → getProjectHub.finance.changeTotal === 3200",
+    "联动：回到基线后 getProjectHub.finance.changeTotal === 3200",
     hubAfterDelete !== null && centEq(hubAfterDelete.finance.changeTotal, 3200),
     `${hubAfterDelete?.finance.changeTotal}`
   );
   chk(
-    "联动：deleteChange → changeWarn 回到 true（3200>3100）",
+    "联动：回到基线后 changeWarn 为 true（3200>3100）",
     hubAfterDelete !== null && hubAfterDelete.finance.changeWarn === true,
     `${hubAfterDelete?.finance.changeWarn}`
   );
 
-  // ── 10) 六类拒绝（title 空 / kind 未知 / amount 0 /
+  // ── 14) 六类拒绝（title 空 / kind 未知 / amount 0 /
   //            deduct 正数 / add 负数 / 日期非法）──────────────
   // title 空
   try {
