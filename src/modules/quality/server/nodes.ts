@@ -9,6 +9,7 @@ import {
   nodeDisplayLabel,
 } from "../status";
 import type { IssueProjection } from "../types";
+import { evidenceUrl, type EvidenceItem } from "./evidence";
 
 /**
  * 质量管控 · 节点查询服务（M7-a）。
@@ -212,6 +213,7 @@ export interface NodeDetail {
   issues: NodeIssueItem[];
   task: NodeTaskInfo | null;
   hasOpenIssues: boolean; // 派生：是否存在 status==="open" 问题（重提门控/UI 提示用）
+  evidence: EvidenceItem[];
 }
 
 /**
@@ -230,6 +232,7 @@ export async function getNodeDetail(id: string): Promise<NodeDetail | null> {
       project: { select: { name: true, code: true } },
       checks: { orderBy: { order: "asc" } },
       issues: { orderBy: { createdAt: "asc" }, select: { id: true, title: true, severity: true, status: true, createdAt: true } },
+      evidence: { orderBy: { createdAt: "desc" } },
     },
   });
   if (!node) return null;
@@ -318,6 +321,10 @@ export async function getNodeDetail(id: string): Promise<NodeDetail | null> {
         }
       : null,
     hasOpenIssues,
+    evidence: node.evidence.flatMap((e) => {
+      const url = evidenceUrl(e.nodeId, e.filename);
+      return url ? [{ ...e, url }] : [];
+    }),
   };
 }
 

@@ -19,9 +19,9 @@ import {
 /**
  * 自定义字段（EAV）读写服务 —— 落 `core/domain` 而非 `modules/fields/server`。
  *
- * 为什么：值录入面在项目中心（projects 模块）、定义管理面在 fields 模块、筛选面在
+ * 为什么：值录入面在项目中心（projects 模块）、定义管理面在平台设置、筛选面在
  * projects 列表——三处都要用。AGENTS §2/§3：模块之间不互相 import 内部，只通过 core
- * 协作；所以这是**平台能力**，`modules/fields/**` 只留 manifest。
+ * 协作；所以这是**平台能力**，不属于任何业务模块。
  *
  * 纪律（照 M8-b 台账 / M9-a 变更单同族）：纯输入校验全部在开事务之前，存在性检查放
  * 事务内；错误类 `CustomFieldError` 的 message 是中文、直达 UI；跨模块只 prisma 直读。

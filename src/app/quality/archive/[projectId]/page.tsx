@@ -108,7 +108,7 @@ export default async function ProjectArchivePage({ params }: PageProps) {
           <span className="mx-2" aria-hidden>
             ·
           </span>
-          影像：未接入
+          影像：节点详情查看
         </p>
       </header>
 

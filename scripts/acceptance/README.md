@@ -48,6 +48,7 @@ node scripts/acceptance/labels.mjs modules/finance                 # 从源码�
 | `s10-splash` | 启动页：入场终态、三种收起、主题随动、reduced-motion、例外不外溢 |
 | `s11-dashboard` | 驾驶舱改版：密集表行数=在册项目、不溢出、三灯不竖排、毛利逐行复算 |
 | `s12-archive-facts` | 「钱按事实 · 事按可见性」端到端：归档→钱不动事收窄→恢复分毫回来 |
+| `s15-evidence` | 验收节点证据图片：上传回读、文件落盘、操作流水、删除清理与实库隔离 |
 
 ## 加一个场景
 

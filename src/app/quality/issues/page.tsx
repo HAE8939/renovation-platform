@@ -8,6 +8,7 @@ import {
 import { listIssues } from "@/modules/quality/server/issues";
 import { IssueLedger } from "./IssueLedger";
 import { NewIssueModal } from "./NewIssueModal";
+import { ProjectSearchFilter } from "../ProjectSearchFilter";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "问题台账" };
@@ -83,21 +84,12 @@ export default async function QualityIssuesPage({
 
       {/* 筛选行：服务端 GET form（仿 design ScopeToggle 的直链思路，无客户端状态） */}
       <form className="flex flex-wrap items-end gap-3" method="get" action="/quality/issues">
-        <label className="block">
-          <span className="mb-1.5 block text-xs font-medium text-secondary">项目</span>
-          <select
-            name="projectId"
-            defaultValue={projectId ?? ""}
-            className="block w-full rounded-inner border border-line bg-surface px-3 py-2 pr-8 text-sm text-primary focus:outline-none focus:border-accent"
-          >
-            <option value="">全部项目</option>
-            {data.projects.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <ProjectSearchFilter
+          projects={data.projects}
+          selectedId={projectId}
+          basePath="/quality/issues"
+          preserveParams={{ status, severity }}
+        />
 
         <label className="block">
           <span className="mb-1.5 block text-xs font-medium text-secondary">状态</span>

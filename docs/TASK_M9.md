@@ -1,5 +1,7 @@
 # 任务卡 M9 · 财务深化 + 驾驶舱 + 自定义字段
 
+> 后续修订（2026-10-13）：自定义字段的 EAV 数据能力仍是平台原语，但定义管理面不再作为独立业务模块展示，现收回平台设置 `/settings#custom-fields`；旧 `/fields` 仅作兼容跳转。
+
 > 状态：**M9-a 已合入（2026-10-11）**；M9 余 b/c/d/e 候开卡（边界已与 HAE 确认，见 §1）｜ 承 `docs/PLAN_FULL_SERVICE_V1.md` v1.2 §5-M9；业务细节源 `Full-Service Project Management/装修经营管理平台 — 网站设计指导文档 v5.1.md` §6.7（**只取业务不取皮**）
 > 前置：M8 财务基础全案结案（`078bcdd`）+ M8.5 修复批（`5e84957`）｜ 执行通道：codebuddy（`custom-local:glm-5.2` → 8787 三号池），master 串行；集成者守 build + 断言 + 截图
 > 边界裁定工具：`docs/PLATFORM_EVOLUTION_V0.1.md`（三问：只动自己目录？跨模块只走 core？口径单点？）

@@ -15,6 +15,7 @@ import {
 import { getNodeDetail } from "@/modules/quality/server/nodes";
 import { SubmitChecksForm } from "./SubmitChecksForm";
 import { ReviewForm } from "./ReviewForm";
+import { EvidencePanel } from "./EvidencePanel";
 
 export const dynamic = "force-dynamic";
 
@@ -48,7 +49,7 @@ function CheckResultBadge({ result }: { result: string | null }) {
 }
 
 /**
- * 验收节点详情（M7-b）：基础信息 + 检查项清单（提交/只读）+ 影像占位 +
+ * 验收节点详情（M7-b）：基础信息 + 检查项清单（提交/只读）+ 节点证据图片 +
  * 关联问题 + 审核区。仿 design/[id] 结构：内联展开、必填校验、错误回显。
  *
  * 页开头先 getNodeDetail 拿 projectId → syncAcceptanceNodes 兜底（调用点②）。
@@ -257,10 +258,11 @@ export default async function NodeDetailPage({
         )}
       </section>
 
-      {/* 影像占位说明条（DEFERRED，诚实空态）*/}
-      <p className="text-[13px] leading-relaxed text-secondary">
-        现场影像本期未接入（规划中）。
-      </p>
+      <EvidencePanel
+        nodeId={detail.id}
+        evidence={detail.evidence}
+        viewerId={submitUser?.id ?? null}
+      />
 
       {/* 关联问题 */}
       <section className="rounded-card border border-line bg-surface p-6">

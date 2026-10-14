@@ -295,13 +295,12 @@ export function QuoteBoard({ data }: { data: QuoteBoardData }) {
       </header>
 
       {/* 实时预算看板：表格上方一条紧凑汇总条，整体右对齐，窄屏折行 */}
-      <div className="flex flex-wrap items-end justify-end gap-x-8 gap-y-3 rounded-inner border border-line bg-surface px-4 py-3">
+      <div className="grid grid-cols-2 items-end gap-x-6 gap-y-3 rounded-inner border border-line bg-surface px-4 py-3 sm:grid-cols-[1fr_auto_auto_auto]">
         <SummaryItem label="直接费" value={formatCny(totals.directSubtotal)} />
         <SummaryItem
           label={`税金（${formatPercent(taxRate)}）`}
           value={formatCny(totals.tax)}
         />
-        <SummaryItem label="总价" value={formatCny(totals.grand)} accent />
         <SummaryItem
           label="单方造价"
           value={
@@ -309,6 +308,12 @@ export function QuoteBoard({ data }: { data: QuoteBoardData }) {
               ? "面积缺失"
               : `${formatCny(totals.unitCost)} /㎡`
           }
+        />
+        <SummaryItem
+          label="总价"
+          value={formatCny(totals.grand)}
+          accent
+          className="col-span-2 border-t border-line pt-3 sm:col-span-1 sm:order-4 sm:border-t-0 sm:pt-0"
         />
       </div>
 
@@ -664,13 +669,15 @@ function SummaryItem({
   label,
   value,
   accent = false,
+  className = "",
 }: {
   label: string;
   value: string;
   accent?: boolean;
+  className?: string;
 }) {
   return (
-    <div className="flex flex-col items-end gap-1 text-right">
+    <div className={`flex flex-col items-end gap-1 text-right ${className}`}>
       <dt className="text-xs text-secondary whitespace-nowrap">{label}</dt>
       <dd
         className={`num ${accent ? "text-[20px] font-semibold text-accent-ink" : "text-[15px]"}`}

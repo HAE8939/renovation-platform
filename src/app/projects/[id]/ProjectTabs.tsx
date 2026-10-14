@@ -24,21 +24,29 @@ export function ProjectTabs({ hub, initialTab }: { hub: ProjectHub; initialTab?:
   const [tab, setTab] = useState<TabKey>(valid ? (initialTab as TabKey) : "basic");
   return (
     <div className="mt-8">
-      <div className="flex gap-6 overflow-x-auto border-b border-line">
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            onClick={() => setTab(t.key)}
-            className={`whitespace-nowrap border-b-2 pb-2 text-[15px] transition-colors duration-[120ms] ${
-              tab === t.key
-                ? "border-accent font-medium text-primary"
-                : "border-transparent text-secondary hover:text-primary"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
+      <div className="flex items-center gap-4 border-b border-line">
+        <div className="flex min-w-0 flex-1 gap-6 overflow-x-auto">
+          {TABS.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => setTab(t.key)}
+              className={`whitespace-nowrap border-b-2 pb-2 text-[15px] transition-colors duration-[120ms] ${
+                tab === t.key
+                  ? "border-accent font-medium text-primary"
+                  : "border-transparent text-secondary hover:text-primary"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <Link
+          href={`/projects/${hub.id}/activity`}
+          className="shrink-0 whitespace-nowrap pb-2 text-[13px] text-accent-ink hover:underline underline-offset-4"
+        >
+          项目动态
+        </Link>
       </div>
 
       <div className="pt-6">

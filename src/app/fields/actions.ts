@@ -43,23 +43,8 @@ function readDefInput(formData: FormData): DefInput {
 /** 定义列表页与项目列表都要刷新（字段改了，录入与筛选面立刻跟着变）。
  *  项目详情是 force-dynamic，导航过去就是新数据，不必逐个 revalidate。 */
 function revalidateFieldSurfaces(): void {
-  revalidatePath("/fields");
+  revalidatePath("/settings");
   revalidatePath("/projects");
-}
-
-export async function createFieldAction(
-  _prev: FieldFormState,
-  formData: FormData,
-): Promise<FieldFormState> {
-  try {
-    const created = await createDef(readDefInput(formData));
-    revalidateFieldSurfaces();
-    return { ok: true, id: created.id };
-  } catch (e) {
-    if (e instanceof CustomFieldError) return { error: e.message };
-    logAppError("[createFieldAction]", e);
-    return { error: "操作失败，请稍后重试" };
-  }
 }
 
 /**
@@ -90,29 +75,6 @@ export async function saveFieldAction(
   } catch (e) {
     if (e instanceof CustomFieldError) return { error: e.message };
     logAppError("[saveFieldAction]", e);
-    return { error: "操作失败，请稍后重试" };
-  }
-}
-
-export async function updateFieldAction(
-  id: string,
-  _prev: FieldFormState,
-  formData: FormData,
-): Promise<FieldFormState> {
-  try {
-    const input = readDefInput(formData);
-    // 编辑态 key/type 由服务端从库里取回，表单不提交这两项 → 天然不可改
-    await updateDef(id, {
-      label: input.label,
-      optionsRaw: input.optionsRaw,
-      required: input.required,
-      active: input.active,
-    });
-    revalidateFieldSurfaces();
-    return { ok: true, id };
-  } catch (e) {
-    if (e instanceof CustomFieldError) return { error: e.message };
-    logAppError("[updateFieldAction]", e);
     return { error: "操作失败，请稍后重试" };
   }
 }

@@ -14,6 +14,8 @@ import {
   removeLogoAction,
   type SettingsState,
 } from "./actions";
+import { FieldsAdmin } from "@/app/fields/FieldsAdmin";
+import type { FieldDef } from "@/core/domain/customFieldRepo";
 
 /**
  * 平台设置面板（M9-d，client）：主题自助切换 + 品牌 Logo 最简版。
@@ -30,13 +32,21 @@ export interface SettingsPanelsProps {
   themeKey: ThemeKey;
   logoFile: string | null;
   logoUrl: string | null;
+  fieldDefs: FieldDef[];
 }
 
-export function SettingsPanels({ themeKey, logoFile, logoUrl }: SettingsPanelsProps) {
+export function SettingsPanels({ themeKey, logoFile, logoUrl, fieldDefs }: SettingsPanelsProps) {
   return (
     <div className="space-y-12">
       <ThemePicker initial={themeKey} />
       <LogoPanel logoFile={logoFile} logoUrl={logoUrl} />
+      <section id="custom-fields">
+        <h2 className="text-[17px] font-semibold">项目字段</h2>
+        <p className="mt-1 text-xs leading-relaxed text-secondary">
+          为项目增加全司共享的扩展属性。字段会出现在项目详情，也可用于项目列表筛选。
+        </p>
+        <FieldsAdmin defs={fieldDefs} />
+      </section>
     </div>
   );
 }

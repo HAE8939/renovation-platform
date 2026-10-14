@@ -1,5 +1,6 @@
 import { brandingUrl } from "@/core/domain/branding";
 import { getPlatformSettings } from "@/core/domain/platformSettings";
+import { listDefs } from "@/core/domain/customFieldRepo";
 import { SettingsPanels } from "./SettingsPanels";
 
 /**
@@ -16,17 +17,18 @@ export const metadata = { title: "平台设置" };
 export default async function SettingsPage() {
   const { themeKey, logoFile } = await getPlatformSettings();
   const logoUrl = brandingUrl(logoFile);
+  const fieldDefs = await listDefs({ includeInactive: true, includeValueCount: true });
 
   return (
     <div className="space-y-12">
       <section>
         <h1 className="text-[28px] font-semibold leading-[1.3]">平台设置</h1>
         <p className="mt-2 text-xs text-secondary">
-          主题与品牌标识 · 改动全站生效 · 单用户免登录（P4 接入登录后归管理员）
+          主题、品牌标识与项目字段 · 改动全站生效 · 单用户免登录（P4 接入登录后归管理员）
         </p>
       </section>
 
-      <SettingsPanels themeKey={themeKey} logoFile={logoFile} logoUrl={logoUrl} />
+      <SettingsPanels themeKey={themeKey} logoFile={logoFile} logoUrl={logoUrl} fieldDefs={fieldDefs} />
     </div>
   );
 }

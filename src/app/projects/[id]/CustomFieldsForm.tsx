@@ -16,7 +16,7 @@ import {
  *   日期→Input date / 单选→Select（选项来自定义，前端不猜类型、不写校验规则）。
  * - 必填项 label 后加「*」；**校验真源在服务端**（core 的 coerce + requiredEmpty），
  *   这里只做输入形态约束（number/date 由控件本身门住）。
- * - 无在用定义 → 诚实空态 + 指向 /fields 的引导（不显示空表框）。
+ * - 无在用定义 → 诚实空态 + 指向平台设置的引导（不显示空表框）。
  * - 保存后回显成功一行（不弹提示、不加动效）。
  */
 export interface CustomFieldsFormProps {
@@ -34,7 +34,7 @@ export function CustomFieldsForm({ projectId, rows }: CustomFieldsFormProps) {
         <h3 className="text-[15px] font-medium">自定义字段</h3>
         <p className="mt-2 text-[13px] text-secondary">
           尚未定义自定义字段。可在
-          <Link href="/fields" className="mx-1 text-accent-ink hover:underline">
+          <Link href="/settings#custom-fields" className="mx-1 text-accent-ink hover:underline">
             自定义字段
           </Link>
           里添加，之后就能在项目上录入并按条件筛选项目列表。

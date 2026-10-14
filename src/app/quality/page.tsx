@@ -6,6 +6,7 @@ import {
   listNodes,
   resolveTaskNode,
 } from "@/modules/quality/server/nodes";
+import { ProjectSearchFilter } from "./ProjectSearchFilter";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "质量管控" };
@@ -17,40 +18,6 @@ function formatDate(d: Date | null): string {
     month: "2-digit",
     day: "2-digit",
   });
-}
-
-/** 项目筛选：服务端直链 pill（仿 design 的 ScopeToggle，无客户端状态）。 */
-function ProjectFilter({
-  projects,
-  selectedId,
-}: {
-  projects: { id: string; name: string; code: string }[];
-  selectedId: string | null;
-}) {
-  const itemClass = (active: boolean) =>
-    `inline-flex h-8 items-center rounded-inner px-3 text-[13px] font-medium whitespace-nowrap transition-colors ${
-      active ? "bg-accent-tint text-accent-ink" : "text-secondary hover:text-primary"
-    }`;
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      <span className="text-[13px] text-secondary whitespace-nowrap">项目</span>
-      <div className="flex flex-wrap items-center rounded-inner border border-line bg-surface p-1">
-        <Link href="/quality" className={itemClass(selectedId === null)}>
-          全部
-        </Link>
-        {projects.map((p) => (
-          <Link
-            key={p.id}
-            href={`/quality?projectId=${p.id}`}
-            className={itemClass(selectedId === p.id)}
-            title={p.name}
-          >
-            {p.name}
-          </Link>
-        ))}
-      </div>
-    </div>
-  );
 }
 
 export default async function QualityListPage({
@@ -92,7 +59,11 @@ export default async function QualityListPage({
               整改复验闭环。节点详情、问题台账与质量档案均已上线。
             </p>
           </div>
-          <ProjectFilter projects={data.projects} selectedId={projectId} />
+          <ProjectSearchFilter
+            projects={data.projects}
+            selectedId={projectId}
+            basePath="/quality"
+          />
         </div>
 
         <p className="mt-4 text-[13px] text-secondary">

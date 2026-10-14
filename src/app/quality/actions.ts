@@ -13,6 +13,11 @@ import type { IssueSeverity } from "@/modules/quality/types";
 import { logAppError } from "@/core/domain/telemetry";
 import { recordOperation } from "@/core/domain/operationLog";
 import prisma from "@/core/db";
+import {
+  deleteEvidence,
+  EvidenceError,
+  uploadEvidence,
+} from "@/modules/quality/server/evidence";
 
 /**
  * 质量管控 Server Action（M7-b）。仿 design/actions.ts：
@@ -68,6 +73,65 @@ export async function submitNodeAction(
     if (e instanceof QualityNodeError) return { error: e.message };
     logAppError("[submitNodeAction]", e);
     return { error: "提交失败，请稍后重试" };
+  }
+}
+
+export interface EvidenceActionFormState {
+  error?: string;
+  ok?: boolean;
+}
+
+/** 节点级证据上传：FormData = nodeId + file。 */
+export async function uploadEvidenceAction(
+  _prev: EvidenceActionFormState,
+  formData: FormData,
+): Promise<EvidenceActionFormState> {
+  try {
+    const nodeId = String(formData.get("nodeId") ?? "").trim();
+    const file = formData.get("file");
+    if (!nodeId) return { error: "缺少节点标识，请刷新页面后重试" };
+    if (!(file instanceof File)) return { error: "请选择要上传的证据图片" };
+    const saved = await uploadEvidence(nodeId, file);
+    await recordOperation({
+      action: "evidence.upload",
+      entity: "evidence",
+      entityId: saved.id,
+      projectId: (await prisma.acceptanceNode.findUnique({ where: { id: nodeId }, select: { projectId: true } }))?.projectId ?? null,
+      summary: `上传验收证据「${saved.originalName}」`,
+      after: `${saved.mimeType}，${saved.size} 字节`,
+    });
+    revalidatePath(`/quality/nodes/${nodeId}`);
+    return { ok: true };
+  } catch (e) {
+    if (e instanceof EvidenceError) return { error: e.message };
+    logAppError("[uploadEvidenceAction]", e);
+    return { error: "上传失败，请稍后重试" };
+  }
+}
+
+/** 删除当前占位用户自己上传的节点级证据。 */
+export async function deleteEvidenceAction(
+  _prev: EvidenceActionFormState,
+  formData: FormData,
+): Promise<EvidenceActionFormState> {
+  try {
+    const evidenceId = String(formData.get("evidenceId") ?? "").trim();
+    if (!evidenceId) return { error: "缺少证据标识，请刷新页面后重试" };
+    const removed = await deleteEvidence(evidenceId);
+    const node = await prisma.acceptanceNode.findUnique({ where: { id: removed.nodeId }, select: { projectId: true } });
+    await recordOperation({
+      action: "evidence.delete",
+      entity: "evidence",
+      entityId: evidenceId,
+      projectId: node?.projectId ?? null,
+      summary: `删除验收证据「${removed.originalName}」`,
+    });
+    revalidatePath(`/quality/nodes/${removed.nodeId}`);
+    return { ok: true };
+  } catch (e) {
+    if (e instanceof EvidenceError) return { error: e.message };
+    logAppError("[deleteEvidenceAction]", e);
+    return { error: "删除失败，请稍后重试" };
   }
 }
 

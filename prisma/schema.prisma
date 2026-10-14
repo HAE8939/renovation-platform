@@ -32,13 +32,13 @@ model Organization {
 
 // 占位表：P4 接入登录。表先建、字段留足，暂不实现认证逻辑。
 model User {
-  id        String   @id @default(cuid())
-  orgId     String
-  name      String
-  email     String   @unique
+  id         String   @id @default(cuid())
+  orgId      String
+  name       String
+  email      String   @unique
   role       String   @default("viewer") // owner / designer / pm / viewer…（字符串常量，见 core/domain/types.ts）
-  department String?                      // management | business | design | engineering
-  createdAt DateTime @default(now())
+  department String? // management | business | design | engineering
+  createdAt  DateTime @default(now())
 
   org Organization @relation(fields: [orgId], references: [id])
 
@@ -61,36 +61,36 @@ model Client {
 }
 
 model Project {
-  id         String   @id @default(cuid())
-  code       String   @unique // 项目编号，如 RP-2026-001
-  name       String
-  address    String?
-  area       Float    @default(0) // 建筑面积㎡；0 时单方造价不可算
-  clientId   String
-  designer   String?
-  pm         String?
-  status     String   @default("draft") // draft / design / in_progress / acceptance / completed / archived
-  startDate  DateTime?
-  endDate    DateTime?                  // 计划/预计完工（B3「工期止」即此）
-  contractAmount Float  @default(0)     // 合同额；0=未录入（哨兵，budgetLight/毛利遇 0 走中性）
-  houseType  String?                    // 户型
-  style      String?                    // 风格偏好
-  source     String?                    // 获客渠道（签约时从 Lead.source 带入，供驾驶舱归因）
-  inspector  String?                    // 工程巡检（本期文本，P4 再改 userId）
-  budgetAnalyst String?                 // 预算员（同上）
-  actualEndDate DateTime?               // 实际完工
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id             String    @id @default(cuid())
+  code           String    @unique // 项目编号，如 RP-2026-001
+  name           String
+  address        String?
+  area           Float     @default(0) // 建筑面积㎡；0 时单方造价不可算
+  clientId       String
+  designer       String?
+  pm             String?
+  status         String    @default("draft") // draft / design / in_progress / acceptance / completed / archived
+  startDate      DateTime?
+  endDate        DateTime? // 计划/预计完工（B3「工期止」即此）
+  contractAmount Float     @default(0) // 合同额；0=未录入（哨兵，budgetLight/毛利遇 0 走中性）
+  houseType      String? // 户型
+  style          String? // 风格偏好
+  source         String? // 获客渠道（签约时从 Lead.source 带入，供驾驶舱归因）
+  inspector      String? // 工程巡检（本期文本，P4 再改 userId）
+  budgetAnalyst  String? // 预算员（同上）
+  actualEndDate  DateTime? // 实际完工
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
-  client    Client       @relation(fields: [clientId], references: [id])
-  quotes    BudgetQuote[]
-  lead      Lead?                        // 反向：签约线索（真源在 Lead.projectId @unique）
-  designTasks DesignTask[]               // 反向：设计任务（M5-a，真源在 DesignTask.projectId）
-  scheduleTasks ScheduleTask[]           // 反向：排程工序（M6-a，真源在 ScheduleTask.projectId）
-  acceptanceNodes AcceptanceNode[]       // 反向：验收节点（M7-a，真源在 AcceptanceNode.projectId）
-  issues    Issue[]                       // 反向：质量问题（M7-a，真源在 Issue.projectId）
-  financeRecords FinanceRecord[]          // 反向：收支台账（M8-a，真源在 FinanceRecord.projectId）
-  paymentNodes PaymentNode[]              // 反向：付款段（M8-a，真源在 PaymentNode.projectId）
+  client          Client           @relation(fields: [clientId], references: [id])
+  quotes          BudgetQuote[]
+  lead            Lead? // 反向：签约线索（真源在 Lead.projectId @unique）
+  designTasks     DesignTask[] // 反向：设计任务（M5-a，真源在 DesignTask.projectId）
+  scheduleTasks   ScheduleTask[] // 反向：排程工序（M6-a，真源在 ScheduleTask.projectId）
+  acceptanceNodes AcceptanceNode[] // 反向：验收节点（M7-a，真源在 AcceptanceNode.projectId）
+  issues          Issue[] // 反向：质量问题（M7-a，真源在 Issue.projectId）
+  financeRecords  FinanceRecord[] // 反向：收支台账（M8-a，真源在 FinanceRecord.projectId）
+  paymentNodes    PaymentNode[] // 反向：付款段（M8-a，真源在 PaymentNode.projectId）
 
   @@map("projects")
 }
@@ -101,9 +101,9 @@ model Project {
 // ─────────────────────────────────────────────────────────────
 
 model CatalogCategory {
-  id        String  @id @default(cuid())
+  id        String   @id @default(cuid())
   name      String
-  order     Int     @default(0)
+  order     Int      @default(0)
   createdAt DateTime @default(now())
 
   items CatalogItem[]
@@ -112,17 +112,17 @@ model CatalogCategory {
 }
 
 model CatalogItem {
-  id          String  @id @default(cuid())
-  categoryId  String
-  code        String
-  name        String
-  unit        String  @default("项")
-  defaultPrice Float  @default(0)
-  defaultQty   Float  @default(1)
-  materials   String  @default("") // 材料说明
-  sop         String  @default("") // 施工要求，多行文本按 \n 分行
-  order       Int     @default(0)
-  createdAt   DateTime @default(now())
+  id           String   @id @default(cuid())
+  categoryId   String
+  code         String
+  name         String
+  unit         String   @default("项")
+  defaultPrice Float    @default(0)
+  defaultQty   Float    @default(1)
+  materials    String   @default("") // 材料说明
+  sop          String   @default("") // 施工要求，多行文本按 \n 分行
+  order        Int      @default(0)
+  createdAt    DateTime @default(now())
 
   category CatalogCategory @relation(fields: [categoryId], references: [id])
 
@@ -130,18 +130,18 @@ model CatalogItem {
 }
 
 model BudgetQuote {
-  id        String   @id @default(cuid())
-  projectId String   @unique // M1a：一项目一报价；多版本留 M1b
-  taxRate   Float    @default(0.03)
-  status    String   @default("draft") // draft / confirmed / locked
+  id        String    @id @default(cuid())
+  projectId String    @unique // M1a：一项目一报价；多版本留 M1b
+  taxRate   Float     @default(0.03)
+  status    String    @default("draft") // draft / confirmed / locked
   note      String?
-  lockedAt  DateTime?                  // 签约锁单时刻；null=未锁
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  lockedAt  DateTime? // 签约锁单时刻；null=未锁
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
-  project Project    @relation(fields: [projectId], references: [id])
+  project Project       @relation(fields: [projectId], references: [id])
   items   QuoteItem[]
-  changes ChangeOrder[]                // 反向：变更单（M9-a，挂报价单级）
+  changes ChangeOrder[] // 反向：变更单（M9-a，挂报价单级）
 
   @@map("budget_quotes")
 }
@@ -149,17 +149,17 @@ model BudgetQuote {
 // 报价明细：CatalogItem 的快照，非引用。
 // 改模板不回溯历史报价 —— 这是刻意的领域决策（AGENTS §5）。
 model QuoteItem {
-  id           String  @id @default(cuid())
+  id           String @id @default(cuid())
   quoteId      String
   categoryName String // 快照科目名
   code         String
   name         String
-  unit         String  @default("项")
-  unitPrice    Float   @default(0)
-  quantity     Float   @default(1)
-  materials    String  @default("")
-  sop          String  @default("")
-  order        Int     @default(0)
+  unit         String @default("项")
+  unitPrice    Float  @default(0)
+  quantity     Float  @default(1)
+  materials    String @default("")
+  sop          String @default("")
+  order        Int    @default(0)
 
   quote BudgetQuote @relation(fields: [quoteId], references: [id])
 
@@ -177,19 +177,19 @@ model Lead {
   orgId        String
   code         String    @unique // LEAD-YYYY-NNN
   name         String
-  phone        String?   // 归并键（M3 签约按此并 Client）
-  estate       String?   // 楼盘
+  phone        String? // 归并键（M3 签约按此并 Client）
+  estate       String? // 楼盘
   area         Float     @default(0)
   style        String?
-  budgetRange  String?   // 意向预算区间（文本，非精确）
-  source       String?   // 获客渠道
+  budgetRange  String? // 意向预算区间（文本，非精确）
+  source       String? // 获客渠道
   stage        String    @default("leads") // leads | contacted | confirmed | quoted | signed
   intentLevel  String    @default("medium") // high | medium | low
-  assignee     String?   // 负责人（本期文本）
+  assignee     String? // 负责人（本期文本）
   lastFollowAt DateTime?
   nextFollowAt DateTime?
   archived     Boolean   @default(false) // 作废位：true=不进漏斗/看板/统计，可恢复（M10-a）
-  archivedAt   DateTime?                 // 作废时刻；null=未作废
+  archivedAt   DateTime? // 作废时刻；null=未作废
   projectId    String?   @unique // 签约回写，1-1；未签为 null
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
@@ -222,21 +222,21 @@ model FollowUp {
 // —— P4 接登录后再决定是否建外键关系，避免现在牵动 User 表。
 // ─────────────────────────────────────────────────────────────
 model DesignTask {
-  id          String   @id @default(cuid())
-  projectId   String                     // ★ 引用共享 core/domain Project，不得自造
-  code        String   @unique           // DES-YYYY-NNN
+  id          String    @id @default(cuid())
+  projectId   String // ★ 引用共享 core/domain Project，不得自造
+  code        String    @unique // DES-YYYY-NNN
   title       String
-  type        String                     // scheme|floorplan|rendering|construction_drawing|measurement（见 design/types.ts 常量）
-  status      String   @default("pending") // pending|assigned|submitted|revisions|approved（见 design/status.ts）
-  assigneeId  String?                    // ★ userId，非自由文本；null=待分配
-  reviewerId  String?                    // ★ userId，审核人
-  requirement String   @default("")      // 需求说明，多行
+  type        String // scheme|floorplan|rendering|construction_drawing|measurement（见 design/types.ts 常量）
+  status      String    @default("pending") // pending|assigned|submitted|revisions|approved（见 design/status.ts）
+  assigneeId  String? // ★ userId，非自由文本；null=待分配
+  reviewerId  String? // ★ userId，审核人
+  requirement String    @default("") // 需求说明，多行
   deadline    DateTime?
-  priority    String   @default("medium") // high|medium|low
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  priority    String    @default("medium") // high|medium|low
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
-  project     Project        @relation(fields: [projectId], references: [id])
+  project     Project          @relation(fields: [projectId], references: [id])
   submissions TaskSubmission[]
 
   @@index([projectId])
@@ -248,13 +248,13 @@ model DesignTask {
 model TaskSubmission {
   id           String    @id @default(cuid())
   taskId       String
-  version      Int                       // 同 task 自增（服务层算 max+1）
-  note         String    @default("")     // 提交说明
-  assetRef     String?                    // 交付物链接占位（本期无上传，可空）
-  submittedBy  String                     // ★ userId
+  version      Int // 同 task 自增（服务层算 max+1）
+  note         String    @default("") // 提交说明
+  assetRef     String? // 交付物链接占位（本期无上传，可空）
+  submittedBy  String // ★ userId
   result       String    @default("pending") // pending|approved|rejected（本次提交审核结果）
-  rejectReason String?                     // 退回时必填（M5-c 服务层校验）
-  reviewedBy   String?                     // ★ userId
+  rejectReason String? // 退回时必填（M5-c 服务层校验）
+  reviewedBy   String? // ★ userId
   reviewedAt   DateTime?
   createdAt    DateTime  @default(now())
 
@@ -274,10 +274,10 @@ model TaskSubmission {
 // 工序模板：11 工序 × 3 档（lt90 / b90_130 / gt130），生成排程时按面积档套用。
 model ProcessTemplate {
   id        String   @id @default(cuid())
-  name      String   // 工序名（11 项）
-  order     Int      // 1..11，生成顺序
-  tier      String   // lt90 | b90_130 | gt130（见 schedule/plan.ts）
-  days      Int      // 标准工期（天）
+  name      String // 工序名（11 项）
+  order     Int // 1..11，生成顺序
+  tier      String // lt90 | b90_130 | gt130（见 schedule/plan.ts）
+  days      Int // 标准工期（天）
   createdAt DateTime @default(now())
 
   @@unique([tier, order])
@@ -287,22 +287,22 @@ model ProcessTemplate {
 // 排程工序：从模板快照生成，挂在 Project 下。改模板不回溯已生成排程。
 model ScheduleTask {
   id          String    @id @default(cuid())
-  projectId   String                     // ★ 引用共享 core/domain Project，不得自造
-  name        String                     // 工序名（快照自模板；改模板不回溯已生成排程）
+  projectId   String // ★ 引用共享 core/domain Project，不得自造
+  name        String // 工序名（快照自模板；改模板不回溯已生成排程）
   order       Int
-  startDate   DateTime                   // 计划开始
-  endDate     DateTime                   // 计划结束（含当天；=start+days-1）
+  startDate   DateTime // 计划开始
+  endDate     DateTime // 计划结束（含当天；=start+days-1）
   actualStart DateTime?
   actualEnd   DateTime?
-  progress    Int       @default(0)      // 0–100 整数
+  progress    Int       @default(0) // 0–100 整数
   status      String    @default("pending") // pending|in_progress|completed（见 schedule/status.ts）
-  ownerId     String?                    // ★ userId，非自由文本；null=未指派
+  ownerId     String? // ★ userId，非自由文本；null=未指派
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  project    Project                   @relation(fields: [projectId], references: [id])
-  deps       ScheduleTaskDependency[]  @relation("sch_dep_task")
-  dependents ScheduleTaskDependency[]  @relation("sch_dep_dependson")
+  project    Project                  @relation(fields: [projectId], references: [id])
+  deps       ScheduleTaskDependency[] @relation("sch_dep_task")
+  dependents ScheduleTaskDependency[] @relation("sch_dep_dependson")
 
   @@index([projectId])
   @@index([ownerId])
@@ -333,10 +333,10 @@ model ScheduleTaskDependency {
 // 检查项库（SOP）：按 stage（=工序名，与 ProcessTemplate.name 同字面）映射 11 工序。
 model CheckItem {
   id        String   @id @default(cuid())
-  stage     String   // 工序名，如"水电工程"
-  name      String   // 检查项名，如"强弱电间距"
-  standard  String   // 验收标准
-  order     Int      // 工序内排序
+  stage     String // 工序名，如"水电工程"
+  name      String // 检查项名，如"强弱电间距"
+  standard  String // 验收标准
+  order     Int // 工序内排序
   createdAt DateTime @default(now())
 
   @@unique([stage, order])
@@ -347,36 +347,56 @@ model CheckItem {
 model AcceptanceNode {
   id           String    @id @default(cuid())
   projectId    String
-  taskId       String?   @unique        // ★ 逻辑引用 ScheduleTask.id；清空排程后允许悬垂
-  name         String                    // 工序名快照
-  order        Int                       // 工序顺序快照
+  taskId       String?   @unique // ★ 逻辑引用 ScheduleTask.id；清空排程后允许悬垂
+  name         String // 工序名快照
+  order        Int // 工序顺序快照
   status       String    @default("pending") // pending|submitted|returned|passed
-  submitNote   String    @default("")    // 提交说明
-  submittedBy  String?                   // ★ userId（占位当前用户）
+  submitNote   String    @default("") // 提交说明
+  submittedBy  String? // ★ userId（占位当前用户）
   submittedAt  DateTime?
-  reviewedBy   String?                   // ★ userId
+  reviewedBy   String? // ★ userId
   reviewedAt   DateTime?
-  returnReason String?                   // 退回原因（最近一次；详情页展示）
+  returnReason String? // 退回原因（最近一次；详情页展示）
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  project Project     @relation(fields: [projectId], references: [id])
-  checks  NodeCheck[]
-  issues  Issue[]
+  project  Project     @relation(fields: [projectId], references: [id])
+  checks   NodeCheck[]
+  issues   Issue[]
+  evidence Evidence[]
 
   @@index([projectId])
   @@index([status])
   @@map("acceptance_nodes")
 }
 
+// M11-D：验收节点证据图片。文件落在 public/uploads/evidence，数据库只存安全文件名与元数据。
+// 上传人先沿用质量模块占位用户；P4 接登录后只替换身份来源，不改表结构。
+model Evidence {
+  id           String   @id @default(cuid())
+  nodeId       String
+  filename     String // 服务端生成的文件名，不接受客户端路径
+  originalName String // 仅用于页面展示
+  mimeType     String // image/jpeg | image/png
+  size         Int // 字节数
+  uploadedBy   String // userId，占位用户；P4 接登录
+  uploaderName String? // 展示名快照
+  createdAt    DateTime @default(now())
+
+  node AcceptanceNode @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+
+  @@index([nodeId, createdAt])
+  @@map("evidence")
+}
+
 // 节点检查项快照行：生成时从 CheckItem 拷入；提交时填结果。
 model NodeCheck {
   id        String   @id @default(cuid())
   nodeId    String
-  name      String   // 快照
-  standard  String   // 快照
+  name      String // 快照
+  standard  String // 快照
   order     Int
-  result    String?  // null=未检 | pass | fail
+  result    String? // null=未检 | pass | fail
   note      String   @default("")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -391,17 +411,17 @@ model NodeCheck {
 model Issue {
   id          String    @id @default(cuid())
   projectId   String
-  nodeId      String?                   // 来源节点（手工建可为空）
-  title       String                    // 问题标题
-  desc        String    @default("")    // 详细描述
+  nodeId      String? // 来源节点（手工建可为空）
+  title       String // 问题标题
+  desc        String    @default("") // 详细描述
   severity    String    @default("normal") // minor|normal|major
-  status      String    @default("open")   // open|rectified|closed
-  reportedBy  String                    // ★ userId
-  assigneeId  String?                   // ★ 责任人 userId
-  dueDate     DateTime?                 // 截止日期
-  rectifyNote String?                   // 整改说明
+  status      String    @default("open") // open|rectified|closed
+  reportedBy  String // ★ userId
+  assigneeId  String? // ★ 责任人 userId
+  dueDate     DateTime? // 截止日期
+  rectifyNote String? // 整改说明
   rectifiedAt DateTime?
-  recheckNote String?                   // 复验意见（关闭/退回共用，取最近一次）
+  recheckNote String? // 复验意见（关闭/退回共用，取最近一次）
   closedAt    DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -426,12 +446,12 @@ model Issue {
 model FinanceRecord {
   id          String   @id @default(cuid())
   projectId   String
-  type        String   // income | expense
-  category    String   // contract | change | refund | material | labor | other
-  amount      Float                       // 恒为正数；方向由 type 决定（免符号歧义）
-  date        DateTime                    // 发生日期
-  description String   @default("")       // 摘要，如「泥工班组第二期人工」
-  recordedBy  String?                     // ★ userId（占位当前用户，P4 接登录）
+  type        String // income | expense
+  category    String // contract | change | refund | material | labor | other
+  amount      Float // 恒为正数；方向由 type 决定（免符号歧义）
+  date        DateTime // 发生日期
+  description String   @default("") // 摘要，如「泥工班组第二期人工」
+  recordedBy  String? // ★ userId（占位当前用户，P4 接登录）
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -445,21 +465,21 @@ model FinanceRecord {
 
 // 付款段：五段计划，金额生成时快照自 Project.contractAmount（决策④）。
 model PaymentNode {
-  id             String    @id @default(cuid())
-  projectId      String
-  order          Int                      // 1..5
-  name           String                   // 段名快照，如「水电完成款」
-  percent        Float                    // 比例快照（30 = 30%），展示用
-  amountDue      Float                    // ★ 应收金额快照（生成时合同额 × 比例，尾差归末段）
-  trigger        String                   // none | stages | all  —— 解锁依赖的验收条件
-  triggerStages  String    @default("")    // 逗号分隔工序名，仅 trigger=="stages" 用
-  unlocksAt      DateTime?                // 可选：不早于此日可付（保修金用；null=无日期约束）
-  note           String    @default("")
-  paid           Boolean   @default(false)
-  paidAt         DateTime?
-  paidBy         String?                  // ★ userId
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  id            String    @id @default(cuid())
+  projectId     String
+  order         Int // 1..5
+  name          String // 段名快照，如「水电完成款」
+  percent       Float // 比例快照（30 = 30%），展示用
+  amountDue     Float // ★ 应收金额快照（生成时合同额 × 比例，尾差归末段）
+  trigger       String // none | stages | all  —— 解锁依赖的验收条件
+  triggerStages String    @default("") // 逗号分隔工序名，仅 trigger=="stages" 用
+  unlocksAt     DateTime? // 可选：不早于此日可付（保修金用；null=无日期约束）
+  note          String    @default("")
+  paid          Boolean   @default(false)
+  paidAt        DateTime?
+  paidBy        String? // ★ userId
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   project Project @relation(fields: [projectId], references: [id])
 
@@ -479,12 +499,12 @@ model PaymentNode {
 model ChangeOrder {
   id        String   @id @default(cuid())
   quoteId   String
-  kind      String   // add | deduct | upgrade | process（增项/减项/材料升级/工艺变更）
-  title     String   // 变更描述（必填）
-  amount    Float    // 金额变化：正=增加、负=减少；拒 0
+  kind      String // add | deduct | upgrade | process（增项/减项/材料升级/工艺变更）
+  title     String // 变更描述（必填）
+  amount    Float // 金额变化：正=增加、负=减少；拒 0
   date      DateTime // 变更日期
   note      String   @default("") // 原因说明
-  createdBy String?  // ★ userId 占位（P4 接登录）
+  createdBy String? // ★ userId 占位（P4 接登录）
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -501,19 +521,19 @@ model ChangeOrder {
 // 关键设计：**值按类型分列存**（valueText / valueNumber / valueDate 三列互斥）——数字与日期若
 // 塞进字符串列，SQLite 的 gte/lte 会按字典序比较（"9" > "10"），区间筛选必错（§8-0-19 推论）。
 model CustomFieldDef {
-  id       String  @id @default(cuid())
-  key      String  @unique // 稳定机读键，如 survey_date；创建后不可改
-  label    String          // 中文名，列表/表单/报错文案都用它
-  type     String          // text | textarea | number | date | select
+  id        String   @id @default(cuid())
+  key       String   @unique // 稳定机读键，如 survey_date；创建后不可改
+  label     String // 中文名，列表/表单/报错文案都用它
+  type      String // text | textarea | number | date | select
   // 仅 select 用：**每行一个选项**的纯文本（如 "不含家电\n仅厨电"）；其余类型存 ""。
   // 为什么不用 Json：Prisma 5.22 在 SQLite 上不支持 Json 类型（`prisma validate` 实测报
   // "The current connector does not support the Json type"），而本栈开发期与首个部署就是 SQLite
   // （AGENTS §1）。按行文本比 JSON 字符串更可读、可手改、无转义坑，迁 PG 时也照样能用。
   // 清洗与解析单点在 core/domain/customField.ts 的 parseOptions（同时兼容数组入参）。
-  options  String   @default("")
-  required Boolean @default(false)
-  active   Boolean @default(true) // 停用＝不进录入、不进筛选，历史值原样保留可查
-  order    Int     @default(0)
+  options   String   @default("")
+  required  Boolean  @default(false)
+  active    Boolean  @default(true) // 停用＝不进录入、不进筛选，历史值原样保留可查
+  order     Int      @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -555,9 +575,9 @@ model CustomFieldValue {
 // 渲染时拼固定目录 → 客户端永远无法借文件名做路径穿越；目录与命名由服务端单点生成。
 // ─────────────────────────────────────────────────────────────
 model PlatformSetting {
-  id       String  @id @default("platform") // 单例行主键固定字面量（免 cuid 漂移）
-  themeKey String  @default("cobalt")        // 主题插槽键名，仅认 theme.ts 的四套
-  logoFile String?                            // 品牌 Logo 文件名；null=未上传（品牌区回落文字标识）
+  id        String   @id @default("platform") // 单例行主键固定字面量（免 cuid 漂移）
+  themeKey  String   @default("cobalt") // 主题插槽键名，仅认 theme.ts 的四套
+  logoFile  String? // 品牌 Logo 文件名；null=未上传（品牌区回落文字标识）
   updatedAt DateTime @updatedAt
 
   @@map("platform_settings")
@@ -579,16 +599,16 @@ model PlatformSetting {
 model OperationLog {
   id        String   @id @default(cuid())
   at        DateTime @default(now())
-  action    String   // 机器名：quote.save / record.create / plan.markPaid / lead.sign / node.review / project.archive …
-  entity    String   // 实体类型：project / quote / financeRecord / paymentNode / lead / node / issue / fieldDef / schedule …
-  entityId  String?  // 实体 id；模板类操作等无单行主体时可空
-  projectId String?  // ★ 尽量挂主脊：支撑「按项目看这一单都发生过什么」（不建外键——流水要能留住已删对象的记录）
-  summary   String   // 中文一句话，给业务同事看（不是给程序看）
-  before    String?  // 变更前关键值（纯文本；null=新建类操作）
-  after     String?  // 变更后关键值（纯文本；null=删除类操作）
+  action    String // 机器名：quote.save / record.create / plan.markPaid / lead.sign / node.review / project.archive …
+  entity    String // 实体类型：project / quote / financeRecord / paymentNode / lead / node / issue / fieldDef / schedule …
+  entityId  String? // 实体 id；模板类操作等无单行主体时可空
+  projectId String? // ★ 尽量挂主脊：支撑「按项目看这一单都发生过什么」（不建外键——流水要能留住已删对象的记录）
+  summary   String // 中文一句话，给业务同事看（不是给程序看）
+  before    String? // 变更前关键值（纯文本；null=新建类操作）
+  after     String? // 变更后关键值（纯文本；null=删除类操作）
   actor     String   @default("user-local") // 占位用户；P4 换真 userId
-  actorName String?  // 展示名快照（人员改名后流水仍显示当时的名字）
-  error     String?  // 失败时记原因；成功为 null（失败的写操作同样值得留档）
+  actorName String? // 展示名快照（人员改名后流水仍显示当时的名字）
+  error     String? // 失败时记原因；成功为 null（失败的写操作同样值得留档）
 
   @@index([projectId, at])
   @@index([entity, entityId])
