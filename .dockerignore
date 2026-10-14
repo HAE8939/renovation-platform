@@ -1,0 +1,8 @@
+node_modules
+.next
+prisma/dev.db*
+public/uploads
+logs
+_scratch
+.git
+*.log
