@@ -193,7 +193,7 @@ model Issue {
     - 007 演示流状态：**003「老街 21 号院」** —— 「拆除工程」节点 `passed`（检查项全 pass；提交人=老郑、审核人=周工；时间取该工序任务 `actualEnd`，提交=actualEnd、审核=次日）；「水电工程」节点 `passed`（同上）；「泥工工程」节点 `returned`（`returnReason="厨卫墙面局部空鼓，需整改后复验"`；检查项「空鼓率检查」result=fail，其余 pass）+ 关联 `Issue`（title「泥工工程验收退回」、desc=原因、severity=normal、status=open、reportedBy=周工、assigneeId=周工、dueDate=今天+3d）。
     - **002「金域蓝湾 2 栋 802」** —— 「拆除工程」节点 `passed`（时间取任务 actualEnd）；「水电工程」节点 `submitted`（检查项全 pass，提交人=老郑，提交时间取 actualEnd）。
     - 其余节点保持 `pending`（由物化产生）。
-  - 自检断言（报数取 DB 真值）：CheckItem=35 且 11 工序齐；节点数 003=11 / 002=6 / 004=0；001 节点数=其 completed 任务数；问题数=1（open）；003 泥工节点=returned、002 水电节点=submitted。
+  - 自检断言（报数取 DB 真值）：CheckItem=35 且 11 工序齐；节点数 003=11 / 002 至少 6 / 004=0；001 节点数=其 completed 任务数；至少 1 条问题且至少 1 条 open；003 泥工节点=returned/passed、002 水电节点=submitted/passed。内测手测可继续推进节点、闭环问题，因此 seed 不再因额外业务事实失败。
 - `/quality` **节点列表页**（server 组件 + `server/nodes.ts` 查询）：读取时对**全部非 archived 项目**逐个 `syncAcceptanceNodes` → 查节点（含项目名、提交人名、检查通过 n/m、关联问题数）。顶部：项目筛选下拉（`?projectId=` 深链，选项=非 archived 项目）；`?taskId=` 时：经 prisma 读该任务得 projectId → 同步 → 找节点 → `redirect(/quality/nodes/[id])`；找不到节点 → `redirect(/quality?projectId=X)`。表格列：验收节点（name）/ 项目 / 状态徽章（含「整改中」派生文案）/ 提交人 / 提交时间 / 检查（通过 n/m；全未检显 —）/ 问题（未关闭数，0 显 —）；行链到节点详情（M7-b 交付，本单元先给 `href` 即可）。排序：项目 order（项目列表顺序）→ 节点 order。空态：无节点→「暂无验收节点——工序完工后自动生成」+ 链到 `/schedule`。
 - `/quality/issues` 占位页：「问题台账将在 M7-c 上线」诚实空态 + 返回 `/quality`；`/quality/archive` 占位页：「质量档案将在 M7-d 上线」+ 返回。`qa-shots` 加 `{ name: "18-quality", path: "/quality" }`。
 

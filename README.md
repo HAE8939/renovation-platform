@@ -49,6 +49,7 @@ pnpm dev           # 开发：http://localhost:3000
   `node scripts/verify-quote.mjs`(37) · `verify-crm.mjs`(11) · `verify-health.mjs`(20) · `verify-design.mjs`(28) · `verify-schedule.mjs`(55) · `verify-quality.mjs`(108) · `verify-finance.mjs`(115)
 - **隔离库集成门禁**（会改临时库，跑前先 `migrate reset --force`，配方见各脚本头注）：
   `verify-sign.mts`(12) · `verify-schedule-gen.mts`(27) · `verify-quality-flow.mts`(94) · `verify-finance-flow.mts`(55)
+- 人员工控：`node scripts/verify-hr.mjs`（5）
 - **页面级**：`node scripts/qa-shots.mjs`（无头截图逐页巡检）；`node scripts/print-pdf.mjs`（打印视图真 A4 PDF）；375 布局争议用同源 iframe DOM 探针量 `scrollWidth`（勿凭截图肉眼）。
 - 纪律：**build 绿 + 断言过 ≠ 页面正确**——历史真缺陷多由截图 / 目检发现。
 

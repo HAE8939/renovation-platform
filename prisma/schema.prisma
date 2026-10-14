@@ -40,7 +40,8 @@ model User {
   department String? // management | business | design | engineering
   createdAt  DateTime @default(now())
 
-  org Organization @relation(fields: [orgId], references: [id])
+  org            Organization    @relation(fields: [orgId], references: [id])
+  projectMembers ProjectMember[]
 
   @@map("users")
 }
@@ -91,8 +92,34 @@ model Project {
   issues          Issue[] // 反向：质量问题（M7-a，真源在 Issue.projectId）
   financeRecords  FinanceRecord[] // 反向：收支台账（M8-a，真源在 FinanceRecord.projectId）
   paymentNodes    PaymentNode[] // 反向：付款段（M8-a，真源在 PaymentNode.projectId）
+  members         ProjectMember[] // 人员工控：项目责任关系（M12-a）
 
   @@map("projects")
+}
+
+// ─────────────────────────────────────────────────────────────
+// 人员工控模块（M12-a）
+// 项目成员关系是平台共享主数据的桥：User 与 Project 均来自 core/domain，
+// 本表只记录某人在某项目承担的责任与时间，不复制姓名、岗位或项目实体。
+// ─────────────────────────────────────────────────────────────
+model ProjectMember {
+  id        String    @id @default(cuid())
+  projectId String
+  userId    String
+  role      String // project_manager | designer | inspector | construction_lead | coordinator
+  startDate DateTime?
+  endDate   DateTime?
+  note      String    @default("")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId, role])
+  @@index([projectId])
+  @@index([userId])
+  @@map("project_members")
 }
 
 // ─────────────────────────────────────────────────────────────
