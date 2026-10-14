@@ -1,19 +1,22 @@
 # AGENTS.md — 装修经营管理数字化平台（renovation-platform）
 
-> 本文件是本项目对**所有 AI 编程助手（含 codebuddy）的权威契约**。任何模块开发前先读本文件 + `docs/`。
-> 版本：契约 v0.4 · 更新：2026-10-13 · 维护人：HAE（AI 视频导演 / 家装业务数字化）
+> 本文件是本项目对**所有 AI 编程助手（含 opencode / codex）的权威契约**。任何模块开发前先读本文件 + `docs/`。
+> 版本：契约 v0.5 · 更新：2026-10-14 · 维护人：HAE（AI 视频导演 / 家装业务数字化）
+> v0.5 变更（M13 系统性体检后的双向对齐）：**契约终于追上实现**——§0 模块范围从"只构建第 1 个模块"改为实际的 9 个模块；§2 目录补 `core/storage`、`scripts/`、`middleware.ts` 与三个部署文件；§4 补平台原语全清单。新增两处硬约束：**§4.6 变更单确认门**（只有客户已确认进金额口径 + 存量回填教训）、**§7.1 内测期最小访问保护**（零鉴权已从"未来项"变成"现实风险"）。并补：§4.3 收 `WorkLog.archived`（工时属事实族）、§6 间距阶梯补"长页 section 上探 64/96"与控件高度组、§6.1 accent 族四值必须同时落 `tailwind.config.ts`、§8 质量门槛改挂 `pnpm verify`。
 > v0.4 变更（M10-c 归档口径收口）：§4.3 改写为「**钱按事实 · 事按可见性**」二分（原句「全司读侧早已排除 archived」只对一半，事实类账不许因归档消失），并补：归档确认框须列未闭环事项、`OperationLog.before` 只能存机器值。
 > v0.3 变更（M10-a 备料批）：新增 §4.3 归档/作废口径、§4.4 操作流水与错误现场、§4.5 主题插槽双声明锁；§6.1 局部预览依赖元素级插槽（同条锁死）。
 > v0.2 变更：R1/R2 落地条款入册（§4.1 跨模块关联主键、§4.2 自定义字段 EAV、§5 报价明细排除、§6.1 主题、§6.2 浮层阴影）+ §9 工作区目录约定入册。原补丁文本在 `docs/PROPOSAL_M1.5.md` §4/§9，其中三处（accent 族值数、设置列名、软删口径）已被 M9-c/M9-d 实际实现取代，**以本文件为准**。
 
 ## 0. 项目定位（一句话）
 
-这是一个**面向装修经营全流程的数字化管理平台**，由多个可插拔模块组成。当前只构建 **第 1 个模块：装修预算报价**。未来会陆续加入「项目管理系统」「设计管理系统」等，**全部集成进同一个平台外壳**，共享登录、主数据与视觉语言。
+这是一个**面向装修经营全流程的数字化管理平台**，由多个可插拔模块组成。**已建成 9 个模块**（`src/modules/registry.ts` 为准）：预算报价、驾驶舱、线索 CRM、项目中心、设计管理、排程、质量验收、财务台账、人员工控；外加平台设置 `/settings`（不占模块位）。全部集成进同一个平台外壳，共享登录、主数据与视觉语言。
+
+> 本条 v0.4 及以前写的是"当前只构建第 1 个模块"，与实现脱节三个月——保留此教训：**代码已有的实体与口径必须回写本契约**，否则新会话冷启动会照旧契约做出与现状冲突的决策。体检报告见 `docs/HEALTH_CHECK_2026-10-14.md` §7。
 
 > 定位澄清（2026-10-08）：首期主打**数字化经营管理**，不预设 AI。**AI 辅助管理 = DEFERRED**（后期再加，不在首期范围，命名/界面均不强调 AI）。
 
-- 目标形态：一个仓库、可部署到阿里云轻量服务器的 Web 平台；模块=平台里的一个功能区。
-- 红线：**模块化单体**，不做微前端、不做多系统拼门户、不在第一个模块阶段做重型权限中台（DEFERRED）。
+- 目标形态：一个仓库、可部署到阿里云轻量服务器的 Web 平台；模块=平台里的一个功能区。当前实际部署形态是**内网 Docker Compose 内测**（NAS/内网机），云上 HTTPS 属 P3——两者不是一回事，别把内测当 P3 完成。
+- 红线：**模块化单体**，不做微前端、不做多系统拼门户、不在第一个模块阶段做重型权限中台（DEFERRED）。但见 **§7.1**：内测期最小访问保护已从 DEFERRED 提升为必做。
 
 ## 1. 技术栈（DECIDED，长期沿用）
 
@@ -27,26 +30,39 @@
 
 ```
 renovation-platform/
-  prisma/schema.prisma  prisma/seed.ts
+  prisma/schema.prisma  prisma/seed.ts  prisma/bootstrap.mjs  prisma/migrations/
   src/
-    app/                       # Next App Router：平台外壳 + 各模块路由
+    middleware.ts              # 内测期最小访问保护的应用层闸（§7.1，勿删）
+    app/                       # Next App Router：平台外壳 + 各模块路由（只放页面与 action）
       layout.tsx               # 全局外壳：左侧模块导航(由注册表动态生成)+ 顶栏
-      page.tsx                 # 平台首页：模块入口卡片网格
-      budget/                  # 预算模块路由（app/router 层，薄，调用 modules/budget）
-    modules/                   # ★ 可插拔业务模块（每个未来功能=一个目录）
+      page.tsx                 # 平台首页：模块入口卡片网格（保持 force-dynamic，§6.1）
+      HeroSplash.tsx           # 启动首屏（§6.3 成文例外，作用域锁 .splash-*）
+      budget/  dashboard/  crm/  projects/  design/  schedule/  quality/  finance/  hr/  settings/  fields/  api/
+    modules/                   # ★ 可插拔业务模块（每个功能=一个目录，清单见 registry.ts）
       registry.ts              # 模块注册表（单一清单，外壳据此渲染导航/首页）
       budget/
         manifest.ts            # 实现 ModuleManifest（见 §3）
         components/  server/  types.ts  lib/
     core/                      # ★ 跨模块共享，不属于任何单一模块
-      domain/                  # 共享主数据服务：project、client、org、user
+      domain/                  # 共享主数据与平台原语服务（清单见 §4）
       ui/                      # 设计系统派生的基础组件(Button/Card/Input/Table/Modal...)
       db/                      # prisma client 单例
+      storage/                 # 上传落盘抽象（FileAsset 的存储侧；uuid 命名 + MIME 白名单 + 防穿越）
+      platform.ts              # 平台级常量（名称等）
     styles/tokens.css globals.css
-  docs/                        # 契约、构建规格、参考副本
+  scripts/                     # verify-*.mjs 纯函数门禁 / verify-*.mts 隔离库集成门禁 / run-gates.mjs 驱动器
+  docs/                        # 契约、构建规格、任务卡、状态交接、体检与验收报告（人看的都在这）
+  Dockerfile  compose.internal.yml  Caddyfile     # 内测部署三件（§7.1 口令保护在 Caddyfile）
   AGENTS.md  CLAUDE.md(指针对本文件)  README.md
+  _scratch/                    # 一切非交付物（gitignore，见 §9）
+  logs/                        # 运行期错误日志（§4.4，§9 里唯一的仓库根例外）
 ```
 要点：**路由层薄、逻辑归 `modules/<id>/server`、UI 原子归 `core/ui`、主数据归 `core/domain`**。模块之间不互相 import 内部实现，只通过 `core` 与注册表协作。
+
+两条由体检补上的边界纪律（都是实见分叉后立的，勿当装饰）：
+
+- **`core` 不得依赖任何单一模块**，包括 type-only import。曾经 `core/ui/NotificationBell.tsx` 反向 import `modules/dashboard/server/notifications` 取一个接口——运行时零耦合所以没出事，但方向错了就是错了：哪天有人顺手 import 了那个模块的运行时函数，core 就把整个 dashboard 的取数拖进共享层。形状类接口一律放 `core/domain/*Types.ts`，模块侧再 re-export 保持引用不变。
+- **门禁清单不靠人记**。`scripts/run-gates.mjs` 按 `verify-*.mjs` / `verify-*.mts` 文件名**自动发现**门禁；新增门禁只要按这个命名放进来就一定会被跑到。反过来，把清单硬编码进驱动器或文档的结局已经出现过一次——`docs/TASK_M11.md` 写"十道纯函数"时实际已有 11 道。
 
 ## 3. 模块契约（ModuleManifest）— 集成机制的核心
 
@@ -66,14 +82,30 @@ export interface ModuleManifest {
 ```
 约束：模块自带 Prisma 迁移实体但**不得重定义核心域实体**（Project/Client/User/Org 属 `core/domain`）。模块表通过 `projectId`/外键引用核心域。
 
-## 4. 共享核心域（core/domain，Prisma 实体）
+## 4. 共享核心域与平台原语（`core/domain`，Prisma 实体）
 
-即便暂只有预算用到，也从一开始建模留位，避免后续模块各存一套：
+即便暂只有一个模块用到，也从一开始建模留位，避免后续模块各存一套。**核心域与平台原语实体归这里，模块不得重定义**；下列清单以 `prisma/schema.prisma` 为准（v0.5 补全——此前只列 4 个，而实际已有 30 个 model、9 个模块，契约成了摆设）：
 
-- `Organization`（占位，当前单一默认行）
-- `User`（占位表已建，暂不接入登录）
+**主数据（业务对象的锚点）**
+
+- `Organization`（占位，当前单一默认行 `slug="default"`）
+- `User`（占位表已建；`role` 取值见 `core/domain/types.ts` 的 `USER_ROLE`，**写不在表内的值**如 `owner` 会让角色显示与 `boss` 兜底逻辑双双落空）
 - `Client`（甲方：名称、电话、备注…）
-- `Project`（★主数据：code、name、地址、面积、client→Client、designer、pm、status、dates）——预算/项目管理/设计管理都挂在 Project 下。
+- `Project`（★主数据：code、name、地址、面积、client→Client、designer、pm、status、dates、contractAmount）——预算/项目管理/设计管理都挂在 Project 下。
+
+**平台原语（跨模块共用，谁都不许另建一套）**
+
+- `Lead` / `FollowUp` — 线索与跟进（CRM 复用主脊，签约后经 `Lead.projectId` 与 Project 1-1 挂钩）
+- `FileAsset` — 全平台附件账（变更单附件、验收证据、Logo 都走它，靠 `ownerType/ownerId` 关联；SQLite 无 Json，故不建结构列）
+- `CustomFieldDef` / `CustomFieldValue` — 自定义字段 EAV（§4.2）
+- `PlatformSetting` — 平台自身配置（主题键名、Logo 等；只存键名，色值在 `tokens.css`）
+- `OperationLog` — 操作流水唯一账本（§4.4；同时承担"归档恢复回哪一态"的职责）
+
+**共享口径与服务的单一真源（无表，但同属 core/domain，模块只调用不自写算式）**
+
+`ledger.ts`（收/支/毛利/毛利率/变更累计，事实族口径）· `pricing.ts`（金额格式化与报价算式）· `health.ts`（三色灯）· `dashboard.ts` · `acceptance.ts` · `theme.ts`（四套插槽键名）· `customField.ts` + `customFieldRepo.ts`（EAV 读写单点）· `operationLog.ts`（流水唯一入口）· `telemetry.ts`（错误现场）· `projects.ts`（项目主数据服务 + 归档/恢复）· `accessGate.ts`（§7.1 闸的口径单点）· `notificationTypes.ts`（形状，不含取数）· `types.ts`（PROJECT_STATUS / USER_ROLE / ENTITY_KIND 等机器值常量）。
+
+**模块自有实体**（不在此列，见 §5 与各模块目录）：budget 5（含 `ChangeOrder`）、quality 5、schedule 3、design 2、finance 2、hr 2。
 
 ### 4.1 跨模块关联主键（R2-①，DECIDED）
 
@@ -104,6 +136,10 @@ export interface ModuleManifest {
 - 线索侧用 `Lead.archived`（作废位）：已签约的线索**不许只作废线索**，那会让项目失去 `Lead.projectId` 这条 1-1 来源（§4.1）——要清掉就去项目中心归档项目。守卫落在服务层 `setLeadArchived`，不在界面里重复判断。
 - 卡片视图这类"整卡是一个 `<a>`"的地方**不放行内按钮**（HTML 不允许在 `a` 里嵌表单，点了也会串成跳转）；操作入口放表格行与详情页两处，够用即可，不为对称去重构卡片。
 - 归档动作必须写流水（`project.archive` / `project.restore` / `lead.archive` / `lead.restore`），且 `before` 记原态——流水在这里同时承担"恢复用什么值"的职责。
+- **状态没变就不写流水**（M13 实见）。`setProjectArchived` 幂等返回 `noop:true`，动作层据此跳过埋点。原因不在"流水脏"这么轻：恢复动作是回读"最新一条 `project.archive` 的 `before`"来决定回到哪一态，一条 `before="archived"` 的无变化记录会把恢复目标污染成 archived——校验合法、执行无变化、还向用户报成功。恢复侧同时用 `NOT: { before: "archived" }` 兜历史脏数据，两处都要。
+- **归档入口只有两处**（`/projects` 表格行 + 项目详情页），二者都走同一服务函数并写流水。**禁止**让"项目设置"表单能把 status 直接改成 archived：那条路径没有未闭环事项的知情确认框、也不写流水，这样归档的项目**无流水可恢复**（只能静默回落 draft）。收口方式=界面选项里摘掉 archived（`ProjectSettingsForm`）+ 服务层守卫拒写（`updateProject`）双保险；已是归档态时放行，因为那是"保持原状"不是绕过。
+- `updateProject` 的 `status` 语义是**未传＝保持原值**，与 `createProject` 的"未传＝draft"相反。给归档项目编辑设置时故意不提交 status 字段，靠这条语义保持——若沿用 create 的回落，改个地址就会把项目悄悄放回全司口径。
+- **`WorkLog.archived` 属事实族**（M13 拍板：归档工时仍进统计）。工时是既成事实，`archived` 位**只隐藏列表可见性**；将来做「人效 / 工时投入」聚合时**必须包含已归档记录**，不得复用列表查询的 `archived:false`，否则某人一归档，他的历史投入就凭空少一截。列表页须显示"另有 N 条已归档未列出"，别让隐藏看起来像丢数据。
 
 ### 4.4 操作流水与错误现场（M10-a，DECIDED）
 
@@ -119,8 +155,19 @@ export interface ModuleManifest {
 
 `tokens.css` 里每套插槽声明**两份**：`:root[data-theme="k"]` 管全站换肤，元素级 `[data-theme="k"]` 管**组件内局部预览**（设置页四张主题卡各自显色）。只有前者时局部预览拿不到插槽色，四张卡看起来"四套没区别"（HAE 意见 4 的真相）。两处必须同键集合同值，由 `verify-theme` 的双声明锁钉死——**只改一处比不改更糟**（全站与预览分叉）。
 
-## 5. 预算模块数据模型（modules/budget 自有实体）
+### 4.6 变更单确认门：只有客户已确认进金额口径（M13，DECIDED）
 
+变更单从"录入即生效"改为四段状态机：`draft → pending → client_confirmed | rejected`（`ChangeOrder.status`，字符串常量 + 默认 `draft`）。**金额口径只认 `client_confirmed`**——`projectDetail.ts` 与 `finance/server/records.ts` 两处聚合都带 `status:"client_confirmed"` 过滤。列表侧（`budget/server/changes.ts`）不过滤、全量展示，这是有意的不对称：**看得见草稿，但草稿不算钱**。
+
+三条纪律，都是这次体检从实坑里拎出来的：
+
+- **改读侧口径必须同步三处**：新迁移的列、所有聚合点、所有门禁断言。`m13` 给 `change_orders` 加 `status` 时，SQLite 的 RedefineTables 重建语句 `INSERT INTO new_change_orders (…) SELECT …` 的列清单里**漏了 `status`**，存量行全部落到 `DEFAULT 'draft'`——于是历史变更金额从累计变更、毛利、毛利率、应收分母（`paidDenom=contractAmount+changeTotal`）和变更预警里同时消失，界面一个字的提示都不给。这正是 §4.3「钱按事实」要避免的事故，而且比归档更糟：**数据没丢，是算没了**。修复=`m13b` 数据回填迁移。
+- **回填判据必须能区分"历史存量"与"上线后的合法草稿"**。`m13b` 用 `createdAt < <m13 上线时刻>` 做判据，并把 `confirmedAt` 取 `createdAt`（旧口径生效时间即创建时间，且避免 UI 拿 null）、`confirmNote` 写明自动确认来源。写成无判据的 `WHERE status='draft'` 会把上线后员工新建的草稿一并确认掉——那是把一个数据 bug 换成一个业务 bug。回填 SQL 幂等，可安全重跑。
+- **SQLite 的 DateTime 存的是整数毫秒**（实测 `typeof("createdAt")='integer'`）。迁移里做时间比较要用 `CAST(strftime('%s','YYYY-MM-DD HH:MM:SS') AS INTEGER) * 1000`，直接跟字符串比会按字典序出错。
+
+**已知缺口（登记，未擅自实现）**：`client_confirmed` 目前是**终态**——`updateChange` 与 `deleteChange` 都拒绝已确认的行，而 `setChangeStatus` 没有任何离开 `client_confirmed` 的边。守卫本身是对的（已确认金额不能被无痕抹掉），但配合 `m13b` 的回填，一旦员工录错并被自动确认，就没有任何纠正路径。是否补"撤销确认"（退回 pending 并即时从口径里摘出、留流水）属产品决策，需单开单元；在此之前，任何批量回填类操作都要先确认这一条。
+
+## 5. 预算模块数据模型（modules/budget 自有实体）
 - `CatalogCategory` 工程科目：id、name、order。（全局模板库，可增删改）
 - `CatalogItem` 科目项模板：category→CatalogCategory、code、name、unit、defaultPrice、defaultQty、materials(文本)、sop(文本/多行)、order。
 - `BudgetQuote` 报价单：project→Project（唯一或多版本）、taxRate(默认 0.03)、status(draft/confirmed)、created/updated。
@@ -132,7 +179,9 @@ export interface ModuleManifest {
 - **UI 相关任务必读并遵守 `E:\19 Python File\MT-Visual-Language\HAE Creator Design System V0.3.md`**（唯一真源，一行指针引用，不在本仓复制全文）。
 - 设计语言：纸感底、**全画面单点 accent**、气声描边、**默认无阴影（L0）**、层级靠字重与对比度，不靠字号与粗线。中文段落排版/负空间按 V0.3 §3.1、§7.4。浮层深度见 §6.2，勿把"默认无阴影"读成"禁止一切阴影"而误删浮层应有的层级手段。
 - **accent 选钴蓝 `#3368A0` 主题**（V0.3 默认铁锈红会与 danger 状态色撞车——见 V0.3 红线）。**主题切换（M9-d）**：`--accent` 一族现为**四值**（`--accent` / `--accent-ink` / `--accent-tint` / `--accent-fg` 主按钮前景），换主题只动这一族、其余 token 一律不动；四套插槽键名 `cobalt/rust/emerald/teal` 存 `PlatformSetting.themeKey`（**只存键名不存自由色值**，R1），实际色值只在 `tokens.css` 的 `:root[data-theme="X"]`，键名口径在 `core/domain/theme.ts`，两处由 `verify-theme` 交叉锁死。teal 浅青上主按钮用深墨（`--accent-fg`），非白。
-- **设计令牌阶梯（M9-e §4-2 固化，硬约束）**：**字号只用 `12/13/15/17/20/28`px、间距只用 `4/8/12/16/24/32/48`px**（对应 V0.3 §3.1/§7.4）。Tailwind 默认刻度未关，写任意值或 off-ladder 工具类（`text-[22px]`、`p-5`、`gap-7`、`text-lg` 等）即越界——新页面/改动必须走这套阶梯，收口批已把历史越界清零，勿再引入。（`text-xs`/`text-sm` 等命名字号作为既定 body 尺寸保留，约束针对**任意值与自造档**。）
+- **设计令牌阶梯（M9-e §4-2 固化 · M13 起机器执行，硬约束）**：**字号只用 `12/13/15/17/20/28`px、间距只用 `4/8/12/16/24/32/48`px**（对应 V0.3 §3.1/§7.4）。Tailwind 默认刻度未关，写任意值或 off-ladder 工具类（`text-[22px]`、`p-5`、`gap-7`、`text-lg` 等）即越界。（`text-xs`/`text-sm` 等命名字号作为既定 body 尺寸保留，约束针对**任意值与自造档**。）
+  - **两处成文的例外，别再当越界来回改**：① `tokens.css` 早就允许**长页 section 上探 64/96**（`gap-16`/`gap-24` 即此档）；② **控件高度另成一组**（`h-8`=32px、`h-9`=36px 是 Button/Input 的既定高度）——§6 那句话字面只管"间距"，别把它外扩成对元素尺寸的全面管制。
+  - **这条现在由 `scripts/verify-tokens.mjs` 机器执行**（连同 §6.2 零阴影、§6.3 splash 作用域、§6.1 禁 localStorage、§1 禁组件库）。为什么必须机器化：M9-e 手工把越界清零过一次，此后三个月又累积到 **87 处**——靠人记得的约束必然回潮，"收口批已清零"这种表述本身就是幻觉。
 - 本仓 `src/styles/tokens.css` 是把 V0.3 token **首次**落成 CSS 变量的地方（设计系统等这个"首个真实项目验证"）。令牌值以 V0.3 为准，不得凭感觉。
 - 反 AI 模板：避免千篇一律的圆角大卡片堆叠、避免彩虹渐变/玻璃拟态/emoji 满屏；遵循 V0.3 的"反模板清单"与页面节奏。
 
@@ -143,6 +192,7 @@ export interface ModuleManifest {
 - 状态存 DB（`PlatformSetting.themeKey`），**不用 localStorage**——本仓红线是 DB 驱动。
 - 配置面收在独立的「平台设置」（`/settings`），**不进模块 registry、不出现在侧栏与首页卡片**（业务模块与平台自身配置两条线不混）；顶部色块预览用 `data-theme` 作用域吃 CSS 变量，不写死 hex。选中后须点「应用主题」才写库（预览与生效分离，不做即点即改全站）。
 - 主题应用是**外壳级事实**：改完须 `revalidatePath("/", "layout")` 让全站跟着换色；首页必须保持动态渲染（`force-dynamic`），否则构建时的插槽色被烘死、切完落地页不变色。
+- **四值族必须在三处同构**：`tokens.css` 的 `--accent*` 定义 · `core/domain/theme.ts` 的键名 · **`tailwind.config.ts` 的 `colors.accent` 映射（DEFAULT/ink/tint/fg 四个都要）**。M13 实见 `fg` 缺席整整一轮：写 `text-accent-fg` 的类在 Tailwind 里无解、不生成任何 CSS，按钮前景静默落回继承色——cobalt/rust 上看着正常，只有切到 teal 才暴露；组件侧被迫用 `text-[color:var(--accent-fg)]` 这种绕过映射的写法。同理，`bg-accent` 配 `text-white` 写死白字在 teal 上对比度约 1.6:1，直接触 V0.3 红线。两处现由 `verify-tokens` 钉住。**根因修法是补映射，不是逐点写绕过式任意值**——后者会把同一个坑留给下一个文件。
 
 ### 6.2 浮层与阴影（修正 §6「无阴影」的过度简化）
 
@@ -158,17 +208,39 @@ export interface ModuleManifest {
 - 首屏是 `fixed` 覆盖层，不改变 `/` 的既有 DOM：收起即原模块索引页，回归面为零。
 
 ## 7. 阶段与状态（DECIDED / EXPLORING / DEFERRED / REJECTED）
-- 开发分期：P0 契约(本文) → **P1 平台壳+预算端到端(SQLite)〔进行中〕** → P2 补全预算交互+导出 → P3 部署到阿里云 → P4 引入登录/多用户 → P5 迁 PostgreSQL（QA 关卡）→ P6 项目管理模块 …
+- 开发分期：P0 契约(本文) → P1 平台壳+预算端到端(SQLite)〔已走过〕→ P2 补全交互+导出〔已走过〕→ **内网 Docker Compose 内测〔当前〕** → P3 部署阿里云（HTTPS）→ **P4 引入登录/多用户** → P5 迁 PostgreSQL（QA 关卡）→ P6 项目管理模块 …
 - 状态：
-  - 技术栈、模块契约、设计指针、SQLite-first = **DECIDED**
-  - 登录/角色权限、PostgreSQL、多品牌换肤、数据可视化色板 = **DEFERRED**（表/位已预留，暂不实现）
+  - 技术栈、模块契约、设计指针、SQLite-first、**§4.6 变更单确认门**、**§7.1 内测最小访问保护** = **DECIDED**
+  - 真 RBAC（角色过滤、"仅老板可见"）、PostgreSQL、多品牌换肤（四套以外）、数据可视化色板 = **DEFERRED**（表/位已预留，暂不实现）
   - 微前端、多独立系统拼门户 = **REJECTED**
+
+### 7.1 内测期最小访问保护（M13，DECIDED：必做，不属于 P4）
+
+一句话：**"不做重型权限中台"不等于"不对内网开放裸应用"**。平台即将交给内部员工真实使用，而它装着 HR（人员档案/工时/责任矩阵）与财务（合同额/毛利/台账）。这两件事在 §7 里曾被同一句"登录 DEFERRED"覆盖，于是零鉴权一直当"未来项"待着——直到体检把它当现实风险抓出来：Server Action 无鉴权，任何能到 3000 端口的人**可读且可写**。自家 `docs/DEPLOYMENT_INTERNAL_AND_CLOUD.md` 早就要求"正式内测前需补最小访问保护"，代码里此前一行都没有。
+
+三层，缺一层就退化成"看起来有保护"：
+
+- **应用不发布端口**。`compose.internal.yml` 里 `app` 服务**没有 `ports:`**，外部唯一入口是 `caddy`。别为调试方便把 `"3000:3000"` 加回去——那会同时绕过口令与身份注入两层。
+- **Caddy 做 basic auth 并注入身份**。`Caddyfile` 里口令哈希经 `CADDY_USER` / `CADDY_HASH` 环境变量注入，**不入库**；缺任一项 Caddy 直接启动失败，是有意 fail-fast（免得"忘了配口令"变成静默敞开）。认证成功后 `header_up x-platform-user {http.auth.user.user}`——`header_up` 是 Set 语义会覆盖客户端自带同名头，加上应用只在内网可达，这个头**不可伪造**。
+- **应用层闸 `src/middleware.ts`**（`PLATFORM_GATE=on` 时生效）。默认**全站都拦**，只放行 `/`、`/about`、`/api/health`、`/api/client-errors` 与 `/uploads/*`（见 `core/domain/accessGate.ts` 的 `isPublicPath`）。刻意不挑"/hr 与 /finance 才保护"——经营数据没有不敏感的那一页，挑两页上闸给的是虚假安全感。
+
+两个连带口径：
+
+- **流水终于能答"是谁改的"**：`operationLog.resolveActor()` 三级优先＝反代认证用户（按 `User.name` 匹配）→ 占位 boss → 占位任意用户。`PLATFORM_GATE` 未开时落回旧占位口径，行为逐字不变（集成门禁走 tsx、拿不到 headers 也走这条，故不破坏测试）。`actor` 仍是占位的这段时间，内测记录里"谁改的"答不了——这是有意的局限，别把流水当成问责依据。
+- **`/api/health` 必须是公开且不查库的**：healthcheck 若打业务路径，开闸后会被自己的闸拦成 401、容器进入 unhealthy 重启循环；原先打的 `/api/notifications` 每 30 秒跑一遍全站聚合，只为证明进程活着却给 SQLite 加真实读负载。
+- 启动时若闸未开，`middleware` 会打一条 `console.warn`。生产日志里看到它就说明这个部署**没有**访问保护。
 
 ## 8. 交付默认与协作
 
 - 参考实现（**只作领域参考，禁止照抄数据/UI/文案**）：`docs/reference/renovation-budget-reference.html`。用来理解"装修预算报价"有哪些要素（科目/项目字段/SOP/材料/计算/打印）；界面与数据须原创、须遵循 §6 设计系统、须是 DB 驱动而非 localStorage。
-- 质量门槛：`pnpm build` 通过、无控制台报错、迁移+seed 能跑、计算正确、中文、响应式、打印友好；关键页 1:1 目检设计语言保真。
-- 不擅自扩大范围：只完成当前被要求的里程碑；保留扩展位但不提前实现未来模块。
+- 质量门槛（M13 起有明确命令，不再靠"记得跑"）：
+  - `pnpm verify` —— 纯函数门禁（当前 12 道 / 695 项）。改算法、口径、格式化、主题映射必跑。
+  - `pnpm verify:integration` —— 隔离库集成门禁（5 道 / 218 项，各自 `_scratch/*.db`，**不碰 `dev.db`**）。改 schema、迁移、服务层写入、跨页联动必跑。
+  - `pnpm build` + `npx tsc --noEmit` + `pnpm lint` —— 构建与类型。`next build` 的 standalone 步骤只在容器里开（`BUILD_STANDALONE=1`，见 `next.config.mjs`）：Windows 非特权进程不能建 symlink，会让本机 build 在编译与页面生成全绿之后 EPERM 失败，从而把这条门槛本身弄没。
+  - 无控制台报错、迁移+seed 能跑、计算正确、中文、响应式、打印友好；关键页 1:1 目检设计语言保真。
+  - **口径变更必须同批改门禁断言**（§4.6 第一条纪律）。判据很简单：门禁没红而行为变了，就是断言没跟上——这跟"门禁红了"一样是交付未完成，不是"测试太严"。
+  - 门禁清单由 `scripts/run-gates.mjs` 按 `verify-*.mjs` / `verify-*.mts` 自动发现，新脚本进目录即被跑到，不需要谁去记。
+- 不擅自扩大范围：只完成当前被要求的里程碑；保留扩展位但不提前实现未来模块。发现值得做但未被要求的（§4.6 的"撤销确认"、镜像瘦身等），**登记进报告并说明为何本轮不做**，不要沉默地顺手做掉，也不要沉默地略过。
 
 ## 9. 工作区目录约定（2026-10-09 立规，2026-10-13 入册本契约）
 
@@ -181,6 +253,7 @@ export interface ModuleManifest {
 - **决策类与人看的产物归 `docs/`**（含 `docs/preview/`），不放根目录、不放 `_scratch/`——它是要留档的。手测清单、审查报告、任务卡、状态交接都在 `docs/`。
 - 一次性脚手架（`create-next-app`、依赖试装等）**必须在系统临时目录或 `_scratch/tmp/` 里跑**，用完即弃，禁止与项目平级建目录。
 - 遗留纠正项（2026-10-13 已收拾）：`qa-shots.mjs` 早期用 `--out _qa` 在仓库根留下 `_qa/`、`_qa_375/`、`_qa_tall*/`、`_qa_acceptance*/` 等下划线目录（虽被 `_qa*/` 规则忽略），一律改道 `_scratch/qa*/`。**脚本默认输出目录不改**（历史命令照用无碍），但新产物不得再落根目录。
+- **凭据一律留在 `.env`（gitignore）与部署环境里，不进仓库、不进镜像**。这条在 M13 有个具体教训：`.dockerignore` 曾缺 `.env` 一条，而 builder 是 `COPY . .`，Next 的 standalone tracing 又会把根 `.env` 复制进产物，于是 `.env` 随最终镜像分发（实测到 `.next/standalone/.env` 确实存在）。当前它只含一个 `DATABASE_URL` 所以实害低，但机制性泄露通道一直开着，P4 的口令进来就是明文层泄露。凡"构建上下文会整体拷入"的步骤，都要单独确认忽略清单，别只盯 git。
 
 ### 9.2 仓库外（跨项目）
 
