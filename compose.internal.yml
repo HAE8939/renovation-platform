@@ -5,24 +5,52 @@ services:
       dockerfile: Dockerfile
     image: renovation-platform:internal
     restart: unless-stopped
-    ports:
-      - "3000:3000"
+    # 有意**不发布任何端口**：外部唯一入口是下面的 caddy（口令 + 身份注入）。
+    # 若你在这里加回 "3000:3000" 图方便，就同时绕过了口令和身份两层保护；
+    # 应用层闸（PLATFORM_GATE=on）会把业务路径全拦成 401，而不是让数据裸奔。
     environment:
       NODE_ENV: production
       PORT: "3000"
+      # Next standalone 的 server.js 用 process.env.HOSTNAME 作监听地址，
+      # 而 Docker 会注入 HOSTNAME=<容器ID>——显式钉死，别让它绑到别处。
+      HOSTNAME: "0.0.0.0"
       DATABASE_URL: file:/app/prisma-data/dev.db
+      PLATFORM_GATE: "on"
     volumes:
       - renovation_db:/app/prisma-data
       - renovation_uploads:/app/public/uploads
       - renovation_logs:/app/logs
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/notifications').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      # 打 /api/health 而不是 /api/notifications：后者每次跑一遍全站聚合，
+      # 只为证明进程活着却给 SQLite 加真实读负载（30s 一次）。
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
       interval: 30s
       timeout: 5s
       retries: 5
-      start_period: 30s
+      start_period: 40s
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      # 员工访问入口。需要标准 80 端口时改成 "80:80"（并确认宿主无占用）。
+      - "8080:80"
+    environment:
+      # 口令哈希不入库：写在同目录 .env（已 gitignore）或部署环境里。
+      # 缺任一项则 Caddy 启动失败——有意 fail-fast，避免"忘了配口令＝全站敞开"。
+      CADDY_USER: ${CADDY_USER:?缺少 CADDY_USER：见 docs/INTERNAL_DOCKER_RUNBOOK.md 的口令生成步骤}
+      CADDY_HASH: ${CADDY_HASH:?缺少 CADDY_HASH：docker run --rm caddy:2 caddy hash-password --plaintext '口令'}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
 
 volumes:
   renovation_db:
   renovation_uploads:
   renovation_logs:
+  caddy_data:
+  caddy_config:

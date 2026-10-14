@@ -28,8 +28,11 @@ export function PlatformShell({
           isHome ? "md:hidden" : ""
         }`}
       >
-        <Link href="/" className="block border-b border-line px-5 py-5">
+        <Link href="/" className="block border-b border-line px-6 py-6">
           {logoSrc ? (
+            // 刻意用原生 <img>：内网 standalone 无 sharp，next/image 的服务端优化会在生产报错；
+            // Logo 由平台设置上传、已限尺寸，不走优化也谈不上带宽损失。
+            // eslint-disable-next-line @next/next/no-img-element
             <img
               src={logoSrc}
               alt={`${PLATFORM.name} 标识`}
@@ -40,7 +43,7 @@ export function PlatformShell({
           ) : (
             <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted">Platform</p>
           )}
-          <p className="mt-1.5 text-sm font-semibold leading-snug transition-colors duration-[120ms] hover:text-accent-ink">
+          <p className="mt-2 text-sm font-semibold leading-snug transition-colors duration-[120ms] hover:text-accent-ink">
             {PLATFORM.name}
           </p>
           <p className="mt-1 text-xs leading-relaxed text-secondary">{PLATFORM.tagline}</p>
@@ -50,7 +53,7 @@ export function PlatformShell({
           <Nav modules={modules} />
         </div>
 
-        <div className="mt-auto border-t border-line px-5 py-4">
+        <div className="mt-auto border-t border-line px-6 py-4">
           <p className="text-xs leading-relaxed text-muted">{PLATFORM.status}</p>
         </div>
       </aside>
@@ -61,8 +64,8 @@ export function PlatformShell({
 
         <main className="min-w-0 flex-1">
           <div
-            className={`mx-auto w-full px-4 sm:px-6 lg:px-10 ${
-              isHome ? "max-w-7xl py-6 sm:py-8 lg:py-10" : "max-w-6xl py-8 lg:py-10"
+            className={`mx-auto w-full px-4 sm:px-6 lg:px-8 ${
+              isHome ? "max-w-7xl py-6 sm:py-8 lg:py-8" : "max-w-6xl py-8 lg:py-8"
             }`}
           >
             {children}

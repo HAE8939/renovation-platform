@@ -37,14 +37,14 @@ function StatBox({
 }) {
   return (
     <div className="rounded-card border border-line bg-surface px-4 py-3">
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-2">
         <span className="text-xs text-secondary">{label}</span>
         {dot ? <MarginDot light={dot} /> : null}
       </div>
       <div className="mt-1 num text-[17px] font-semibold text-primary whitespace-nowrap">
         {value}
       </div>
-      {hint ? <div className="mt-0.5 text-xs text-secondary">{hint}</div> : null}
+      {hint ? <div className="mt-1 text-xs text-secondary">{hint}</div> : null}
     </div>
   );
 }
@@ -114,7 +114,7 @@ export default async function FinanceLedgerPage({
         action="/finance"
       >
         <label className="block">
-          <span className="mb-1.5 block text-xs font-medium text-secondary">项目</span>
+          <span className="mb-2 block text-xs font-medium text-secondary">项目</span>
           <select
             name="projectId"
             defaultValue={projectId ?? ""}
@@ -132,7 +132,7 @@ export default async function FinanceLedgerPage({
         <div className="flex items-center gap-2">
           <button
             type="submit"
-            className="inline-flex h-9 items-center justify-center rounded-inner bg-accent px-4 text-sm font-medium text-white whitespace-nowrap transition-colors hover:brightness-95"
+            className="inline-flex h-9 items-center justify-center rounded-inner bg-accent px-4 text-sm font-medium text-accent-fg whitespace-nowrap transition-colors hover:brightness-95"
           >
             筛选
           </button>

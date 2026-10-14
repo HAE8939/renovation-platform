@@ -161,7 +161,7 @@ function CannotGenerate({ data }: { data: ProjectScheduleData }) {
       </p>
       <Link
         href={`/budget/${data.project.id}/settings`}
-        className="mt-4 inline-flex h-8 items-center rounded-inner bg-accent px-3 text-[13px] font-medium text-white whitespace-nowrap transition-colors hover:opacity-90"
+        className="mt-4 inline-flex h-8 items-center rounded-inner bg-accent px-3 text-[13px] font-medium text-accent-fg whitespace-nowrap transition-colors hover:opacity-90"
       >
         前往项目设置
       </Link>
@@ -393,7 +393,7 @@ function GanttBody({ data }: { data: ProjectScheduleData }) {
             onClick={() => setZoom("week")}
             className={`inline-flex h-8 items-center rounded-inner px-3 text-[13px] whitespace-nowrap transition-colors ${
               zoom === "week"
-                ? "bg-accent text-white"
+                ? "bg-accent text-accent-fg"
                 : "text-secondary hover:bg-sunken hover:text-primary"
             }`}
           >
@@ -404,7 +404,7 @@ function GanttBody({ data }: { data: ProjectScheduleData }) {
             onClick={() => setZoom("day")}
             className={`inline-flex h-8 items-center rounded-inner px-3 text-[13px] whitespace-nowrap transition-colors ${
               zoom === "day"
-                ? "bg-accent text-white"
+                ? "bg-accent text-accent-fg"
                 : "text-secondary hover:bg-sunken hover:text-primary"
             }`}
           >

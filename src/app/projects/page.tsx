@@ -9,7 +9,9 @@ import {
   listProjectsForManagement,
   type ProjectManagementItem,
 } from "@/modules/projects/server/projects";
-import { formatCny, formatQty } from "@/modules/budget/lib/quote";
+// 金额/数量格式化取 core 单一真源：budget/lib/quote 只是它的 re-export，
+// 借道模块内部会让 projects 页对 budget 模块产生不该有的依赖方向（§2）。
+import { formatCny, formatQty } from "@/core/domain/pricing";
 import { buildFiltersFromParams, listDefs } from "@/core/domain/customFieldRepo";
 import { describeFilter } from "@/core/domain/customField";
 import { ViewToggle } from "./ViewToggle";
@@ -39,14 +41,14 @@ function formatDate(d: Date): string {
 function ProgressCell({ progress }: { progress: number | null }) {
   if (progress == null) {
     return (
-      <span className="inline-flex items-center gap-1.5 text-[13px] text-muted whitespace-nowrap">
+      <span className="inline-flex items-center gap-2 text-[13px] text-muted whitespace-nowrap">
         <span className="h-1.5 w-1.5 rounded-full bg-sunken" />
         未排程
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1.5 text-[13px] text-primary whitespace-nowrap">
+    <span className="inline-flex items-center gap-2 text-[13px] text-primary whitespace-nowrap">
       <span className="h-1.5 w-1.5 rounded-full bg-accent" />
       <span className="num">{progress}%</span>
     </span>
@@ -181,7 +183,7 @@ export default async function ProjectsListPage({
         )}
 
         {projects.length === 0 ? (
-          <Card className="mt-3 py-10 text-center text-[15px] text-secondary">
+          <Card className="mt-3 py-8 text-center text-[15px] text-secondary">
             没有符合条件的项目。
           </Card>
         ) : view === "card" ? (

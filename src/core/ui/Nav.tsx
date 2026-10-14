@@ -55,7 +55,7 @@ export function Nav({ modules, compact = false }: NavProps) {
           <div key={m.id}>
             <Link
               href={m.entryPath}
-              className={`group relative flex items-baseline gap-3 px-4 py-2.5 text-sm transition-colors duration-[120ms] ${
+              className={`group relative flex items-baseline gap-3 px-4 py-3 text-sm transition-colors duration-[120ms] ${
                 active
                   ? "bg-accent-tint font-semibold text-accent-ink"
                   : "text-secondary hover:bg-surface hover:text-primary"

@@ -314,6 +314,26 @@ export async function reorderDefs(orderedIds: string[]): Promise<void> {
 }
 
 /** 某实体的字段值（只含 active 定义，按 order）。两次查询拼好，禁 N+1。 */
+/**
+ * 取一条定义的**流水快照**（label / key / 已挂值数），专供动作层写 before 用。
+ *
+ * 为什么单开一个函数而不是让页面直查 `prisma.customFieldDef`：§4.2 的读写单点收口
+ * 正是为了防止"各存一套"以另一种形式回来。删除前需要知道会连带多少历史值，
+ * 这个需求合理，那就把取数放在这里，而不是每个调用点各写一份 select。
+ */
+export async function getDefSnapshot(id: string): Promise<{
+  label: string;
+  key: string;
+  valueCount: number;
+} | null> {
+  const row = await prisma.customFieldDef.findUnique({
+    where: { id },
+    select: { label: true, key: true, _count: { select: { values: true } } },
+  });
+  if (!row) return null;
+  return { label: row.label, key: row.key, valueCount: row._count.values };
+}
+
 export async function getEntityValues(
   entityKind: string,
   entityId: string,

@@ -22,7 +22,7 @@ export function Topbar({ modules }: TopbarProps) {
 
   return (
     <header className="flex h-14 shrink-0 items-center justify-between border-b border-line bg-canvas px-4 sm:px-6">
-      <div className="flex items-baseline gap-2.5">
+      <div className="flex items-baseline gap-3">
         {active ? (
           <>
             <Link

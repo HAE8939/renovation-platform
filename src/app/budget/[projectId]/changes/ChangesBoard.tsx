@@ -100,7 +100,7 @@ export function ChangesBoard({
       </div>
 
       {rows.length === 0 ? (
-        <div className="rounded-card border border-line bg-surface px-5 py-12 text-center">
+        <div className="rounded-card border border-line bg-surface px-6 py-12 text-center">
           <p className="text-[15px] font-medium text-secondary">暂无变更单</p>
           <p className="mx-auto mt-2 max-w-prose text-[13px] leading-relaxed text-muted">
             施工过程中发生的增项、减项、材料升级或工艺变更，可在此录入；累计变更额超合同额 5% 时会在此页顶部提示。

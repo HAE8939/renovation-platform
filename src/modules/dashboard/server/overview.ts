@@ -10,6 +10,7 @@ import {
   changeTotal,
   changeWatch,
   expenseTotal,
+  grossProfit,
   marginLight,
   marginRate,
   receivedTotal,
@@ -76,7 +77,8 @@ export interface DashboardKpi {
   signedThisMonth: number;
   prevMonthSigned: number;
   momPct: number | null;
-  /** 全司回款率：Σ收入 / Σmax(0, 合同额+变更)，非 archived 范围 */
+  /** 全司回款率：Σ收入 / Σmax(0, 合同额+变更)。范围**含已归档项目**——回款是既成事实，
+   *  不因归档消失（§4.3 钱按事实）。主查询 project.findMany 无 status 过滤，勿照旧注释加排除。 */
   collectionRate: number | null;
   collectionLight: CollectionLight;
   /** 回款率进度条的 CSS 宽度（>1 钳满 100%）；rate 为 null → null（页面不渲条、显「—」）。算式只在此处一次。 */
@@ -237,7 +239,8 @@ export interface DashboardCash {
 /**
  * 项目毛利率排行视图模型（M9-b-2b）。
  *
- * 范围＝主查询全部非 archived 项目（不筛在建，与健康矩阵的在建口径不同）。
+ * 范围＝主查询全部项目，**含已归档**（毛利与毛利率属事实族，§4.3；主查询刻意不带 status 过滤）。
+ * 不筛在建——与「项目健康度表」只看未归档的运营口径不同，两者有意分叉。
  * 顺序：rankable 组按 rate 降序、同值按 code 升序；其后接「未录入支出」组、
  * 最后接「未录入合同额，不可算」组（后两组按 code 升序）。
  */
@@ -478,7 +481,14 @@ export async function getDashboardOverview(
       incomeAmount: r.incomeAmount,
       expenseAmount: r.expenseAmount,
       changeAmount: r.changeAmount,
-      profit: Math.round((r.contractAmount + r.changeAmount - r.expenseAmount) * 100) / 100,
+      // 毛利与毛利率同源于 ledger.grossProfit —— 此前这里另写了一遍算式，
+      // 于是同一行里 margin 走钳负口径、profit 走带符号口径，两个字段互相打脸（M13 体检）。
+      // §4-17 已裁定"净负变更按 0 计"，页面侧不再自带第二套算式。
+      profit: grossProfit({
+        contractAmount: r.contractAmount,
+        changeTotal: r.changeAmount,
+        expenseTotal: r.expenseAmount,
+      }),
       margin: r.margin,
       marginLight: r.marginLight,
       rankable: r.expenseAmount > 0,
@@ -511,7 +521,8 @@ export async function getDashboardOverview(
   const descKeys = monthKeysDescending(6, now);
   // 时间升序（最早在左）：monthKeysDescending 由近到远，故浅拷贝后反转
   const keys = [...descKeys].reverse();
-  // 全司口径：与 KPI 同一批非 archived 项目，复用主查询 financeRecords（带 date），不另发查询
+  // 全司口径：与 KPI 同一批项目，**含已归档**（月度现金线是既成流水，归档不该让历史月份掉一截，
+  // §4.3 钱按事实）；复用主查询 financeRecords（带 date），不另发查询。
   const cashRows: CashRow[] = projects.flatMap((p) =>
     p.financeRecords.map((r) => ({ type: r.type, amount: r.amount, date: r.date }))
   );
@@ -544,7 +555,8 @@ export async function getDashboardOverview(
   };
 
   // ── 项目毛利率排行（M9-b-2b）──────────────────────────────────────────────
-  // 范围＝主查询全部非 archived 项目（不筛在建，与健康矩阵的在建口径不同）。
+  // 范围＝主查询全部项目，**含已归档**（毛利与毛利率属事实族，§4.3；主查询刻意不带 status 过滤）。
+  // 不筛在建——与「项目健康度表」只看未归档的运营口径不同，两者有意分叉。
   // 灰态剔除规则已拍板：只录合同额、没录任何支出的项目按公式恰得 100%，
   // 摆进榜首必误导 → 不入榜、率不展示（light 字段留着给巡检用，页面灰态不渲色点）。
   // 三档 tier（优先级从高到低）：0 rankable / 1 未录入支出 / 2 不可算。

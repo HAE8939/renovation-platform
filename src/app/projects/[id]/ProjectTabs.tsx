@@ -74,7 +74,7 @@ function Row({ label, value }: { label: string; value?: string | number | null }
 function BasicTab({ hub }: { hub: ProjectHub }) {
   return (
     <div className="space-y-6">
-      <div className="rounded-card border border-line bg-surface p-5">
+      <div className="rounded-card border border-line bg-surface p-6">
         <SectionTitle className="mb-2">客户与房屋</SectionTitle>
         <dl>
           <Row label="客户" value={hub.client?.name} />
@@ -87,7 +87,7 @@ function BasicTab({ hub }: { hub: ProjectHub }) {
         </dl>
       </div>
 
-      <div className="rounded-card border border-line bg-surface p-5">
+      <div className="rounded-card border border-line bg-surface p-6">
         <SectionTitle className="mb-2">合同与工期</SectionTitle>
         <dl>
           <Row label="项目编号" value={hub.code} />
@@ -98,7 +98,7 @@ function BasicTab({ hub }: { hub: ProjectHub }) {
         </dl>
       </div>
 
-      <div className="rounded-card border border-line bg-surface p-5">
+      <div className="rounded-card border border-line bg-surface p-6">
         <SectionTitle className="mb-3">项目健康度</SectionTitle>
         <div className="flex flex-wrap gap-x-8 gap-y-3 text-[13px]">
           <Light
@@ -207,7 +207,7 @@ function GrossProfitCard({ hub }: { hub: ProjectHub }) {
   const f = hub.finance;
   const noExpenseData = f.marginRate !== null && f.expenseTotal === 0;
   return (
-    <div className="rounded-card border border-line bg-surface p-5">
+    <div className="rounded-card border border-line bg-surface p-6">
       <div className="flex items-center gap-2">
         <SectionTitle>毛利</SectionTitle>
         <MarginDot light={noExpenseData ? "neutral" : f.marginLight} />
@@ -215,13 +215,13 @@ function GrossProfitCard({ hub }: { hub: ProjectHub }) {
       <div className="mt-3 flex flex-wrap items-baseline gap-x-8 gap-y-2">
         <div>
           <p className="text-xs text-secondary">毛利额</p>
-          <p className="num mt-1.5 text-[20px] font-semibold text-primary whitespace-nowrap">
+          <p className="num mt-2 text-[20px] font-semibold text-primary whitespace-nowrap">
             {formatCny(f.grossProfit)}
           </p>
         </div>
         <div>
           <p className="text-xs text-secondary">毛利率</p>
-          <p className="num mt-1.5 text-[17px] font-medium whitespace-nowrap">
+          <p className="num mt-2 text-[17px] font-medium whitespace-nowrap">
             {f.marginRate === null || noExpenseData ? "—" : formatPercent(f.marginRate)}
           </p>
         </div>
@@ -287,7 +287,7 @@ function BudgetTab({ hub }: { hub: ProjectHub }) {
             <Stat label="单方造价" value={q.unitCost != null ? `${formatCny(q.unitCost)}/㎡` : "—"} />
           </div>
 
-          <div className="rounded-card border border-line bg-surface p-5">
+          <div className="rounded-card border border-line bg-surface p-6">
             <SectionTitle className="mb-4">分科目占比</SectionTitle>
             <div className="space-y-4">
               {q.categories.map((c) => (
@@ -325,7 +325,7 @@ function Stat({ label, value, strong }: { label: string; value: string; strong?:
   return (
     <div className="rounded-card border border-line bg-surface p-4">
       <p className="text-xs text-secondary">{label}</p>
-      <p className={`num mt-1.5 ${strong ? "text-[20px] font-semibold text-primary" : "text-[15px] font-medium"}`}>
+      <p className={`num mt-2 ${strong ? "text-[20px] font-semibold text-primary" : "text-[15px] font-medium"}`}>
         {value}
       </p>
     </div>
@@ -334,7 +334,7 @@ function Stat({ label, value, strong }: { label: string; value: string; strong?:
 
 function PeopleTab({ hub }: { hub: ProjectHub }) {
   return (
-    <div className="rounded-card border border-line bg-surface p-5">
+    <div className="rounded-card border border-line bg-surface p-6">
       <SectionTitle className="mb-2">参与人员</SectionTitle>
       <dl>
         <Row label="项目设计师" value={hub.people.designer} />
@@ -383,7 +383,7 @@ function ScheduleTab({ hub }: { hub: ProjectHub }) {
   const s = hub.schedule;
   if (!s.hasSchedule) {
     return (
-      <div className="rounded-card border border-line bg-surface px-5 py-12 text-center">
+      <div className="rounded-card border border-line bg-surface px-6 py-12 text-center">
         <p className="text-[15px] font-medium text-secondary">该项目暂无排程</p>
         <p className="mx-auto mt-2 max-w-prose text-[13px] leading-relaxed text-muted">
           在「时间管控」按面积档一键生成排程后，这里会显示整体进度、工期预警与工序清单。
@@ -399,7 +399,7 @@ function ScheduleTab({ hub }: { hub: ProjectHub }) {
   }
   return (
     <div className="space-y-6">
-      <div className="rounded-card border border-line bg-surface p-5">
+      <div className="rounded-card border border-line bg-surface p-6">
         <div className="flex items-baseline justify-between gap-4">
           <SectionTitle>整体进度</SectionTitle>
           <span className="num text-[28px] font-semibold text-primary whitespace-nowrap">
@@ -414,12 +414,12 @@ function ScheduleTab({ hub }: { hub: ProjectHub }) {
         </div>
       </div>
 
-      <div className="rounded-card border border-line bg-surface p-5">
+      <div className="rounded-card border border-line bg-surface p-6">
         <SectionTitle className="mb-3">工期状态</SectionTitle>
         <ScheduleLightRow light={s.light} />
       </div>
 
-      <div className="rounded-card border border-line bg-surface p-5">
+      <div className="rounded-card border border-line bg-surface p-6">
         <SectionTitle className="mb-3">工序清单</SectionTitle>
         <ul className="divide-y divide-line">
           {s.tasks.map((t) => (
@@ -458,7 +458,7 @@ function DesignTab({ hub }: { hub: ProjectHub }) {
   const d = hub.design;
   if (d.total === 0) {
     return (
-      <div className="rounded-card border border-line bg-surface px-5 py-12 text-center">
+      <div className="rounded-card border border-line bg-surface px-6 py-12 text-center">
         <p className="text-[15px] font-medium text-secondary">该项目暂无设计任务</p>
         <p className="mx-auto mt-2 max-w-prose text-[13px] leading-relaxed text-muted">
           在「设计管理」为该项目分派设计任务后，这里会显示任务总量与各状态分布。
@@ -475,7 +475,7 @@ function DesignTab({ hub }: { hub: ProjectHub }) {
   ];
   return (
     <div className="space-y-6">
-      <div className="rounded-card border border-line bg-surface p-5">
+      <div className="rounded-card border border-line bg-surface p-6">
         <div className="flex items-baseline justify-between gap-4">
           <SectionTitle>设计任务</SectionTitle>
           <span className="num text-[20px] font-semibold text-primary whitespace-nowrap">
@@ -546,7 +546,7 @@ function QualityTab({ hub }: { hub: ProjectHub }) {
   const q = hub.quality;
   if (!q.hasNodes) {
     return (
-      <div className="rounded-card border border-line bg-surface px-5 py-12 text-center">
+      <div className="rounded-card border border-line bg-surface px-6 py-12 text-center">
         <p className="text-[15px] font-medium text-secondary">暂无验收节点</p>
         <p className="mx-auto mt-2 max-w-prose text-[13px] leading-relaxed text-muted">
           工序完工后自动生成验收节点；排程推进到 100% 的工序将在此处出现。
@@ -562,7 +562,7 @@ function QualityTab({ hub }: { hub: ProjectHub }) {
   }
   return (
     <div className="space-y-6">
-      <div className="rounded-card border border-line bg-surface p-5">
+      <div className="rounded-card border border-line bg-surface p-6">
         <div className="flex items-baseline justify-between gap-4">
           <SectionTitle>验收节点</SectionTitle>
           <span className="num text-[20px] font-semibold text-primary whitespace-nowrap">
@@ -591,7 +591,7 @@ function QualityTab({ hub }: { hub: ProjectHub }) {
         </ul>
       </div>
 
-      <div className="rounded-card border border-line bg-surface p-5">
+      <div className="rounded-card border border-line bg-surface p-6">
         <SectionTitle className="mb-3">未关闭问题</SectionTitle>
         {q.recentIssues.length === 0 ? (
           <p className="text-[13px] text-muted">无未关闭问题</p>
@@ -633,7 +633,7 @@ function QualityTab({ hub }: { hub: ProjectHub }) {
 
 function EmptyTab({ title, note }: { title: string; note: string }) {
   return (
-    <div className="rounded-card border border-line bg-surface px-5 py-12 text-center">
+    <div className="rounded-card border border-line bg-surface px-6 py-12 text-center">
       <p className="text-[15px] font-medium text-secondary">{title}</p>
       <p className="mx-auto mt-2 max-w-prose text-[13px] leading-relaxed text-muted">{note}</p>
     </div>

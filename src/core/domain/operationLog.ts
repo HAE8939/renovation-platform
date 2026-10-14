@@ -18,9 +18,35 @@
 import prisma from "@/core/db";
 import { USER_ROLE } from "@/core/domain/types";
 import { logAppError } from "@/core/domain/telemetry";
+import { headers } from "next/headers";
+import { GATE_USER_HEADER, readGateUser } from "@/core/domain/accessGate";
 
 /** 无登录态时的兜底操作人（P4 接登录后由 session 取代，本行随之失效）。 */
 export const FALLBACK_ACTOR = "user-local";
+
+/**
+ * 内测期真人识别（M13-c 最小访问保护）：反代 basic auth 通过后注入
+ * X-Platform-User，这里按 User.name 匹配到真实账号，让流水第一次能回答「是谁改的」。
+ *
+ * 信任链见 core/domain/accessGate.ts 顶部注释——应用只绑回环，该头由 Caddy 覆盖式注入。
+ * 拿不到头、或 next/headers 在非请求上下文抛错（集成门禁走 tsx、构建期静态生成）
+ * 一律返回 null 落回占位口径，因此**旧行为逐字不变**；P4 接真登录后整段换成 session。
+ */
+async function resolveGateActor(): Promise<{ id: string; name: string } | null> {
+  try {
+    const hdrs = await headers();
+    const name = readGateUser(hdrs.get(GATE_USER_HEADER));
+    if (!name) return null;
+    return await prisma.user.findFirst({
+      where: { name },
+      orderBy: { createdAt: "asc" },
+      select: { id: true, name: true },
+    });
+  } catch {
+    // best-effort：身份解析受损不该波及流水，更不该波及业务
+    return null;
+  }
+}
 
 export interface OperationInput {
   /** 机器名，建议 `域.动作`：quote.save / record.create / plan.markPaid / lead.sign / node.review / project.archive */
@@ -40,10 +66,12 @@ export interface OperationInput {
 }
 
 /**
- * 取占位操作人：最早的 boss → 最早的任意用户 → 兜底常量。
- * 与 modules/finance/currentUser.ts 同一口径（P4 接登录后两处一起删，换成 session）。
+ * 取操作人，三级优先：反代认证过的真人 → 占位 boss → 占位任意用户 → 兜底常量。
+ * 前两级是 M13-c 加的；后两级是 P4 之前的既有口径（接登录 session 后两处一并删）。
  */
 export async function resolveActor(): Promise<{ id: string; name: string }> {
+  const gated = await resolveGateActor();
+  if (gated) return gated;
   try {
     const select = { id: true, name: true } as const;
     const boss = await prisma.user.findFirst({

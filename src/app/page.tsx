@@ -28,7 +28,7 @@ export default function HomePage() {
 function ModuleIndex() {
   return (
     <div>
-      <header className="grid gap-8 border-b border-line pb-8 lg:grid-cols-[minmax(0,7fr)_minmax(280px,5fr)] lg:gap-16 lg:pb-10">
+      <header className="grid gap-8 border-b border-line pb-8 lg:grid-cols-[minmax(0,7fr)_minmax(280px,5fr)] lg:gap-16 lg:pb-8">
         <div>
           <p className="text-xs font-medium uppercase tracking-[0.14em] text-accent-ink">
             平台工作台 · {modules.length} 个功能区
@@ -41,14 +41,14 @@ function ModuleIndex() {
             也可以先进入数据驾驶舱查看当前全貌。
           </p>
         </div>
-        <dl className="grid content-end gap-3 border-t border-line pt-5 text-sm lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
+        <dl className="grid content-end gap-3 border-t border-line pt-6 text-sm lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
           <MetaRow label="形态" value="模块化单体，共享项目主数据" />
           <MetaRow label="当前环境" value="SQLite · 内测先部署在公司 NAS" />
           <MetaRow label="正式部署" value="阿里云轻量服务器 + OSS" />
         </dl>
       </header>
 
-      <section className="mt-8 lg:mt-10">
+      <section className="mt-8 lg:mt-8">
         <div className="flex items-baseline justify-between gap-4">
           <div>
             <p className="text-xs font-medium uppercase tracking-[0.14em] text-secondary">现在可用</p>
@@ -56,11 +56,11 @@ function ModuleIndex() {
           </div>
           <span className="num text-[13px] text-muted">01 — {String(modules.length).padStart(2, "0")}</span>
         </div>
-        <ul className="mt-5 grid gap-x-10 lg:grid-cols-2">
+        <ul className="mt-6 grid gap-x-8 lg:grid-cols-2">
           {modules.map((m, i) => (
             <li key={m.id} className="border-t border-line">
-              <Link href={m.entryPath} className="group flex min-h-28 items-start gap-4 py-5">
-                <span className="num pt-0.5 text-xs text-muted">{String(i + 1).padStart(2, "0")}</span>
+              <Link href={m.entryPath} className="group flex min-h-28 items-start gap-4 py-6">
+                <span className="num pt-1 text-xs text-muted">{String(i + 1).padStart(2, "0")}</span>
                 <span className="min-w-0 flex-1">
                   <span className="block text-[17px] font-semibold leading-snug transition-colors duration-[120ms] group-hover:text-accent-ink">
                     {m.name}
@@ -71,21 +71,21 @@ function ModuleIndex() {
                     </span>
                   )}
                 </span>
-                <span aria-hidden className="num pt-0.5 text-sm text-muted transition-colors duration-[120ms] group-hover:text-accent-ink">→</span>
+                <span aria-hidden className="num pt-1 text-sm text-muted transition-colors duration-[120ms] group-hover:text-accent-ink">→</span>
               </Link>
             </li>
           ))}
         </ul>
       </section>
 
-      <section className="mt-10 grid gap-8 border-t border-line pt-8 lg:grid-cols-[minmax(0,7fr)_minmax(280px,5fr)] lg:gap-16">
+      <section className="mt-8 grid gap-8 border-t border-line pt-8 lg:grid-cols-[minmax(0,7fr)_minmax(280px,5fr)] lg:gap-16">
         <div>
           <p className="text-xs font-medium uppercase tracking-[0.14em] text-secondary">下一步</p>
           <h2 className="mt-2 text-[20px] font-semibold">正在建设的平台能力</h2>
           <ul className="mt-4 divide-y divide-line border-y border-line">
             {deferredModules.map((d) => (
               <li key={d.id} className="flex items-start gap-4 py-4">
-                <span className="pt-0.5 text-xs text-muted">—</span>
+                <span className="pt-1 text-xs text-muted">—</span>
                 <span className="min-w-0 flex-1">
                   <span className="block text-[15px] font-medium text-secondary">{d.name}</span>
                   <span className="mt-1 block text-sm leading-relaxed text-muted">{d.description}</span>

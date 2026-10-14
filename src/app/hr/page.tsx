@@ -1,7 +1,7 @@
 import { Badge, Card, Field, Input, Select, Table, Td, Th } from "@/core/ui";
 import { getWorkLogPageData } from "@/modules/hr/server/worklogs";
 import { PROJECT_MEMBER_ROLE, PROJECT_MEMBER_ROLE_LABEL } from "@/modules/hr/roles";
-import { addProjectMember, removeProjectMember, createWorkLogAction, archiveWorkLogAction } from "./actions";
+import { addProjectMemberAction, removeProjectMemberAction, createWorkLogAction, archiveWorkLogAction } from "./actions";
 import { WORKLOG_CATEGORY, WORKLOG_CATEGORY_LABEL } from "@/modules/hr/worklogs";
 
 export const dynamic = "force-dynamic";
@@ -38,7 +38,7 @@ export default async function HrPage() {
           </div>
         </div>
         <Card className="mt-4" padded>
-          <form action={addProjectMember} className="grid gap-4 md:grid-cols-4 md:items-end">
+          <form action={addProjectMemberAction} className="grid gap-4 md:grid-cols-4 md:items-end">
             <Field label="项目" required>
               <Select name="projectId" required defaultValue="">
                 <option value="" disabled>请选择项目</option>
@@ -62,7 +62,7 @@ export default async function HrPage() {
         </Card>
 
         {data.assignments.length === 0 ? (
-          <Card className="mt-4 py-10 text-center text-[15px] text-secondary">还没有项目责任关系，先在上方添加第一条。</Card>
+          <Card className="mt-4 py-8 text-center text-[15px] text-secondary">还没有项目责任关系，先在上方添加第一条。</Card>
         ) : (
           <Card className="mt-4" padded={false}>
             <Table>
@@ -75,7 +75,7 @@ export default async function HrPage() {
                     <Td><Badge variant="outline">{a.roleLabel}</Badge></Td>
                     <Td className="text-[13px] text-secondary">{formatDate(a.startDate)} — {formatDate(a.endDate)}</Td>
                     <Td className="text-[13px] text-secondary">{a.note || "—"}</Td>
-                    <Td align="right"><form action={removeProjectMember}><input type="hidden" name="id" value={a.id} /><button type="submit" className="text-[13px] text-secondary hover:text-danger">移除</button></form></Td>
+                    <Td align="right"><form action={removeProjectMemberAction}><input type="hidden" name="id" value={a.id} /><button type="submit" className="text-[13px] text-secondary hover:text-danger">移除</button></form></Td>
                   </tr>
                 ))}
               </tbody>
@@ -90,7 +90,12 @@ export default async function HrPage() {
             <h2 className="text-[17px] font-semibold">人员工作记录</h2>
             <p className="mt-1 text-[13px] text-secondary">记录拜访、设计、现场和沟通事实，后续可按项目与人员汇总。</p>
           </div>
-          <span className="num text-[13px] text-muted">{data.logs.length} 条</span>
+          <span className="num text-[13px] text-muted">
+            {data.logs.length} 条
+            {data.archivedCount > 0
+              ? ` · 另有 ${data.archivedCount} 条已归档未列出（归档只隐藏列表，仍计入工时统计）`
+              : ""}
+          </span>
         </div>
         <Card className="mt-4" padded>
           <form action={createWorkLogAction} className="grid gap-4 md:grid-cols-4 md:items-end">
@@ -106,7 +111,7 @@ export default async function HrPage() {
           </form>
         </Card>
         <Card className="mt-4" padded={false}>
-          {data.logs.length === 0 ? <p className="px-5 py-10 text-center text-[15px] text-secondary">还没有工作记录。</p> : <Table><thead><tr><Th>日期</Th><Th>项目</Th><Th>人员</Th><Th>事项</Th><Th>类型</Th><Th>工时</Th><Th align="right">操作</Th></tr></thead><tbody>{data.logs.map((l) => <tr key={l.id}><Td className="num text-[13px] text-secondary">{formatDate(l.workDate)}</Td><Td><span className="num text-[13px] text-secondary">{l.project.code}</span><span className="ml-2">{l.project.name}</span></Td><Td>{l.user.name}</Td><Td><p className="font-medium">{l.title}</p>{l.outputNote && <p className="mt-1 text-[12px] text-secondary">{l.outputNote}</p>}</Td><Td><Badge variant="outline">{l.categoryLabel}</Badge></Td><Td className="num text-[13px] text-secondary">{l.minutes ? `${l.minutes} 分钟` : "—"}</Td><Td align="right"><form action={archiveWorkLogAction}><input type="hidden" name="id" value={l.id} /><button type="submit" className="text-[13px] text-secondary hover:text-danger">归档</button></form></Td></tr>)}</tbody></Table>}
+          {data.logs.length === 0 ? <p className="px-6 py-8 text-center text-[15px] text-secondary">还没有工作记录。</p> : <Table><thead><tr><Th>日期</Th><Th>项目</Th><Th>人员</Th><Th>事项</Th><Th>类型</Th><Th>工时</Th><Th align="right">操作</Th></tr></thead><tbody>{data.logs.map((l) => <tr key={l.id}><Td className="num text-[13px] text-secondary">{formatDate(l.workDate)}</Td><Td><span className="num text-[13px] text-secondary">{l.project.code}</span><span className="ml-2">{l.project.name}</span></Td><Td>{l.user.name}</Td><Td><p className="font-medium">{l.title}</p>{l.outputNote && <p className="mt-1 text-[12px] text-secondary">{l.outputNote}</p>}</Td><Td><Badge variant="outline">{l.categoryLabel}</Badge></Td><Td className="num text-[13px] text-secondary">{l.minutes ? `${l.minutes} 分钟` : "—"}</Td><Td align="right"><form action={archiveWorkLogAction}><input type="hidden" name="id" value={l.id} /><button type="submit" className="text-[13px] text-secondary hover:text-danger">归档</button></form></Td></tr>)}</tbody></Table>}
         </Card>
       </section>
 

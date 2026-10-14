@@ -214,11 +214,11 @@ export function CatalogEditor({ catalog }: { catalog: CatalogCategoryRow[] }) {
         </div>
 
         {catalog.length === 0 ? (
-          <Card className="mt-3 py-10 text-center text-sm text-secondary">
+          <Card className="mt-3 py-8 text-center text-sm text-secondary">
             还没有科目。先用上面的「新增科目」建一个工程科目，再往里加科目项。
           </Card>
         ) : visible.length === 0 ? (
-          <Card className="mt-3 py-10 text-center text-sm text-secondary">
+          <Card className="mt-3 py-8 text-center text-sm text-secondary">
             没有与「{query.trim()}」匹配的科目或科目项。
           </Card>
         ) : (
@@ -416,7 +416,7 @@ export function CatalogEditor({ catalog }: { catalog: CatalogCategoryRow[] }) {
                 aria-label={item ? "编辑科目项" : "新增科目项"}
                 className="relative flex h-full w-full max-w-xl flex-col border-l border-line bg-surface"
               >
-                <header className="flex items-baseline justify-between gap-3 border-b border-line px-5 py-4">
+                <header className="flex items-baseline justify-between gap-3 border-b border-line px-6 py-4">
                   <div>
                     <h2 className="text-sm font-semibold">
                       {item ? "编辑科目项" : "新增科目项"}
@@ -439,7 +439,7 @@ export function CatalogEditor({ catalog }: { catalog: CatalogCategoryRow[] }) {
                   key={item ? item.id : "new"}
                   id="item-form"
                   onSubmit={submitItem}
-                  className="flex-1 space-y-4 overflow-y-auto px-5 py-5"
+                  className="flex-1 space-y-4 overflow-y-auto px-6 py-6"
                 >
                   <div className="grid gap-4 sm:grid-cols-2">
                     <Field label="编号" required hint="全库唯一，如 SD-01">
@@ -507,7 +507,7 @@ export function CatalogEditor({ catalog }: { catalog: CatalogCategoryRow[] }) {
                   </Field>
                 </form>
 
-                <footer className="flex items-center justify-end gap-2 border-t border-line px-5 py-4">
+                <footer className="flex items-center justify-end gap-2 border-t border-line px-6 py-4">
                   <Button
                     variant="ghost"
                     onClick={() => setDrawer(null)}

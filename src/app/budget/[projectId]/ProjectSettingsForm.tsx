@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useFormState } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Button, Card, Field, Input, Select } from "@/core/ui";
-import { PROJECT_STATUS_LABEL, PROJECT_STATUS_ORDER } from "@/core/domain/types";
+import { PROJECT_STATUS, PROJECT_STATUS_LABEL, PROJECT_STATUS_ORDER } from "@/core/domain/types";
 import type { ProjectStatus } from "@/core/domain/types";
 import { updateProjectAction, type ProjectFormState } from "../actions";
 
@@ -28,10 +28,15 @@ const initialState: ProjectFormState = {};
 
 // 顺序严格按 PROJECT_STATUS_ORDER（TS 不会强制数组穷举，故以 ORDER 派生，
 // 避免漏加 design / acceptance 两态或顺序错位）。
-const STATUS_OPTIONS = (PROJECT_STATUS_ORDER as readonly ProjectStatus[]).map((s) => ({
-  value: s,
-  label: PROJECT_STATUS_LABEL[s] ?? s,
-}));
+// **归档态不在这里给选**（M13 体检 M-3）：走这个表单归档既没有"未闭环事项"的知情确认框，
+// 也不写 project.archive 流水，而恢复动作正是回读那条流水决定回到哪一态——
+// 经此归档的项目将无流水可恢复，只能静默回落 draft。服务层另有守卫兜住绕过。
+const STATUS_OPTIONS = (PROJECT_STATUS_ORDER as readonly ProjectStatus[])
+  .filter((s) => s !== PROJECT_STATUS.archived)
+  .map((s) => ({
+    value: s,
+    label: PROJECT_STATUS_LABEL[s] ?? s,
+  }));
 
 function fmtDate(d: Date | string | null): string {
   if (!d) return "";
@@ -111,13 +116,22 @@ export function ProjectSettingsForm({ values }: { values: ProjectSettingsValues 
           />
         </Field>
         <Field label="状态">
-          <Select name="status" defaultValue={values.status}>
-            {STATUS_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </Select>
+          {values.status === PROJECT_STATUS.archived ? (
+            // 归档项目不渲染 Select：字段不提交时浏览器会把回落的首项交出去，
+            // 等于改个地址就把项目悄悄放回全司口径。这里干脆不传 status，
+            // 由 updateProject 按「未传＝保持原值」处理。
+            <div className="flex h-9 items-center text-[13px] text-muted">
+              已归档 · 需先在项目详情页点「恢复」
+            </div>
+          ) : (
+            <Select name="status" defaultValue={values.status}>
+              {STATUS_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </Select>
+          )}
         </Field>
         <Field label="设计师">
           <Input name="designer" defaultValue={values.designer ?? ""} placeholder="选填" />

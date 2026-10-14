@@ -64,9 +64,9 @@ export interface FieldProps {
 export function Field({ label, required, hint, children }: FieldProps) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-xs font-medium text-secondary">
+      <span className="mb-2 block text-xs font-medium text-secondary">
         {label}
-        {required && <span className="ml-0.5 text-danger">*</span>}
+        {required && <span className="ml-1 text-danger">*</span>}
       </span>
       {children}
       {hint && <span className="mt-1 block text-xs text-muted">{hint}</span>}

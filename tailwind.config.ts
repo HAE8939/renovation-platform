@@ -18,11 +18,15 @@ const config: Config = {
         primary: "var(--text-primary)",
         secondary: "var(--text-secondary)",
         muted: "var(--text-disabled)",
-        // 单点 accent（钴蓝）
+        // 单点 accent（钴蓝）。四值一族与 AGENTS §6 / tokens.css 对齐：
+        // DEFAULT=主色、ink=深墨（浅底上的文字）、tint=浅底、fg=**主按钮上的前景色**。
+        // fg 曾缺失（M13 体检 H-4）：`text-accent-fg` 写出来无解，按钮前景静默落回继承色，
+        // 组件只能改用 text-[color:var(--accent-fg)] 这种绕过映射的写法。补上后两者都不必再写。
         accent: {
           DEFAULT: "var(--accent)",
           ink: "var(--accent-ink)",
           tint: "var(--accent-tint)",
+          fg: "var(--accent-fg)",
         },
         // 气声描边
         line: "var(--border)",

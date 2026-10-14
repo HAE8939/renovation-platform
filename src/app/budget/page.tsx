@@ -47,7 +47,7 @@ export default async function BudgetListPage() {
         </div>
 
         {projects.length === 0 ? (
-          <Card className="mt-3 py-10 text-center text-sm text-secondary">
+          <Card className="mt-3 py-8 text-center text-sm text-secondary">
             还没有项目，先用上面的表单创建一个。
           </Card>
         ) : (

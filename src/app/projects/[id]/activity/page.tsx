@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Badge } from "@/core/ui";
-import prisma from "@/core/db";
+import { getProjectIdentity } from "@/core/domain/projects";
 import { listOperations } from "@/core/domain/operationLog";
 import { PROJECT_STATUS_LABEL, type ProjectStatus } from "@/core/domain/types";
+import { LEAD_STAGE_LABEL } from "@/modules/crm/stages";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "项目动态" };
@@ -35,6 +36,8 @@ const ACTION_LABEL: Record<string, string> = {
 };
 
 const STATUS_LABEL: Record<string, string> = {
+  // 线索阶段垫底、项目态覆盖在前：同名（signed）时以项目态为准，语义两者本就一致。
+  ...LEAD_STAGE_LABEL,
   ...PROJECT_STATUS_LABEL,
   submitted: "待审核",
   returned: "已退回",
@@ -64,6 +67,8 @@ function readableValue(value: string | null, action: string): string | null {
   if (action.startsWith("node.")) return STATUS_LABEL[value] ?? null;
   if (action.startsWith("issue.")) return STATUS_LABEL[value] ?? null;
   if (action.startsWith("schedule.")) return STATUS_LABEL[value] ?? null;
+  // 线索流水的 before/after 存阶段机器值（§4.3），不映射就整条显示为空
+  if (action.startsWith("lead.")) return STATUS_LABEL[value] ?? null;
   if (value === "active") return "启用";
   if (value === "inactive") return "停用";
   if (value === "true") return "是";
@@ -102,10 +107,9 @@ export default async function ProjectActivityPage({
   params: { id: string };
   searchParams: { limit?: string };
 }) {
-  const project = await prisma.project.findUnique({
-    where: { id: params.id },
-    select: { id: true, name: true, code: true },
-  });
+  // 标题经 core/domain 取，页面不直查主数据表（§2 分层）；刻意不用 getProjectHub——
+  // 取个页头标题不该付一次全站聚合的代价。
+  const project = await getProjectIdentity(params.id);
   if (!project) notFound();
 
   const parsedLimit = Number.parseInt(searchParams?.limit ?? "50", 10);
@@ -141,7 +145,7 @@ export default async function ProjectActivityPage({
       ) : (
         <ol className="space-y-3">
           {operations.map((operation) => (
-            <li key={operation.id} className="rounded-card border border-line bg-surface p-5">
+            <li key={operation.id} className="rounded-card border border-line bg-surface p-6">
               <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                 <p className="text-[15px] font-medium text-primary">
                   {ACTION_LABEL[operation.action] ?? "项目操作"}

@@ -22,12 +22,14 @@ import {
   updateChange,
   type ChangeInput,
 } from "@/modules/budget/server/changes";
-import { setChangeStatus } from "@/modules/budget/server/changes";
+import {
+  setChangeStatus,
+  changeAttachmentFiles,
+  saveChangeAttachments,
+} from "@/modules/budget/server/changes";
 import { logAppError } from "@/core/domain/telemetry";
-import { saveUploadedFile } from "@/core/storage/storage";
 import { recordOperation, moneyText, diffText } from "@/core/domain/operationLog";
 import prisma from "@/core/db";
-import { getBudgetUser } from "@/modules/budget/currentUser";
 
 /** Server Action 表单状态：客户端用 useFormState 读回。 */
 export interface ProjectFormState {
@@ -402,7 +404,7 @@ export async function createChangeAction(
   try {
     const ci = readChangeInput(formData);
     const created = await createChange(projectId, ci);
-    await saveChangeAttachments(projectId, created.id, formData);
+    await saveChangeAttachments(projectId, created.id, changeAttachmentFiles(formData));
     await recordOperation({
       action: "change.create",
       entity: "changeOrder",
@@ -432,7 +434,7 @@ export async function updateChangeAction(
     const oldChange = await prisma.changeOrder.findUnique({ where: { id: changeId }, select: { title: true, amount: true, kind: true } });
     const ci = readChangeInput(formData);
     await updateChange(changeId, projectId, ci);
-    await saveChangeAttachments(projectId, changeId, formData);
+    await saveChangeAttachments(projectId, changeId, changeAttachmentFiles(formData));
     await recordOperation({
       action: "change.update",
       entity: "changeOrder",
@@ -453,15 +455,8 @@ export async function updateChangeAction(
   }
 }
 
-async function saveChangeAttachments(projectId: string, changeId: string, formData: FormData) {
-  const me = await getBudgetUser();
-  if (!me) return;
-  const files = formData.getAll("attachments").filter((v): v is File => v instanceof File && v.size > 0).slice(0, 5);
-  for (const file of files) {
-    const saved = await saveUploadedFile(file, "change_attachment", changeId);
-    await prisma.fileAsset.create({ data: { projectId, ownerType: "change_order", ownerId: changeId, category: "change_attachment", ...saved, uploadedBy: me.id, uploaderName: me.name } });
-  }
-}
+// saveChangeAttachments（含"最多 5 个附件"的上限）已搬到 modules/budget/server/changes.ts：
+// 动作层不该循环直写 fileAsset，而这份 action 本就是全仓最厚的一份（§2 逻辑归服务层）。
 
 /** 删除变更单：deleteChange(changeId)。 */
 export async function deleteChangeAction(

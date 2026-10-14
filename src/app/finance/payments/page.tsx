@@ -83,7 +83,7 @@ export default async function FinancePaymentsPage({
         action="/finance/payments"
       >
         <label className="block">
-          <span className="mb-1.5 block text-xs font-medium text-secondary">
+          <span className="mb-2 block text-xs font-medium text-secondary">
             项目
           </span>
           <select
@@ -101,7 +101,7 @@ export default async function FinancePaymentsPage({
         <div className="flex items-center gap-2">
           <button
             type="submit"
-            className="inline-flex h-9 items-center justify-center rounded-inner bg-accent px-4 text-[13px] font-medium text-white whitespace-nowrap transition-colors hover:brightness-95"
+            className="inline-flex h-9 items-center justify-center rounded-inner bg-accent px-4 text-[13px] font-medium text-accent-fg whitespace-nowrap transition-colors hover:brightness-95"
           >
             筛选
           </button>

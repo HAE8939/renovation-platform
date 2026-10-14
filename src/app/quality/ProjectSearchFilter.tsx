@@ -52,7 +52,7 @@ export function ProjectSearchFilter({
       <label className="block text-[13px] text-secondary" htmlFor={`${basePath}-project-search`}>
         项目
       </label>
-      <div className="mt-1.5 flex items-center gap-2">
+      <div className="mt-2 flex items-center gap-2">
         <input
           id={`${basePath}-project-search`}
           type="search"
@@ -72,7 +72,7 @@ export function ProjectSearchFilter({
           </button>
         ) : null}
       </div>
-      <p id={`${basePath}-project-search-help`} className="mt-1.5 text-xs text-muted">
+      <p id={`${basePath}-project-search-help`} className="mt-2 text-xs text-muted">
         {selected ? `当前：${selected.name}` : "输入后从匹配项目中选择"}
       </p>
       {matches.length > 0 && (!selected || query !== `${selected.name} · ${selected.code}`) ? (
@@ -82,7 +82,7 @@ export function ProjectSearchFilter({
               key={project.id}
               type="button"
               onClick={() => choose(project)}
-              className="flex w-full items-baseline justify-between gap-3 rounded-inner px-2 py-1.5 text-left text-[13px] hover:bg-canvas"
+              className="flex w-full items-baseline justify-between gap-3 rounded-inner px-2 py-2 text-left text-[13px] hover:bg-canvas"
             >
               <span className="min-w-0 truncate text-primary">{project.name}</span>
               <span className="num shrink-0 text-xs text-secondary">{project.code}</span>

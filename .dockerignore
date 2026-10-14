@@ -1,8 +1,25 @@
 node_modules
 .next
+
+# 凭据与本地配置绝不入镜像（M13-c）：
+# builder 阶段是 COPY . .，而 Next 的 standalone tracing 会把根 .env 一并复制进
+# .next/standalone —— 于是 .env 会随最终镜像分发。此前实测到 .next/standalone/.env 存在。
+# 镜像内只应靠 compose 的 environment 注入，不该有 .env 文件。
+.env
+.env.*
+!.env.example
+
 prisma/dev.db*
+prisma/*.db-journal
 public/uploads
 logs
 _scratch
-.git
 *.log
+*.tsbuildinfo
+.git
+.gitignore
+Caddyfile
+docker-compose*.yml
+compose*.yml
+.vscode
+.idea

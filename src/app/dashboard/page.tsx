@@ -120,7 +120,7 @@ export default async function DashboardPage() {
         </div>
 
         <div className="grid divide-y divide-line sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-          <div className="min-w-0 pb-4 sm:border-l-0 sm:px-5 sm:pb-0 sm:first:pl-0">
+          <div className="min-w-0 pb-4 sm:border-l-0 sm:px-6 sm:pb-0 sm:first:pl-0">
             <p className="text-xs text-secondary">在建项目数</p>
             <p className="num mt-1 text-[20px] font-semibold leading-[1.2]">{kpi.activeProjects}</p>
             <p className="mt-1 text-[12px] leading-relaxed text-secondary">
@@ -147,7 +147,7 @@ export default async function DashboardPage() {
               财务总览 →
             </Link>
           </div>
-          <div className="min-w-0 pt-4 sm:px-5 sm:pt-0 sm:pl-4">
+          <div className="min-w-0 pt-4 sm:px-6 sm:pt-0 sm:pl-4">
             <p className="text-xs text-secondary">风险项数</p>
             <p className="num mt-1 text-[20px] font-semibold leading-[1.2]">{kpi.risk.total}</p>
             <p className="mt-1 text-[12px] leading-relaxed text-secondary">
@@ -177,7 +177,7 @@ export default async function DashboardPage() {
           <Card padded={false} className="mt-4">
             <ul className="grid divide-y divide-line sm:grid-cols-2 sm:divide-y-0 lg:grid-cols-3 lg:divide-x">
               {actionGroups.map((g) => (
-                <li key={g.key} className="min-w-0 border-line p-5 sm:border-b lg:border-b-0">
+                <li key={g.key} className="min-w-0 border-line p-6 sm:border-b lg:border-b-0">
                   <div className="flex items-baseline gap-2">
                     <span
                       className={`num text-[20px] font-semibold leading-none ${

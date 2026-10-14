@@ -10,6 +10,7 @@
  * 硬删——单用户无回收站，同 M8-b finance record 范式。
  */
 import prisma from "@/core/db";
+import { saveUploadedFile } from "@/core/storage/storage";
 import {
   CHANGE_KIND,
   CHANGE_KIND_LABEL,
@@ -257,6 +258,47 @@ export async function setChangeStatus(changeId: string, status: "pending" | "cli
   if (status === "client_confirmed" && row.status !== "pending") throw new ChangeOrderError("只有待确认的变更才能确认");
   if (status === "rejected" && row.status !== "pending") throw new ChangeOrderError("只有待确认的变更才能驳回");
   return prisma.changeOrder.update({ where: { id: changeId }, data: status === "pending" ? { status, submittedAt: new Date(), submittedBy: me.id, rejectReason: null } : status === "client_confirmed" ? { status, confirmedAt: new Date(), confirmedBy: me.id, confirmNote: note.trim(), rejectReason: null } : { status, rejectReason: note.trim() || "客户未确认" } });
+}
+
+/**
+ * 保存变更单附件（M13 体检收口：这段此前写在 src/app/budget/actions.ts 里，
+ * 由动作层循环直写 fileAsset —— 而那是全仓最厚的一份 action）。
+ *
+ * 与"范围红线只写 ChangeOrder 表"（§3-4）不冲突：FileAsset 属 core 域共享附件账，
+ * 不是别的模块的表；变更单靠 ownerType/ownerId 关联它，保持 SQLite 可移植（不建 Json 列）。
+ *
+ * 行为与搬迁前逐字一致（含"最多 5 个、空文件跳过、无占位用户则整段不写"）——
+ * 本次只搬位置，不改语义。
+ */
+export async function saveChangeAttachments(
+  projectId: string,
+  changeId: string,
+  files: File[]
+): Promise<void> {
+  const me = await getBudgetUser();
+  if (!me) return;
+  for (const file of files) {
+    const saved = await saveUploadedFile(file, "change_attachment", changeId);
+    await prisma.fileAsset.create({
+      data: {
+        projectId,
+        ownerType: "change_order",
+        ownerId: changeId,
+        category: "change_attachment",
+        ...saved,
+        uploadedBy: me.id,
+        uploaderName: me.name,
+      },
+    });
+  }
+}
+
+/** 从 FormData 里取附件（≤5 个、跳过空文件）。上限写死在这，动作层不必知道。 */
+export function changeAttachmentFiles(formData: FormData): File[] {
+  return formData
+    .getAll("attachments")
+    .filter((v): v is File => v instanceof File && v.size > 0)
+    .slice(0, 5);
 }
 
 /**

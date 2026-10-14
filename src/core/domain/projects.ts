@@ -303,9 +303,12 @@ export async function updateProject(
   const code = input.code.trim();
   if (!code) throw new ValidationError("请填写项目编号");
 
-  const status = input.status ?? PROJECT_STATUS.draft;
-  if (!isProjectStatus(status)) throw new ValidationError(`未知项目状态：${status}`);
-
+  // status 语义与 createProject 不同：**未传＝保持原值**，不是回落 draft。
+  // 归档项目的设置页故意不给状态字段（见 ProjectSettingsForm），若这里回落 draft，
+  // 用户改个地址就会把已归档项目悄悄放回全司口径。
+  if (input.status !== undefined && !isProjectStatus(input.status)) {
+    throw new ValidationError(`未知项目状态：${input.status}`);
+  }
   // 合同额：undefined = 不改此列；0 = 未录入哨兵（合法）；负数 → 抛中文校验错。
   // 同源 createProject 的写法，但 update 需区分"未传"与"传 0"。
   let contractAmountPatch: { contractAmount?: number } = {};
@@ -323,6 +326,17 @@ export async function updateProject(
       include: { client: true },
     });
     if (!project) throw new ValidationError("项目不存在");
+
+    const nextStatus = input.status ?? project.status;
+    // 归档态不可经「项目设置」写入：这条路径没有未闭环事项的知情确认框，也不写
+    // project.archive 流水，结果是这样归档的项目**没有流水可恢复**（只能回落 draft）。
+    // 归档一律走 /projects 表格行或项目详情页的归档入口——§4.3「归档入口两处」。
+    // 已是归档态时放行，因为那是"保持原状"，不是绕过。
+    if (nextStatus === PROJECT_STATUS.archived && project.status !== PROJECT_STATUS.archived) {
+      throw new ValidationError(
+        "请改用项目列表或项目详情页的「归档」入口：那里会列出未闭环事项并记录可恢复的原状态"
+      );
+    }
 
     // 编号唯一性排除自身；只有编号真正变更时才查重
     if (code !== project.code) {
@@ -346,12 +360,31 @@ export async function updateProject(
         area,
         designer: input.designer?.trim() || null,
         pm: input.pm?.trim() || null,
-        status,
+        status: nextStatus,
         startDate: parseDateInput(input.startDate),
         endDate: parseDateInput(input.endDate),
         ...contractAmountPatch,
       },
     });
+  });
+}
+
+/**
+ * 项目身份三元组（id / code / name）——给"只需要标题"的页面用。
+ *
+ * 为什么要单开：项目动态页原先在 page.tsx 里直接 prisma.project.findUnique 取标题。
+ * 页面直查主数据表是 §2「路由层薄、主数据归 core/domain」的反面——一次两行看着无害，
+ * 但每个人都补一次，主数据的读取口径就会散成十份。给一个足够便宜的函数，就不会有人自己写。
+ * 刻意不返回 getProjectHub 那样的全量聚合：取个标题不该付一次全站聚合的代价。
+ */
+export async function getProjectIdentity(projectId: string): Promise<{
+  id: string;
+  code: string;
+  name: string;
+} | null> {
+  return prisma.project.findUnique({
+    where: { id: projectId },
+    select: { id: true, code: true, name: true },
   });
 }
 
@@ -366,7 +399,10 @@ export async function updateProject(
  * 三条口径：
  * ① 归档前记下原状态（`restoreTo` 语义）：恢复时回到归档前那一态，而不是一律塞回 draft。
  *    实现上取当前 status 存进流水，恢复动作显式传回该值；本函数只负责写。
- * ② 已归档项目再点归档 = 幂等返回，不报错（界面刷新竞态下常见）。
+ * ② 已归档项目再点归档 = 幂等返回 `noop:true`，不报错（界面刷新竞态下常见）。
+ *    **调用方拿到 noop 就不该写流水**——否则流水里会留下一条 `before="archived"` 的记录，
+ *    而恢复动作正是回读"最新一条 project.archive 的 before"来决定回到哪一态，
+ *    这条无变化的记录会把恢复目标污染成 archived（恢复变成静默无操作却报成功）。
  * ③ 归档不改 `actualEndDate` / 不改任何金额列——它是可见性开关，不是业务动作。
  *
  * 流水由调用方（动作层）写，服务层保持在事务内不多写别表（见 operationLog 头部纪律）。
@@ -375,7 +411,7 @@ export async function setProjectArchived(
   projectId: string,
   archived: boolean,
   restoreTo?: string
-): Promise<{ before: string; after: string } | null> {
+): Promise<{ before: string; after: string; noop: boolean } | null> {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     select: { id: true, status: true, code: true, name: true },
@@ -383,8 +419,8 @@ export async function setProjectArchived(
   if (!project) return null;
 
   const next = archived ? "archived" : restoreTo && isProjectStatus(restoreTo) ? restoreTo : "draft";
-  if (project.status === next) return { before: project.status, after: next };
+  if (project.status === next) return { before: project.status, after: next, noop: true };
 
   await prisma.project.update({ where: { id: projectId }, data: { status: next } });
-  return { before: project.status, after: next };
+  return { before: project.status, after: next, noop: false };
 }

@@ -13,7 +13,12 @@ import {
 } from "./server/leads";
 import { logAppError } from "@/core/domain/telemetry";
 import { recordOperation, moneyText } from "@/core/domain/operationLog";
+import { LEAD_STAGE_LABEL } from "./stages";
 import prisma from "@/core/db";
+
+/** 线索阶段的中文名，只进 summary；before/after 一律存机器值（§4.3 一格不两用）。 */
+const stageText = (stage: string | null | undefined): string =>
+  stage ? (LEAD_STAGE_LABEL[stage as LeadStage] ?? stage) : "未知";
 
 export interface LeadFormState {
   error?: string;
@@ -120,7 +125,7 @@ export async function signLeadAction(
       return { error: "合同额需为大于 0 的数字" };
     }
 
-    const leadForSign = await prisma.lead.findUnique({ where: { id: leadId }, select: { name: true, phone: true } });
+    const leadForSign = await prisma.lead.findUnique({ where: { id: leadId }, select: { name: true, phone: true, stage: true } });
     const result = await signLead(leadId, {
       contractAmount,
       designer: text("designer") || undefined,
@@ -139,9 +144,11 @@ export async function signLeadAction(
       entity: "lead",
       entityId: leadId,
       projectId: result.projectId,
-      summary: `签约建项「${leadForSign?.name ?? leadId}」→ ${signedProject ? `${signedProject.code} ${signedProject.name}` : result.projectId}，合同额 ${moneyText(Number(formData.get("contractAmount")))}`,
-      before: leadForSign ? `线索阶段 quoted · 电话 ${leadForSign.phone ?? "未填"}` : null,
-      after: signedProject ? `项目 ${signedProject.code} · 客户 ${signedProject.client?.name ?? ""}` : null,
+      summary: `签约建项「${leadForSign?.name ?? leadId}」→ ${signedProject ? `${signedProject.code} ${signedProject.name}` : result.projectId}，合同额 ${moneyText(Number(formData.get("contractAmount")))}${leadForSign ? `；签约前阶段「${stageText(leadForSign.stage)}」· 电话 ${leadForSign.phone ?? "未填"}` : ""}`,
+      // before 存**机器值**（线索真实阶段码，原先这里硬编码 "quoted"、与真实阶段无关），
+      // after 存结果标记；中文说明全在 summary（§4.3）。
+      before: leadForSign?.stage ?? null,
+      after: signedProject ? "signed" : null,
     });
     return { ok: true, projectId: result.projectId };
   } catch (e) {
@@ -214,9 +221,10 @@ export async function archiveLeadAction(
       entity: "lead",
       entityId: leadId,
       projectId: lead?.projectId ?? null,
-      summary: `${archived ? "作废" : "恢复"}线索「${lead?.name ?? leadId}」（${lead?.code ?? ""}）`,
-      before: archived ? `阶段 ${lead?.stage ?? "?"}` : "已作废",
-      after: archived ? "已作废（不进漏斗与看板）" : `阶段 ${lead?.stage ?? "?"}`,
+      summary: `${archived ? "作废" : "恢复"}线索「${lead?.name ?? leadId}」（${lead?.code ?? ""}）——${archived ? `作废前阶段「${stageText(lead?.stage)}」，作废后不进漏斗与待办视野` : `恢复到阶段「${stageText(lead?.stage)}」`}`,
+      // before 存**阶段机器值**：恢复线索要靠它回写 stage，存中文会让回写校验失败而静默回落。
+      before: archived ? (lead?.stage ?? null) : "archived",
+      after: archived ? "archived" : (lead?.stage ?? null),
     });
     return { ok: true };
   } catch (e) {

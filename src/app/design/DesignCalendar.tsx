@@ -184,7 +184,7 @@ export function DesignCalendar({
           </p>
           <Link
             href="/design?view=board"
-            className="mt-4 inline-flex h-8 items-center rounded-inner bg-accent px-3 text-[13px] font-medium text-white whitespace-nowrap transition-colors hover:opacity-90"
+            className="mt-4 inline-flex h-8 items-center rounded-inner bg-accent px-3 text-[13px] font-medium text-accent-fg whitespace-nowrap transition-colors hover:opacity-90"
           >
             切换到看板
           </Link>

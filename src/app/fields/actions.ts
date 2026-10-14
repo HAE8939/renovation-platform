@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import {
   createDef,
   deleteDef,
+  getDefSnapshot,
   reorderDefs,
   setDefActive,
   updateDef,
@@ -85,17 +86,17 @@ export async function deleteFieldAction(
   _formData?: FormData,
 ): Promise<FieldFormState> {
   try {
-    const defOld = await prisma.customFieldDef.findUnique({
-      where: { id },
-      select: { label: true, key: true, _count: { select: { values: true } } },
-    });
+    // 取快照必须在删除之前——定义一删，label 与值数就无处可查了。
+    // 读经 customFieldRepo 而非直查表：§4.2 的读写单点收口，防"各存一套"换个形式回来。
+    const defOld = await getDefSnapshot(id);
     await deleteDef(id);
     await recordOperation({
       action: "field.delete",
       entity: "fieldDef",
       entityId: id,
-      summary: `删除自定义字段「${defOld?.label ?? id}」${defOld ? `，连带硬删 ${defOld._count.values} 条已录值` : ""}`,
-      before: defOld ? `${defOld.key} · 已填 ${defOld._count.values} 条` : null,
+      summary: `删除自定义字段「${defOld?.label ?? id}」（${defOld?.key ?? ""}），连带硬删 ${defOld?.valueCount ?? 0} 条已录值`,
+      // before 存**机器值**（字段 key）；人话进 summary——一格两用会让下游无从校验（§4.3）。
+      before: defOld?.key ?? null,
     });
     revalidateFieldSurfaces();
     return { ok: true };
@@ -113,8 +114,9 @@ export async function toggleFieldActiveAction(
   _prev?: FieldFormState,
 ): Promise<FieldFormState> {
   try {
+    // 先取快照再改：写失败时流水也不该因为查不到 label 而缺名。
+    const defT = await getDefSnapshot(id);
     await setDefActive(id, nextActive);
-    const defT = await prisma.customFieldDef.findUnique({ where: { id }, select: { label: true } });
     await recordOperation({
       action: "field.toggle",
       entity: "fieldDef",

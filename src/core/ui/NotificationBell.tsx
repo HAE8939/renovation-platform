@@ -13,7 +13,8 @@
  */
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import type { NotificationSummary } from "@/modules/dashboard/server/notifications";
+// 形状取自 core，不 import dashboard 模块内部——core 不依赖任何单一模块（§2）。
+import type { NotificationSummary } from "@/core/domain/notificationTypes";
 
 export function NotificationBell() {
   const [open, setOpen] = useState(false);
@@ -67,7 +68,7 @@ export function NotificationBell() {
         onClick={toggle}
         aria-expanded={open}
         aria-haspopup="dialog"
-        className={`relative inline-flex h-8 items-center gap-1.5 rounded-inner px-3 text-xs transition-colors duration-[120ms] ${
+        className={`relative inline-flex h-8 items-center gap-2 rounded-inner px-3 text-xs transition-colors duration-[120ms] ${
           open ? "bg-accent-tint font-medium text-accent-ink" : "text-secondary hover:bg-accent-tint hover:text-accent-ink"
         }`}
       >

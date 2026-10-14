@@ -20,30 +20,15 @@
 
 import prisma from "@/core/db";
 import { changeWatch } from "@/core/domain/ledger";
+import type {
+  NotificationGroup,
+  NotificationRow,
+  NotificationSummary,
+} from "@/core/domain/notificationTypes";
 
-export interface NotificationRow {
-  /** 展示文案（中文，含主体名） */
-  label: string;
-  /** 点进去的页（项目级深链用 id，见 AGENTS §4.1） */
-  href: string;
-}
-
-export interface NotificationGroup {
-  id: "node-review" | "issue-open" | "schedule-overdue" | "change-watch" | "lead-followup";
-  title: string;
-  count: number;
-  rows: NotificationRow[];
-  /** 该组的"全部"入口（例如问题台账页） */
-  allHref: string;
-}
-
-export interface NotificationSummary {
-  /** 未读总数（各组计数之和，用于铃铛角标） */
-  total: number;
-  groups: NotificationGroup[];
-  /** 生成时刻，界面显示"更新于 …"用 */
-  at: string;
-}
+// 形状定义已提到 core/domain/notificationTypes（core 不得反向依赖模块，§2）。
+// 这里按原名再导出，既有引用（api route、页面）一行都不必改。
+export type { NotificationGroup, NotificationRow, NotificationSummary };
 
 const MAX_ROWS = 3;
 const today = () => {

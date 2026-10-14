@@ -2,14 +2,19 @@
   "name": "renovation-platform",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@11.7.0",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "typecheck": "tsc --noEmit",
     "db:migrate": "prisma migrate dev",
     "db:seed": "prisma db seed",
-    "db:studio": "prisma studio"
+    "db:bootstrap": "node prisma/bootstrap.mjs",
+    "db:studio": "prisma studio",
+    "verify": "node scripts/run-gates.mjs",
+    "verify:integration": "node scripts/run-gates.mjs --integration"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

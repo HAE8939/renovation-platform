@@ -73,7 +73,7 @@ export function NewRecordModal({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex h-9 items-center justify-center rounded-inner bg-accent px-4 text-sm font-medium text-white whitespace-nowrap transition-colors hover:brightness-95"
+        className="inline-flex h-9 items-center justify-center rounded-inner bg-accent px-4 text-sm font-medium text-accent-fg whitespace-nowrap transition-colors hover:brightness-95"
       >
         + 新建记录
       </button>

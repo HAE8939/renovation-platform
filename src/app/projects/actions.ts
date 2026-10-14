@@ -36,18 +36,22 @@ export async function archiveProjectAction(
     const r = await setProjectArchived(projectId, true);
     if (!r) return { error: "项目不存在，请刷新页面后重试" };
     revalidateList();
-    await recordOperation({
-      action: "project.archive",
-      entity: "project",
-      entityId: projectId,
-      projectId,
-      summary: `归档项目「${project?.name ?? projectId}」（${project?.code ?? ""}）——已从驾驶舱/财务/质量口径移出，可随时恢复；归档前状态：${PROJECT_STATUS_LABEL[r.before as ProjectStatus] ?? r.before}`,
-      // before 存**机器值**（不是中文标签）：恢复动作要拿它回写 status。
-      // 中文态名放 summary 里给人看——两个用途不能挤在同一格，否则恢复时会拿到
-      // 「施工中」去校验 isProjectStatus 而静默回落 draft（本轮 s9 实测撞出）。
-      before: r.before,
-      after: "archived",
-    });
+    // 无变化就不写流水。这条流水同时承担「恢复到哪一态」的唯一依据，
+    // 写进一条 before="archived" 的记录会把恢复目标污染成 archived（M13 体检 M-2）。
+    if (!r.noop) {
+      await recordOperation({
+        action: "project.archive",
+        entity: "project",
+        entityId: projectId,
+        projectId,
+        summary: `归档项目「${project?.name ?? projectId}」（${project?.code ?? ""}）——未闭环事项已移出全司视野，已发生的收支与毛利照常统计，可随时恢复；归档前状态：${PROJECT_STATUS_LABEL[r.before as ProjectStatus] ?? r.before}`,
+        // before 存**机器值**（不是中文标签）：恢复动作要拿它回写 status。
+        // 中文态名放 summary 里给人看——两个用途不能挤在同一格，否则恢复时会拿到
+        // 「施工中」去校验 isProjectStatus 而静默回落 draft（本轮 s9 实测撞出）。
+        before: r.before,
+        after: "archived",
+      });
+    }
     return { ok: true };
   } catch (e) {
     logAppError("[archiveProjectAction]", e, { projectId });
@@ -67,8 +71,11 @@ export async function restoreProjectAction(
   const projectId = String(formData.get("projectId") ?? "").trim();
   if (!projectId) return { error: "缺少项目标识，请刷新页面后重试" };
   try {
+    // 回读「最近一次真正改变了状态的归档流水」。排除 before="archived" 是防历史脏数据：
+    // 修复前重复点归档会留下这样一条记录，若不排除，恢复目标就变成 archived——
+    // isProjectStatus 校验合法、执行无变化、还向用户报成功（体检 M-2）。
     const lastArchive = await prisma.operationLog.findFirst({
-      where: { projectId, action: "project.archive" },
+      where: { projectId, action: "project.archive", NOT: { before: "archived" } },
       orderBy: { at: "desc" },
       select: { before: true },
     });
@@ -80,15 +87,18 @@ export async function restoreProjectAction(
     const r = await setProjectArchived(projectId, false, restoreTo);
     if (!r) return { error: "项目不存在，请刷新页面后重试" };
     revalidateList();
-    await recordOperation({
-      action: "project.restore",
-      entity: "project",
-      entityId: projectId,
-      projectId,
-      summary: `恢复项目「${project?.name ?? projectId}」（${project?.code ?? ""}）→ ${PROJECT_STATUS_LABEL[r.after as ProjectStatus] ?? r.after}`,
-      before: "archived",
-      after: r.after,
-    });
+    // 与归档侧对称：状态没变就不写流水（否则流水里出现一条"恢复了但什么都没发生"）。
+    if (!r.noop) {
+      await recordOperation({
+        action: "project.restore",
+        entity: "project",
+        entityId: projectId,
+        projectId,
+        summary: `恢复项目「${project?.name ?? projectId}」（${project?.code ?? ""}）→ ${PROJECT_STATUS_LABEL[r.after as ProjectStatus] ?? r.after}`,
+        before: "archived",
+        after: r.after,
+      });
+    }
     return { ok: true };
   } catch (e) {
     logAppError("[restoreProjectAction]", e, { projectId });
@@ -96,7 +106,11 @@ export async function restoreProjectAction(
   }
 }
 
-/** 归档位一变，全站口径都跟着变（驾驶舱 / 财务 / 质量 / 排程都排除已归档）。 */
+/**
+ * 归档位一变，全站口径都要重算。注意两族口径不同但**都必须重算**：
+ * 前瞻类（驾驶舱待办与健康度、质量、排程、付款计划）把已归档摘出去；
+ * 事实类（已收 / 支出 / 毛利 / 现金线）仍含它，但页面上的「归档参与说明」要跟着出现或消失。
+ */
 function revalidateList(): void {
   revalidatePath("/projects");
   revalidatePath("/dashboard");

@@ -92,7 +92,7 @@ export default async function QualityIssuesPage({
         />
 
         <label className="block">
-          <span className="mb-1.5 block text-xs font-medium text-secondary">状态</span>
+          <span className="mb-2 block text-xs font-medium text-secondary">状态</span>
           <select
             name="status"
             defaultValue={status ?? ""}
@@ -108,7 +108,7 @@ export default async function QualityIssuesPage({
         </label>
 
         <label className="block">
-          <span className="mb-1.5 block text-xs font-medium text-secondary">严重度</span>
+          <span className="mb-2 block text-xs font-medium text-secondary">严重度</span>
           <select
             name="severity"
             defaultValue={severity ?? ""}
@@ -126,7 +126,7 @@ export default async function QualityIssuesPage({
         <div className="flex items-center gap-2">
           <button
             type="submit"
-            className="inline-flex h-9 items-center justify-center rounded-inner bg-accent px-4 text-sm font-medium text-white whitespace-nowrap transition-colors hover:brightness-95"
+            className="inline-flex h-9 items-center justify-center rounded-inner bg-accent px-4 text-sm font-medium text-accent-fg whitespace-nowrap transition-colors hover:brightness-95"
           >
             筛选
           </button>

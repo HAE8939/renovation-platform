@@ -44,8 +44,8 @@ export default async function ProjectDetailPage({
         <div className="mt-4 flex items-center justify-between gap-4">
           <p className="text-[13px] leading-relaxed text-muted">
             {hub.status === "archived"
-              ? "该项目已归档：不再计入驾驶舱、财务与质量口径，数据全部保留，可恢复。"
-              : "归档＝从全司口径里摘出去（可恢复），不是删除数据。"}
+              ? "该项目已归档：待收款、未整改问题与待办不再出现在全司视野里；已收、支出、合同额与毛利等已发生的账仍照常统计（发生过的事不因归档消失）。数据全部保留，可恢复。"
+              : "归档＝未闭环事项从全司视野里摘出去（可恢复），不是删除数据；已发生的收支与毛利照常计入财务口径。"}
           </p>
           <ArchiveButton
             projectId={hub.id}

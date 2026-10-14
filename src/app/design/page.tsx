@@ -266,7 +266,7 @@ export default async function DesignBoardPage({
             {scope === "mine" && (
               <Link
                 href="/design"
-                className="mt-4 inline-flex h-8 items-center rounded-inner bg-accent px-3 text-[13px] font-medium text-white whitespace-nowrap transition-colors hover:opacity-90"
+                className="mt-4 inline-flex h-8 items-center rounded-inner bg-accent px-3 text-[13px] font-medium text-accent-fg whitespace-nowrap transition-colors hover:opacity-90"
               >
                 查看全部任务
               </Link>

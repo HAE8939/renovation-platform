@@ -139,7 +139,7 @@ function ThemeSwatch({ theme }: { theme: ThemeKey }) {
   return (
     <span
       data-theme={theme}
-      className="flex shrink-0 flex-col gap-1.5 pt-0.5"
+      className="flex shrink-0 flex-col gap-2 pt-1"
       role="img"
       aria-label={`${THEME_LABEL[theme]}主题：强调色、深墨字、浅晕底、按钮字色四色预览`}
     >
@@ -214,6 +214,8 @@ function LogoPanel({ logoFile, logoUrl }: { logoFile: string | null; logoUrl: st
       <div className="mt-4 flex items-center gap-4">
         {logoUrl ? (
           <span className="flex items-center gap-3">
+            {/* 与侧栏 Logo 同一口径：原生 <img>，不经 next/image 优化（standalone 无 sharp）。 */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={logoUrl}
               alt="当前 Logo 预览"

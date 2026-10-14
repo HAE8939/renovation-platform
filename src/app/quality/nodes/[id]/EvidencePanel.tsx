@@ -61,6 +61,9 @@ export function EvidencePanel({
         <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3">
           {evidence.map((item) => (
             <figure key={item.id} className="min-w-0 border border-line bg-canvas p-2">
+              {/* 证据图走原生 <img>：standalone 无 sharp，next/image 优化会在生产报错；
+                  且证据是手机原片，任何有损优化都可能改动呈像——验收凭证宁可不处理。 */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={item.url}
                 alt={item.originalName}
@@ -94,7 +97,7 @@ export function EvidencePanel({
       )}
 
       {evidence.length < 9 ? (
-        <form action={uploadAction} className="mt-6 space-y-4 border-t border-line pt-5">
+        <form action={uploadAction} className="mt-6 space-y-4 border-t border-line pt-6">
           <input type="hidden" name="nodeId" value={nodeId} />
           <Field label="上传图片" hint="仅支持 JPG / PNG，单张不超过 5 MB。">
             <input

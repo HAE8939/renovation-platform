@@ -22,7 +22,7 @@ export interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
 export function Badge({ variant = "neutral", className = "", ...rest }: BadgeProps) {
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-inner px-2 py-0.5 text-xs font-medium leading-5 whitespace-nowrap ${variantClass[variant]} ${className}`}
+      className={`inline-flex items-center gap-1 rounded-inner px-2 py-1 text-xs font-medium leading-5 whitespace-nowrap ${variantClass[variant]} ${className}`}
       {...rest}
     />
   );

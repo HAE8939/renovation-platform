@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { ENTITY_KIND } from "@/core/domain/customField";
-import { CustomFieldError, saveEntityValues } from "@/core/domain/customFieldRepo";
+import { CustomFieldError, getEntityValues, saveEntityValues } from "@/core/domain/customFieldRepo";
 import { logAppError } from "@/core/domain/telemetry";
 
 /**
@@ -34,19 +34,25 @@ export async function saveCustomFieldValuesAction(
     inputs.push({ fieldId: name.slice(PREFIX.length), raw: String(value ?? "") });
   }
   try {
-    const valsOld = await prisma.customFieldValue.findMany({
-      where: { entityKind: ENTITY_KIND.project, entityId: projectId },
-      select: { fieldId: true, valueText: true, valueNumber: true, valueDate: true },
-    });
+    // 读经 customFieldRepo（§4.2 单点收口）。getEntityValues 会返回**全部在用定义**
+    // 的行（含未填），所以"原已填几项"要按三列是否全空来数，不能直接用 length。
+    const oldValues = await getEntityValues(ENTITY_KIND.project, projectId);
+    const filledOld = oldValues.filter(
+      (v) =>
+        v.columns.valueText !== null ||
+        v.columns.valueNumber !== null ||
+        v.columns.valueDate !== null
+    ).length;
     await saveEntityValues(ENTITY_KIND.project, projectId, inputs);
     await recordOperation({
       action: "customValues.save",
       entity: "project",
       entityId: projectId,
       projectId,
-      summary: `保存自定义字段值（提交 ${inputs.length} 项 · 原已填 ${valsOld.length} 项，未提交的按清空处理）`,
-      before: `${valsOld.length} 项`,
-      after: `${inputs.length} 项`,
+      summary: `保存自定义字段值（提交 ${inputs.length} 项 · 原已填 ${filledOld} 项，未提交的按清空处理）`,
+      // 数量作机器值入 before/after，中文说明留给 summary（§4.3 一格不两用）。
+      before: String(filledOld),
+      after: String(inputs.length),
     });
     revalidatePath(`/projects/${projectId}`);
     revalidatePath("/projects");
