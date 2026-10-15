@@ -53,6 +53,7 @@ renovation-platform/
   scripts/                     # verify-*.mjs 纯函数门禁 / verify-*.mts 隔离库集成门禁 / run-gates.mjs 驱动器
   docs/                        # 契约、构建规格、任务卡、状态交接、体检与验收报告（人看的都在这）
   Dockerfile  compose.internal.yml  Caddyfile     # 内测部署三件（§7.1 口令保护在 Caddyfile）
+  deploy/nas-deploy.sh           # 极空间 NAS 部署入口（该机无 docker compose，见 §7.2）
   AGENTS.md  CLAUDE.md(指针对本文件)  README.md
   _scratch/                    # 一切非交付物（gitignore，见 §9）
   logs/                        # 运行期错误日志（§4.4，§9 里唯一的仓库根例外）
@@ -229,6 +230,19 @@ export interface ModuleManifest {
 - **流水终于能答"是谁改的"**：`operationLog.resolveActor()` 三级优先＝反代认证用户（按 `User.name` 匹配）→ 占位 boss → 占位任意用户。`PLATFORM_GATE` 未开时落回旧占位口径，行为逐字不变（集成门禁走 tsx、拿不到 headers 也走这条，故不破坏测试）。`actor` 仍是占位的这段时间，内测记录里"谁改的"答不了——这是有意的局限，别把流水当成问责依据。
 - **`/api/health` 必须是公开且不查库的**：healthcheck 若打业务路径，开闸后会被自己的闸拦成 401、容器进入 unhealthy 重启循环；原先打的 `/api/notifications` 每 30 秒跑一遍全站聚合，只为证明进程活着却给 SQLite 加真实读负载。
 - 启动时若闸未开，`middleware` 会打一条 `console.warn`。生产日志里看到它就说明这个部署**没有**访问保护。
+
+### 7.2 内测部署环境事实（极空间 Z0220021，2026-10-15 实跑通）
+
+当前唯一在跑的部署目标是这台 NAS，环境有五个反直觉之处，改动部署配置前先看这里：
+
+- **aarch64，不是 x64**。所有基础镜像与二进制都要按 arm64 选；官方 `docker/compose` 镜像给的是 amd64 的 v1 二进制，装上也跑不起来。
+- **没有 docker compose**。面板里能"编排容器"是极空间自己调 Docker HTTP API，不等于有 compose。所以 `deploy/nas-deploy.sh`（纯 docker CLI）才是这台的部署入口，`compose.internal.yml` 留给有 compose 的环境——**两者等价，改一个必须同步另一个**。
+- **docker 需要 sudo**，当前用户不在 docker 组。
+- **`scp` 不可用**：sshd 关了 sftp 子系统（`subsystem request failed`）。传文件走 `ssh "cat > 目标路径" < 本地文件`。
+- **`/tmp` 会被周期性清空**，日志与中间产物不要只放 /tmp（部署日志落 `/opt/renovation-platform/`）；当前用户不在 `/etc/passwd` 里，`$HOME` 为空，脚本别依赖 `~`。
+- 镜像与卷的 data-root 在 `/data_s002`（已用 96%），系统盘 `/` 剩 9G；`/data_s001`、`8080`、`8088`、`3000`、`3001` 都被极空间或既有容器占用，对外端口用 **8181**（经 `.env` 的 `CADDY_PORT` 覆盖，别在仓库里为某台机器改死）。
+
+首次在这台机器上部署连续失败四轮，七个根因**全部是 x64/Windows 本机照不出来的**（本机 913 项门禁与 build 全绿照样通过）：pnpm 11 要 Node 22 的 `node:sqlite`、arm64 的 Prisma OpenSSL 引擎选择、构建期必须先有表、`.env` 里的 bcrypt 哈希不能被 shell `source`、Caddyfile 的 `basic_auth` 必须用块形式、`docker run` 不会自动注册 compose 式网络别名。逐条记录在 `docs/INTERNAL_DOCKER_RUNBOOK.md` 与 commit `ed8c151`，改 Dockerfile / Caddyfile / 部署脚本前先读，别凭本机经验推断。
 
 ## 8. 交付默认与协作
 

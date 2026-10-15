@@ -1,8 +1,9 @@
 # 项目状态 — renovation-platform
 
-> 更新：**2026-10-14（M13 系统性体检 + 全量收口）** · 维护：集成者
-> 当前状态：**M1–M9 已完成，M10-a/b/c 已完成，M11-A/B/C/D 已完成，M12-a 人员工控已合入，M13 体检收口已合入（契约升 v0.5）**。本页顶部摘要与底部交接以当前代码和最近验收记录为准。
-> **M13（本轮）＝对 codex 四个提交（`f90ea94`/`df512c9`/`21db1cc`/`ad8809c`）做系统性体检后的全量修复**。体检过程与逐条证据见 `docs/HEALTH_CHECK_2026-10-14.md`；修完的净结果：
+> 更新：**2026-10-15（M13 体检收口 + 内网 NAS 内测已上线）** · 维护：集成者
+> 当前状态：**M1–M9 已完成，M10-a/b/c 已完成，M11-A/B/C/D 已完成，M12-a 人员工控已合入，M13 体检收口已合入（契约升 v0.5），内测已部署到极空间 NAS 并实测通过**。本页顶部摘要与底部交接以当前代码和最近验收记录为准。
+> **部署轮（2026-10-15）**：平台已在 `http://192.168.1.135:8181` 运行（`renovation-app` 不对外发布端口 + `renovation-caddy` 口令入口，两容器稳定 healthy）。验收：14 个业务页带口令全 200、无口令/错口令全 401、容器内绕过反代无身份头 401 带头 200、空库 bootstrap 得 1 组织 + 1 boss + 零演示数据、重启后数据与 14 条迁移计数不变。**首次部署连续失败四轮、七个根因全部是 x64/Windows 本机照不出来的**（本机 913 项门禁与 build 全绿照样通过）——pnpm 11 需 Node 22 的 `node:sqlite`、arm64 的 Prisma OpenSSL 引擎要装 openssl 且显式 `binaryTargets`、构建期必须先建表否则 root layout 抛 P2021、`.env` 里的 bcrypt 哈希不能被 shell `source`、Caddyfile 的 `basic_auth` 必须用块形式、`docker run` 不会自动注册 compose 式网络别名；其中两项还互相掩盖。逐条记录见契约新增 **§7.2**（该机型环境事实：aarch64、无 compose、docker 需 sudo、`scp` 不可用因 sshd 关了 sftp、`/tmp` 会被周期性清空）与 `docs/HEALTH_CHECK_2026-10-14.md` §12、commit `ed8c151`。因该机无 compose 且官方 compose 镜像是 amd64 v1，新增 **`deploy/nas-deploy.sh`**（纯 docker CLI，与 `compose.internal.yml` 等价）作为该环境部署入口。
+> **M13（体检轮）＝对 codex 四个提交（`f90ea94`/`df512c9`/`21db1cc`/`ad8809c`）做系统性体检后的全量修复**。体检过程与逐条证据见 `docs/HEALTH_CHECK_2026-10-14.md`；修完的净结果：
 >
 > - **B-1 变更单金额静默消失（阻塞级）**：`m13` 加 `status` 时 SQLite 重建语句漏带该列，存量变更单全落 `DEFAULT 'draft'`，而读侧只认 `client_confirmed` → 历史变更额从毛利/应收/预警里消失。新增 `m13b_backfill_change_status` 幂等回填（判据 `createdAt < m13 上线时刻`，绝不误伤上线后新草稿），并把 `verify-finance-flow` 从 76 项重写为 **91 项**——新增"draft 不算钱／pending 不算钱／确认瞬间算钱／驳回回落／已确认禁改禁删"全链路锁。
 > - **B-2 零鉴权（阻塞级）**：新增 `Caddyfile`（basic auth + `header_up` 注入 `x-platform-user`）+ `src/middleware.ts` 应用层闸（`PLATFORM_GATE=on`，默认全站拦、放行 `/`、`/about`、`/api/health`、`/api/client-errors`、`/uploads/*`）+ `compose.internal.yml` 的 `app` **不再发布端口**、外部唯一入口 8080。`resolveActor()` 改三级优先，**流水第一次能答"是谁改的"**。新增公开不查库的 `/api/health`（否则开闸后 healthcheck 会被自己的闸拦成 unhealthy）。

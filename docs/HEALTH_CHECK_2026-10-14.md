@@ -168,5 +168,32 @@
 
 **修复轮全量回归**：`tsc --noEmit` 0 错 · `next lint` 零警告零错误 · **17 道门禁 913 项通过 0 失败** · `next build` 编译成功 + 22/22 页 · `prisma validate` 通过 · 14 条迁移 up-to-date · `dev.db` 全程 md5 未变（集成门禁均走 `_scratch/*.db`）。
 
+## 12. 部署轮结果（2026-10-15，极空间 NAS 内测上线）
+
+体检与修复都过了真机这一关——**内网 Docker 部署已成功运行**，`http://192.168.1.135:8181`。
+
+**实测验收**：14 个业务页经 Caddy 带口令全部 200；无口令、错口令一律 401；容器内绕过 Caddy 直连——无身份头 401、带头 200（证明应用层闸独立生效，不依赖反代）；`/api/health` 返回 `{"ok":true}`；空库经 bootstrap 得 1 组织 + 1 boss、零演示数据、14 条迁移；重启容器后数据与迁移计数不变、bootstrap 幂等跳过、页面仍 200。`renovation-app` 不对外发布端口，外部唯一入口是 Caddy。
+
+**首次部署连续失败四轮，七个根因全部是本机照不出来的**（本机 913 项门禁与 build 全绿，一个不落地通过）：
+
+| # | 症状 | 根因 | 修法 |
+|---|---|---|---|
+| ① | `pnpm install` 抛 `ERR_UNKNOWN_BUILTIN_MODULE: node:sqlite` | pnpm 11.7.0 需要 Node 22.5+ 才内置的 `node:sqlite`，基础镜像是 `node:20-alpine` | 升 Node 22（不降 pnpm：`pnpm-workspace.yaml` 用了 pnpm 11 的 `allowBuilds`） |
+| ② | 静态导出 `/_not-found` 炸，报 `libssl.so.1.1` 加载失败 | Prisma 5.22 在 arm64+musl 上挑 openssl-1.1 引擎 | 换 Debian 基础镜像 |
+| ③ | 换 slim 后**同样**报 `libssl.so.1.1` | `node:22-slim` 里 openssl 的 CLI 与 `.so` 全都没有，版本探测失败后仍回落 1.1 | 三阶段都装 openssl **且** schema 显式 `binaryTargets=["native","linux-arm64-openssl-3.0.x"]`，缺一不可 |
+| ④ | 错误变成 `P2021 platform_settings 表不存在` | 构建期 `DATABASE_URL` 指向的 `/tmp/build.db` 从未建表，而 root layout 会 `platformSetting.upsert()`。本机照不出是因为它指向有表的 `dev.db` | builder 加 `prisma migrate deploy`（只建 schema、不灌数据） |
+| ⑤ | 正确口令也一律 401 | 部署脚本用 `. "$ENV_FILE"` 读 `.env`，而 bcrypt 哈希形如 `$2a$14$…`，被 shell 当位置参数展开成残缺值 | 改逐行 `KEY=VALUE` 读取、引号包住不展开 |
+| ⑥ | Caddy 进重启循环 `unrecognized hash algorithm: admin` | `basic_auth <user> <hash>` 行内两参数写法下，Caddy 把第一个 token 当算法名 | 改块形式 |
+| ⑦ | 认证正确了但全线 502 | `docker run --name renovation-app` 只注册 `renovation-app` 这个 DNS 名，不像 compose 会把服务名 `app` 注册成别名 → Caddyfile 的 `reverse_proxy app:3000` 解析失败 | 加 `--network-alias app`，保持 Caddyfile 两种部署路径通用 |
+
+⑤⑥ 曾**互相掩盖**：残缺哈希恰好让 `basic_auth` 的参数数量变了，Caddy 能起来但永远 401——所以看起来像"修好一个就崩另一个"。这类成对掩盖才是逐轮试错慢的真实原因。
+
+**该机型没有 docker compose**（面板的编排能力是极空间自己调 Docker API），且官方 `docker/compose` 镜像给的是 amd64 的 v1 二进制、装上也跑不起来。因此新增 `deploy/nas-deploy.sh` 用纯 docker CLI 完成与 `compose.internal.yml` **等价**的部署，作为该环境的正式入口入库；本轮是重跑脚本而非手工敲对容器——脚本是交付物，手工修好了下次跑还是坏的。
+
+**未验证项（诚实标注）**：写一条真实业务数据后、流水 `actor` 是否显示为 `admin` 而非 `user-local`——需浏览器提交一次 Server Action（curl 构造不可靠）。间接证据已具备：`PLATFORM_GATE=on` 下经 Caddy 带口令访问业务页得 200，而中间件只认非空 `x-platform-user`，说明身份注入确实生效；库里也确有 `name='admin'` 的 boss 账号可与 `CADDY_USER` 匹配。
+
+**凭据处置**：口令只存 NAS `/opt/renovation-platform/ACCESS.txt`（600）与 `.env`（600），未进仓库、未进镜像；部署过程中的 sudo 明文文件、curl 配置文件、平台口令临时文件均已清零，本机临时 askpass 脚本已入回收站。
+
 ---
-*本次体检阶段未改动任何仓库文件；其后的修复轮（同日夜）按上表逐条实施，改动均已入库并可经 git 回退。体检阶段产物：`_scratch/logs/static-gates.log`、`_scratch/logs/build-healthcheck.log`、`_scratch/backup/dev.pre-healthcheck-20261014-165408.db`（dev.db 体检前快照）、`_scratch/{sign,finance-flow,quality-flow,schedgen,evidence-flow}.db`（隔离库）。修复轮另新增 `dev.db` 快照与 `_scratch/{boot,backfill}.db`、`_scratch/tmp/{verify-backfill,probe-datetime,codemod-tokens}.mjs`。*
+
+*本次体检阶段未改动任何仓库文件；其后的修复轮（同日夜）按上表逐条实施、部署轮（次日）按本节记录实施，改动均已入库并可经 git 回退。体检阶段产物：`_scratch/logs/static-gates.log`、`_scratch/logs/build-healthcheck.log`、`_scratch/backup/dev.pre-healthcheck-20261014-165408.db`（dev.db 体检前快照）、`_scratch/{sign,finance-flow,quality-flow,schedgen,evidence-flow}.db`（隔离库）。修复轮另新增 `dev.db` 快照与 `_scratch/{boot,backfill}.db`、`_scratch/tmp/{verify-backfill,probe-datetime,codemod-tokens,probe-boot}.mjs`。部署轮产物在 NAS `/opt/renovation-platform/deploy7.log`（最后一次成功构建的完整日志），此前的失败轮次日志已清零。*
