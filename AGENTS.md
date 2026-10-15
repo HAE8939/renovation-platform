@@ -166,7 +166,7 @@ export interface ModuleManifest {
 - **回填判据必须能区分"历史存量"与"上线后的合法草稿"**。`m13b` 用 `createdAt < <m13 上线时刻>` 做判据，并把 `confirmedAt` 取 `createdAt`（旧口径生效时间即创建时间，且避免 UI 拿 null）、`confirmNote` 写明自动确认来源。写成无判据的 `WHERE status='draft'` 会把上线后员工新建的草稿一并确认掉——那是把一个数据 bug 换成一个业务 bug。回填 SQL 幂等，可安全重跑。
 - **SQLite 的 DateTime 存的是整数毫秒**（实测 `typeof("createdAt")='integer'`）。迁移里做时间比较要用 `CAST(strftime('%s','YYYY-MM-DD HH:MM:SS') AS INTEGER) * 1000`，直接跟字符串比会按字典序出错。
 
-**已知缺口（登记，未擅自实现）**：`client_confirmed` 目前是**终态**——`updateChange` 与 `deleteChange` 都拒绝已确认的行，而 `setChangeStatus` 没有任何离开 `client_confirmed` 的边。守卫本身是对的（已确认金额不能被无痕抹掉），但配合 `m13b` 的回填，一旦员工录错并被自动确认，就没有任何纠正路径。是否补"撤销确认"（退回 pending 并即时从口径里摘出、留流水）属产品决策，需单开单元；在此之前，任何批量回填类操作都要先确认这一条。
+**撤销确认（M14 补口，2026-10-15 落地）**：`client_confirmed` 曾是**终态**——`updateChange` 与 `deleteChange` 都拒绝已确认的行，而 `setChangeStatus` 没有任何离开 `client_confirmed` 的边。守卫本身是对的（已确认金额不能被无痕改写或删除），但配合 `m13b` 的回填，一旦员工录错并被自动确认，就没有任何纠正路径。现补一条**唯一的受控出口** `revokeChangeConfirm`：`client_confirmed → pending`，**即时从金额口径摘出**（退回 pending 自然掉出两处 `status:"client_confirmed"` 过滤），并清空 `confirmedAt/confirmedBy/confirmNote`（原始确认信息不丢，全在撤销前后写入的 `change.revoke_confirm` 流水里，§4.4）。退回 pending 后行可编辑、可再次确认，构成「撤销 → 纠错 → 再确认」闭环，而不是把已确认金额变成可无痕改写。三条纪律：① 只对 `client_confirmed` 开放，非该态撤销即拒（防把 pending/draft「撤销」成无意义写入）；② 撤销动作走独立函数与独立流水 `action`（`change.revoke_confirm`），不复用 `setChangeStatus("pending")`——后者语义是「提交确认」（往口径里放钱的前一步），撤销语义相反（把钱拿出来），混用会让流水答反方向；③ 界面**不再给已确认行放编辑/删除按钮**（它们必然被服务层守卫拒绝），只放「撤销确认」。`verify-finance-flow` §13b 钉死「确认进账→撤销摘出→改→再确认」的金额口径与字段清空。仍**保留** `updateChange`/`deleteChange` 对 `client_confirmed` 的拒绝——纠错必须先撤销，不能绕过。
 
 ## 5. 预算模块数据模型（modules/budget 自有实体）
 - `CatalogCategory` 工程科目：id、name、order。（全局模板库，可增删改）
@@ -248,8 +248,8 @@ export interface ModuleManifest {
 
 - 参考实现（**只作领域参考，禁止照抄数据/UI/文案**）：`docs/reference/renovation-budget-reference.html`。用来理解"装修预算报价"有哪些要素（科目/项目字段/SOP/材料/计算/打印）；界面与数据须原创、须遵循 §6 设计系统、须是 DB 驱动而非 localStorage。
 - 质量门槛（M13 起有明确命令，不再靠"记得跑"）：
-  - `pnpm verify` —— 纯函数门禁（当前 12 道 / 695 项）。改算法、口径、格式化、主题映射必跑。
-  - `pnpm verify:integration` —— 隔离库集成门禁（5 道 / 218 项，各自 `_scratch/*.db`，**不碰 `dev.db`**）。改 schema、迁移、服务层写入、跨页联动必跑。
+  - `pnpm verify` —— 纯函数门禁（12 道 / 675 项，2026-10-15 由 `scripts/run-gates.mjs` 实测）。改算法、口径、格式化、主题映射必跑。
+  - `pnpm verify:integration` —— 隔离库集成门禁（5 道 / 238 项，各自 `_scratch/*.db`，**不碰 `dev.db`**）。改 schema、迁移、服务层写入、跨页联动必跑。
   - `pnpm build` + `npx tsc --noEmit` + `pnpm lint` —— 构建与类型。`next build` 的 standalone 步骤只在容器里开（`BUILD_STANDALONE=1`，见 `next.config.mjs`）：Windows 非特权进程不能建 symlink，会让本机 build 在编译与页面生成全绿之后 EPERM 失败，从而把这条门槛本身弄没。
   - 无控制台报错、迁移+seed 能跑、计算正确、中文、响应式、打印友好；关键页 1:1 目检设计语言保真。
   - **口径变更必须同批改门禁断言**（§4.6 第一条纪律）。判据很简单：门禁没红而行为变了，就是断言没跟上——这跟"门禁红了"一样是交付未完成，不是"测试太严"。

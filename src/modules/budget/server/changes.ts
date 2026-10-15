@@ -261,6 +261,44 @@ export async function setChangeStatus(changeId: string, status: "pending" | "cli
 }
 
 /**
+ * 撤销确认：client_confirmed → pending（§4.6「已知缺口」补口）。
+ *
+ * 为什么补这条边：§4.6 把变更单金额口径锁死为「只认 client_confirmed」，且刻意不给它出口——
+ * 已确认金额不能被无痕改写或删除（updateChange / deleteChange 都拒绝 client_confirmed 行）。
+ * 守卫本身对，但配合 m13b 的批量回填，一旦员工录错并被自动确认，此前**没有任何纠正路径**。
+ * 本函数给的就是那条纠错边，而不是把已确认金额变成可无痕改写：
+ *  - 只把状态退回 pending，并**即时从金额口径摘出**（两处聚合按 status==='client_confirmed' 过滤，退回 pending 自然掉出）；
+ *  - 清空 confirmedAt / confirmedBy / confirmNote——留着它们会让一条 pending 行挂着「已确认时间」这种矛盾现场；
+ *    原始确认信息不丢，全在撤销前后写入的操作流水里（before/after 可重建，§4.4）；
+ *  - 退回 pending 后行可编辑（updateChange 允许 pending）、可再次确认，构成「撤销 → 纠错 → 再确认」闭环。
+ *
+ * 幂等与守卫：非 client_confirmed 的行拒绝（避免把 pending/draft「撤销」成 pending 的无意义写入）。
+ * 流水由动作层写（§4.4：埋点在动作层、不在事务内，防记流水失败连业务一起滚掉）。
+ */
+export async function revokeChangeConfirm(changeId: string): Promise<void> {
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.changeOrder.findUnique({
+      where: { id: changeId },
+      select: { id: true, status: true },
+    });
+    if (!existing) throw new ChangeOrderError("变更单不存在");
+    if (existing.status !== "client_confirmed") {
+      throw new ChangeOrderError("只有客户已确认的变更才能撤销确认");
+    }
+    await tx.changeOrder.update({
+      where: { id: changeId },
+      data: {
+        status: "pending",
+        confirmedAt: null,
+        confirmedBy: null,
+        confirmNote: "",
+        rejectReason: null,
+      },
+    });
+  });
+}
+
+/**
  * 保存变更单附件（M13 体检收口：这段此前写在 src/app/budget/actions.ts 里，
  * 由动作层循环直写 fileAsset —— 而那是全仓最厚的一份 action）。
  *

@@ -38,6 +38,7 @@ import {
   updateChange,
   deleteChange,
   setChangeStatus,
+  revokeChangeConfirm,
 } from "@/modules/budget/server/changes";
 import { getProjectHub } from "@/modules/projects/server/projectDetail";
 import { buildPaymentPlan, PAYMENT_STAGE_DEFS } from "@/modules/finance/payment";
@@ -749,6 +750,89 @@ async function main() {
     "联动：回到基线后 changeWarn 为 true（3200>3100）",
     hubAfterDelete !== null && hubAfterDelete.finance.changeWarn === true,
     `${hubAfterDelete?.finance.changeWarn}`
+  );
+
+  // ── 13b) 撤销确认闭环：退回 pending → 即时从口径摘出 → 改 → 再确认（§4.6 补口）──
+  const { id: revId } = await createChange(p1.id, {
+    kind: "add",
+    title: "撤销闭环",
+    amount: 2000,
+    dateIso: "2026-10-15",
+  });
+  await setChangeStatus(revId, "pending");
+  // 守卫：未确认（pending）的行不能撤销——避免把「提交前」的行撤销成 pending 的无意义写入
+  try {
+    await revokeChangeConfirm(revId);
+    chk("守卫：pending 撤销 → 抛错", false, "未抛错");
+  } catch (e) {
+    chk(
+      "守卫：pending 撤销 → 「只有客户已确认的变更才能撤销确认」",
+      e instanceof ChangeOrderError &&
+        e.message === "只有客户已确认的变更才能撤销确认",
+      e instanceof Error ? e.message : "非 Error"
+    );
+  }
+  await setChangeStatus(revId, "client_confirmed", "先确认");
+  const okPreRevoke = await dbChangeTotal(p1.id);
+  chk(
+    "撤销前：已确认口径 3200→5200（确认瞬间进账）",
+    centEq(okPreRevoke, 5200),
+    `${okPreRevoke}`
+  );
+  await revokeChangeConfirm(revId);
+  const okPostRevoke = await dbChangeTotal(p1.id);
+  chk(
+    "撤销确认 → 已确认口径即时回到 3200（退回 pending 不算钱）",
+    centEq(okPostRevoke, 3200),
+    `${okPostRevoke}`
+  );
+  const allPostRevoke = await dbChangeTotalAll(p1.id);
+  chk(
+    "撤销确认 → 全量口径仍 5200（行保留可追溯，撤销≠删除）",
+    centEq(allPostRevoke, 5200),
+    `${allPostRevoke}`
+  );
+  const revRow = await prisma.changeOrder.findUnique({
+    where: { id: revId },
+    select: { status: true, confirmedAt: true, confirmNote: true },
+  });
+  chk(
+    "撤销确认 → status 回 pending",
+    revRow?.status === "pending",
+    `${revRow?.status}`
+  );
+  chk(
+    "撤销确认 → confirmedAt 清空（不留已确认时间戳于待确认行）",
+    revRow?.confirmedAt === null,
+    String(revRow?.confirmedAt)
+  );
+  chk(
+    "撤销确认 → confirmNote 清空",
+    revRow?.confirmNote === "",
+    revRow?.confirmNote ?? "空"
+  );
+  // 纠错闭环：撤销 → 改金额 → 再确认（已确认行不能改，退回 pending 后改得动）
+  await updateChange(revId, p1.id, {
+    kind: "add",
+    title: "撤销后纠错",
+    amount: 1500,
+    dateIso: "2026-10-15",
+    note: "纠正金额",
+  });
+  await setChangeStatus(revId, "client_confirmed", "纠错后再确认");
+  const okReconfirm = await dbChangeTotal(p1.id);
+  chk(
+    "纠错闭环：撤销→改→再确认 → 已确认口径 3200+1500=4700",
+    centEq(okReconfirm, 4700),
+    `${okReconfirm}`
+  );
+  // 收尾：已确认行经服务层不可删（正是 §4.6 守卫），直连清库回 3200 基线，不污染后续 section 14
+  await prisma.changeOrder.delete({ where: { id: revId } });
+  const okRevokeCleanup = await dbChangeTotal(p1.id);
+  chk(
+    "收尾：撤销测试行清库 → 已确认口径回 3200（基线）",
+    centEq(okRevokeCleanup, 3200),
+    `${okRevokeCleanup}`
   );
 
   // ── 14) 六类拒绝（title 空 / kind 未知 / amount 0 /

@@ -62,3 +62,6 @@ _scratch/
 
 # 运行期错误日志（M10-a 备料一 · telemetry 落盘，见 AGENTS §9 唯一例外）
 /logs/
+
+# CodeGraph 本机代码索引（跨机器无意义；库与 daemon 文件由 .codegraph/.gitignore 二次兜底）
+/.codegraph/

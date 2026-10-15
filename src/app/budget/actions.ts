@@ -24,6 +24,7 @@ import {
 } from "@/modules/budget/server/changes";
 import {
   setChangeStatus,
+  revokeChangeConfirm,
   changeAttachmentFiles,
   saveChangeAttachments,
 } from "@/modules/budget/server/changes";
@@ -380,6 +381,27 @@ export async function changeStatusFormAction(formData: FormData) {
   const status = String(formData.get("status") ?? "") as "pending" | "client_confirmed" | "rejected";
   const note = String(formData.get("note") ?? "");
   const result = await setChangeStatusAction(projectId, changeId, status, note);
+  if (result.error) throw new Error(result.error);
+}
+
+/**
+ * 撤销确认（§4.6 补口）：把客户已确认的变更退回 pending，金额即时从经营口径摘出，留流水。
+ * 与 setChangeStatusAction 分开写，是为了让流水的 action 名能明确区分「提交确认」与「撤销确认」——
+ * 二者都落到 pending 态，但业务含义相反（一个是往口径里放钱的前一步，一个是把钱拿出来）。
+ */
+export async function revokeChangeConfirmAction(projectId: string, changeId: string) {
+  try {
+    await revokeChangeConfirm(changeId);
+    await recordOperation({ action: "change.revoke_confirm", entity: "changeOrder", entityId: changeId, projectId, summary: "撤销客户确认，该变更金额已即时从经营口径摘出并退回待确认", before: "client_confirmed", after: "pending" });
+    revalidatePath(`/budget/${projectId}/changes`); revalidatePath(`/budget/${projectId}`); revalidatePath(`/projects/${projectId}`);
+    return { ok: true } as ChangeFormState;
+  } catch (e) { if (e instanceof ChangeOrderError) return { error: e.message }; logAppError("[revokeChangeConfirmAction]", e); return { error: "操作失败，请稍后重试" }; }
+}
+
+export async function revokeChangeFormAction(formData: FormData) {
+  const projectId = String(formData.get("projectId") ?? "");
+  const changeId = String(formData.get("changeId") ?? "");
+  const result = await revokeChangeConfirmAction(projectId, changeId);
   if (result.error) throw new Error(result.error);
 }
 

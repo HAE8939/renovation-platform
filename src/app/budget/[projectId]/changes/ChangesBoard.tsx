@@ -17,6 +17,7 @@ import {
   type ChangeFormState,
 } from "@/app/budget/actions";
 import { changeStatusFormAction } from "@/app/budget/actions";
+import { revokeChangeFormAction } from "@/app/budget/actions";
 
 /** 仅日期（展示用）。 */
 function formatDate(d: Date | null): string {
@@ -196,16 +197,31 @@ function ChangeRow({
       <div className="flex shrink-0 items-center gap-2">
         {row.status === "draft" || row.status === "rejected" ? <form action={changeStatusFormAction}><input type="hidden" name="projectId" value={projectId} /><input type="hidden" name="changeId" value={row.id} /><input type="hidden" name="status" value="pending" /><Button size="sm" variant="ghost" type="submit">提交确认</Button></form> : null}
         {row.status === "pending" ? <><form action={changeStatusFormAction}><input type="hidden" name="projectId" value={projectId} /><input type="hidden" name="changeId" value={row.id} /><input type="hidden" name="status" value="client_confirmed" /><Button size="sm" type="submit">客户确认</Button></form><form action={changeStatusFormAction}><input type="hidden" name="projectId" value={projectId} /><input type="hidden" name="changeId" value={row.id} /><input type="hidden" name="status" value="rejected" /><Button size="sm" variant="danger" type="submit">驳回</Button></form></> : null}
-        <Button size="sm" variant="ghost" onClick={onEdit}>
-          编辑
-        </Button>
-        <DeleteInlineButton
-          projectId={projectId}
-          changeId={row.id}
-          confirming={confirming}
-          onRequestConfirm={() => setConfirming(true)}
-          onReset={() => setConfirming(false)}
-        />
+        {row.status === "client_confirmed" ? (
+          <>
+            {/* 已确认行不能直接编辑或删除（金额不得被无痕改写）；纠错走「撤销确认」：
+                退回待确认 → 即时从经营口径摘出 → 改 → 再确认。留流水可追溯（§4.6）。 */}
+            <span className="text-[12px] text-muted whitespace-nowrap">金额已计入</span>
+            <form action={revokeChangeFormAction}>
+              <input type="hidden" name="projectId" value={projectId} />
+              <input type="hidden" name="changeId" value={row.id} />
+              <Button size="sm" variant="ghost" type="submit">撤销确认</Button>
+            </form>
+          </>
+        ) : (
+          <>
+            <Button size="sm" variant="ghost" onClick={onEdit}>
+              编辑
+            </Button>
+            <DeleteInlineButton
+              projectId={projectId}
+              changeId={row.id}
+              confirming={confirming}
+              onRequestConfirm={() => setConfirming(true)}
+              onReset={() => setConfirming(false)}
+            />
+          </>
+        )}
       </div>
     </li>
   );
