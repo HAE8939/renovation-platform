@@ -5,6 +5,12 @@
 
 generator client {
   provider = "prisma-client-js"
+  // linux-arm64-openssl-3.0.x 是给 NAS（aarch64 + Debian）用的显式引擎目标。
+  // 不写它就得靠 Prisma 自己探测 OpenSSL 版本，而 node:22-slim 里既无 openssl CLI 也无
+  // libssl.so.*，探测失败会回落到 openssl-1.1 引擎 → 运行时 "libssl.so.1.1 not found"、
+  // 静态导出阶段 /_not-found 炸掉（NAS 实测）。native 保留给 Windows 本机开发。
+  // 前提是镜像里必须真的装上 openssl（见 Dockerfile），否则引擎下对了也加载不了。
+  binaryTargets = ["native", "linux-arm64-openssl-3.0.x"]
 }
 
 datasource db {

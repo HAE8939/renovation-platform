@@ -11,14 +11,19 @@
 # 两者任一未设置，Caddy 启动即失败——这是有意的 fail-fast，
 # 避免「忘了配口令＝全站敞开」变成静默的默认态。
 #
-# 需要每人独立身份（流水才能区分到人）时，把下面 basic_auth 那一行改成块形式：
+# 需要每人独立身份（流水才能区分到人）时，在下面的块里每人加一行即可：
 #   basic_auth {
 #       zhang  $2a$14$....
 #       li     $2a$14$....
 #   }
 
 :80 {
-	basic_auth {$CADDY_USER} {$CADDY_HASH}
+	# 必须用块形式。写成 `basic_auth {$CADDY_USER} {$CADDY_HASH}` 这种行内两参数时，
+	# Caddy 会把第一个 token 当成哈希算法名，报
+	# "unrecognized hash algorithm: admin" 并进入重启循环（NAS 实测）。
+	basic_auth {
+		{$CADDY_USER} {$CADDY_HASH}
+	}
 
 	# header_up 是 Set 语义（覆盖而非追加），客户端自带的 x-platform-user 到这里会被替换，
 	# 因此身份不可伪造。应用层闸（src/middleware.ts）只认这个头。

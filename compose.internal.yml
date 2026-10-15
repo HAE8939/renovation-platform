@@ -36,8 +36,9 @@ services:
       app:
         condition: service_healthy
     ports:
-      # 员工访问入口。需要标准 80 端口时改成 "80:80"（并确认宿主无占用）。
-      - "8080:80"
+      # 对外入口端口，经 .env 的 CADDY_PORT 覆盖（NAS 上 3000/3001/8080/8088 常被占用，
+      # 默认 8080 只是通用缺省值，别在仓库里为某台机器改死）。
+      - "${CADDY_PORT:-8080}:80"
     environment:
       # 口令哈希不入库：写在同目录 .env（已 gitignore）或部署环境里。
       # 缺任一项则 Caddy 启动失败——有意 fail-fast，避免"忘了配口令＝全站敞开"。
