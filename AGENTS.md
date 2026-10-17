@@ -246,6 +246,8 @@ export interface ModuleManifest {
 
 首次在这台机器上部署连续失败四轮，七个根因**全部是 x64/Windows 本机照不出来的**（本机 913 项门禁与 build 全绿照样通过）：pnpm 11 要 Node 22 的 `node:sqlite`、arm64 的 Prisma OpenSSL 引擎选择、构建期必须先有表、`.env` 里的 bcrypt 哈希不能被 shell `source`、Caddyfile 的 `basic_auth` 必须用块形式、`docker run` 不会自动注册 compose 式网络别名。逐条记录在 `docs/INTERNAL_DOCKER_RUNBOOK.md` 与 commit `ed8c151`，改 Dockerfile / Caddyfile / 部署脚本前先读，别凭本机经验推断。
 
+**要亲手把一次提交部署上 NAS，照 `docs/NAS_DEPLOY_PLAYBOOK.md` 执行**（AI 操作者 playbook，含 SSH 登录、凭据位置、命令块、验收、回退）。两条最易踩的新坑先记住：① NAS 上 `/opt/renovation-platform` **不是 git 仓库**（整包放的），**不能 `git pull`**，只能用 `git archive` 铺文件；② Windows 宿主 `git core.autocrlf=true` 会让 `git archive` 把 `nas-deploy.sh`/`Dockerfile`/`Caddyfile` 的 LF 转成 **CRLF**，落地后 `sh` 报 `set: Illegal option -`、`docker build` 的 `RUN` 吃行尾 `\r` 失败——**必须 `git -c core.autocrlf=false -c core.eol=lf archive` 且落地后 `tr -d '\r'` 校验 CR=0 才 build**。凭据（NAS SSH 用户/密码）明文只存 gitignore 排除的 `_scratch/deploy/`，绝不进仓库/镜像/聊天。
+
 ## 8. 交付默认与协作
 
 - 参考实现（**只作领域参考，禁止照抄数据/UI/文案**）：`docs/reference/renovation-budget-reference.html`。用来理解"装修预算报价"有哪些要素（科目/项目字段/SOP/材料/计算/打印）；界面与数据须原创、须遵循 §6 设计系统、须是 DB 驱动而非 localStorage。
