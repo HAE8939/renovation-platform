@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import Image from "next/image";
 import { Card } from "@/core/ui";
 
 /**
@@ -18,16 +19,29 @@ export function DocsPage({
   eyebrow,
   title,
   lead,
+  hero,
   children,
 }: {
   eyebrow: string;
   title: string;
   lead: string;
+  /** 可选头图：只用于个别需要气质铺垫的页面（当前仅总览）。展示用插画，不承载信息。 */
+  hero?: { src: string; alt: string; width: number; height: number };
   children: ReactNode;
 }) {
   return (
     <article className="flex flex-col gap-24">
       <header className="border-b border-line pb-8">
+        {hero && (
+          <Image
+            src={hero.src}
+            alt={hero.alt}
+            width={hero.width}
+            height={hero.height}
+            priority
+            className="mb-8 h-auto w-full rounded-card border border-line"
+          />
+        )}
         <p className="text-xs font-medium uppercase tracking-[0.14em] text-accent-ink">{eyebrow}</p>
         <h1 className={`mt-3 text-[28px] font-semibold leading-[1.3] ${BODY_W}`}>{title}</h1>
         <p className={`mt-4 ${BODY_W} text-[15px] leading-relaxed text-secondary`}>{lead}</p>

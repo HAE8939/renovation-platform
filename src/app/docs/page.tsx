@@ -6,6 +6,12 @@ export default function DocsOverview() {
     <DocsPage
       eyebrow="平台说明 · 总览"
       title="装修经营全流程数字化管理平台"
+      hero={{
+        src: "/docs-overview-hero.jpg",
+        alt: "住宅剖面线稿与装修图纸的插画：米纸底、细墨线、钴蓝单点色",
+        width: 2138,
+        height: 735,
+      }}
       lead="面向中小型装修公司经营全流程的模块化单体平台：一个代码仓库、一套平台外壳、一份共享主数据、九个可插拔功能区。它替代的不是某个软件，而是「Excel 报价单 + 微信群里的现场照片 + 口头汇报的进度 + 月底对不上的账」这套组合。"
     >
       <DocsSection title="主脊链路" desc="平台的主脊已经打通并真实联动，一次签约即驱动后续全链：">
