@@ -1,0 +1,6 @@
+# 根治 Windows 宿主 core.autocrlf=true 把部署关键文件带 CRLF 的问题：
+# 一旦 CRLF 落到 NAS，sh 报 `set: Illegal option -`、`docker build` 的 RUN 吃行尾 \r 直接失败。
+# 详见 docs/NAS_DEPLOY_PLAYBOOK.md §4 / §7。仅锁这三类，不对全仓 renormalize。
+*.sh        text eol=lf
+Dockerfile  text eol=lf
+Caddyfile   text eol=lf
