@@ -48,7 +48,7 @@ export default function DocsOverview() {
       <DocsSection title="当前形态与边界" desc="一条在所有对外材料里都应保留的事实：">
         <Note tone="warning">
           当前形态是 <strong className="font-medium text-primary">免登录单用户内测</strong>，部署在公司内网 / NAS 的 Docker 环境，
-          经反向代理口令入口访问——不是多员工并发的生产环境，也不是公网服务。数据表与 11 个业务角色常量已预留，
+          仅内网可达、未开放公网——不是多员工并发的生产环境。数据表与 11 个业务角色常量已预留，
           但权限收敛排在登录批次，现阶段「角色」是数据字段与看板视角，<strong className="font-medium text-primary">不是安全边界</strong>。
         </Note>
       </DocsSection>
@@ -56,7 +56,10 @@ export default function DocsOverview() {
       <DocsSection title="怎么读这套文档">
         <Prose>
           <p>
-            左侧目录按「先为什么、再是什么、后怎么用」的顺序排列。想了解平台解决什么问题看
+            第一次上手或教同事用平台，从
+            <Link href="/docs/quickstart" className="mx-1 text-accent-ink hover:underline">快速上手</Link>与
+            <Link href="/docs/manual" className="mx-1 text-accent-ink hover:underline">模块操作手册</Link>开始——前者按一单生意的时间顺序走主线，后者按模块查操作与边界。
+            想了解平台解决什么问题看
             <Link href="/docs/background" className="mx-1 text-accent-ink hover:underline">建设背景</Link>；
             关心技术与质量看
             <Link href="/docs/architecture" className="mx-1 text-accent-ink hover:underline">整体架构</Link>；
@@ -66,7 +69,7 @@ export default function DocsOverview() {
             被追问局限时，
             <Link href="/docs/notes" className="mx-1 text-accent-ink hover:underline">事实与边界</Link> 一节可直接照答。
           </p>
-          <Muted>本文档所有能力描述以仓库当前代码为准（M1–M14 已合入并通过构建、类型、迁移与种子回归），未实现的能力一律不写成已有功能。</Muted>
+          <Muted>本文档所有能力描述以仓库当前代码为准（M1–M15 已合入并通过构建、类型、迁移与种子回归），未实现的能力一律不写成已有功能。</Muted>
         </Prose>
       </DocsSection>
     </DocsPage>

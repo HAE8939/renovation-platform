@@ -39,7 +39,7 @@ export default function DocsRoadmap() {
       <DocsSection title="基础设施">
         <Prose>
           <p>
-            <strong className="font-medium text-primary">内测部署（已跑通）：</strong>极空间 NAS 局域网 Docker（aarch64），单 Web 容器 + 反向代理口令，保持 SQLite，暂不开放公网。
+            <strong className="font-medium text-primary">内测部署（已跑通）：</strong>极空间 NAS 局域网 Docker（aarch64），单 Web 容器，保持 SQLite，暂不开放公网。
             部署三件配置在仓库根：<Code>Dockerfile</Code>、<Code>compose.internal.yml</Code>、<Code>Caddyfile</Code>。
           </p>
           <p className="mt-4">
