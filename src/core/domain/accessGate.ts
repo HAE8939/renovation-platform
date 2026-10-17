@@ -31,6 +31,8 @@ export function gateEnabled(): boolean {
  * 只挑 /hr 与 /finance 上闸会给人虚假的安全感。
  */
 export function isPublicPath(pathname: string): boolean {
+  // /about 是公开「门面页」：只放不敏感的定位介绍 + 指向 /docs。完整文档站 /docs/* 含内部经营口径，
+  // 刻意不进白名单 → 随全站受口令保护。/docs 不公开，故 /about 也不直连 /docs 的正文，只做引路。
   if (pathname === "/" || pathname === "/about") return true;
   // 错误上报必须可达，否则 app/error.tsx 的 digest 反查链路会被自己的闸掐断
   if (pathname.startsWith("/api/client-errors")) return true;

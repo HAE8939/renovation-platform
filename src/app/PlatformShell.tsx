@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 import { Nav, Topbar } from "@/core/ui";
 import { PLATFORM } from "@/core/platform";
 import { modules } from "@/modules/registry";
+import { DocsNav } from "./docs/DocsNav";
+import { isDocsPath } from "./docs/docsToc";
 
 /**
  * 平台外壳的路径感知层。
@@ -20,6 +22,8 @@ export function PlatformShell({
 }) {
   const pathname = usePathname() ?? "/";
   const isHome = pathname === "/";
+  // 文档站：左侧栏由业务模块导航换成「说明目录」，文档区只留一套导航（与首页隐藏侧栏同构）。
+  const isDocs = isDocsPath(pathname);
 
   return (
     <div className="flex min-h-screen flex-col bg-canvas md:flex-row">
@@ -49,9 +53,7 @@ export function PlatformShell({
           <p className="mt-1 text-xs leading-relaxed text-secondary">{PLATFORM.tagline}</p>
         </Link>
 
-        <div className="py-2">
-          <Nav modules={modules} />
-        </div>
+        <div className="py-2">{isDocs ? <DocsNav /> : <Nav modules={modules} />}</div>
 
         <div className="mt-auto border-t border-line px-6 py-4">
           <p className="text-xs leading-relaxed text-muted">{PLATFORM.status}</p>
@@ -60,7 +62,7 @@ export function PlatformShell({
 
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar modules={modules} />
-        {!isHome && <Nav modules={modules} compact />}
+        {!isHome && (isDocs ? <DocsNav compact /> : <Nav modules={modules} compact />)}
 
         <main className="min-w-0 flex-1">
           <div
@@ -73,7 +75,9 @@ export function PlatformShell({
         </main>
 
         <footer className="border-t border-line px-4 py-4 sm:px-6">
-          <p className="text-xs text-muted">平台外壳由模块注册表驱动 · 当前已注册模块 {modules.length} 个</p>
+          <p className="text-xs text-muted">
+            {isDocs ? "文档站目录由单一真源驱动" : `平台外壳由模块注册表驱动 · 当前已注册模块 ${modules.length} 个`}
+          </p>
         </footer>
       </div>
     </div>

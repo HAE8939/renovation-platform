@@ -54,21 +54,11 @@ await withPlatform("s10-splash", 9370, async ({ br, db, rep, go, shot, srv }) =>
     await go("/");
     await br.settle(2400);
     await br.evaluate(`window.__A.clickS ? true : true`);
-    // 「平台说明」现阶段不挂链接：点开只给就地说明，不跳转、不出 404
-    const urlBefore = await br.url();
-    await br.clickText("平台说明");
-    await br.settle(500);
-    rep.eq(await br.url(), urlBefore, "UI", "点「平台说明」不跳转（详情页后期再做）");
-    rep.assert(await br.hasText("尚未上线"), "UI", "给了诚实的就地说明而不是死按钮");
-    rep.assert(await br.hasText("splash") || true, "UI", "首屏仍在（说明展开不收起）");
-    await br.clickText("平台说明");
-    await br.settle(300);
-    rep.assert(!(await br.hasText("尚未上线")), "UI", "再点一次可收起说明");
-
+    // 「平台说明」CTA 现挂真链接（见文末 SP3b）；这里不点它，避免导航离开首页打断「三种收起」。
     await br.clickText("进入平台");
     await br.settle(900);
     rep.eq(await br.evaluate(`!!document.querySelector('.splash')`), false, "UI", "点「进入平台」后首屏移除");
-    rep.assert(await br.hasText("已上线模块"), "UI", "收起后是原来的模块索引页（功能未丢）");
+    rep.assert(await br.hasText("选择一个工作入口"), "UI", "收起后是原来的模块索引页（功能未丢）");
     rep.assert(await br.hasText("数据驾驶舱"), "UI", "模块清单完整（首个模块在列）");
     const bodyOverflow = await br.evaluate(`document.body.style.overflow`);
     rep.assert(bodyOverflow !== "hidden", "UI", "收起后页面滚动锁已释放", `overflow=${bodyOverflow || "(空)"}`);
@@ -84,6 +74,16 @@ await withPlatform("s10-splash", 9370, async ({ br, db, rep, go, shot, srv }) =>
     await br.evaluate(`window.dispatchEvent(new WheelEvent('wheel',{deltaY:120}))`);
     await br.settle(800);
     rep.eq(await br.evaluate(`!!document.querySelector('.splash')`), false, "UI", "滚轮也能收起");
+  });
+
+  await rep.scenario("SP3b 平台说明 CTA 跳文档站总览", async () => {
+    await go("/");
+    await br.settle(2400);
+    // 内测台闸默认关 → /docs 可达；线上 /docs 含内部口径，须经反向代理口令入口（AGENTS §7.1）。
+    await br.clickText("平台说明");
+    await br.settle(900);
+    rep.assert((await br.url()).includes("/docs"), "UI", "点「平台说明」跳转到文档站 /docs", await br.url());
+    rep.assert(await br.hasText("装修经营全流程数字化管理平台"), "UI", "/docs 总览页正常渲染，不是 404");
   });
 
   await rep.scenario("SP4 模块数从 registry 取，不写死", async () => {

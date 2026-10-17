@@ -106,7 +106,7 @@ export function HeroSplash({ moduleNameCount }: { moduleNameCount: number }) {
           进入平台
           <span aria-hidden>↗</span>
         </button>
-        <Link href="/about" className="splash-ghost">
+        <Link href="/docs" className="splash-ghost">
           平台说明
           <span aria-hidden>↗</span>
         </Link>
