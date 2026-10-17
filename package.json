@@ -12,6 +12,7 @@
     "db:migrate": "prisma migrate dev",
     "db:seed": "prisma db seed",
     "db:bootstrap": "node prisma/bootstrap.mjs",
+    "db:seed:templates": "node prisma/seed-templates.mjs",
     "db:studio": "prisma studio",
     "verify": "node scripts/run-gates.mjs",
     "verify:integration": "node scripts/run-gates.mjs --integration"

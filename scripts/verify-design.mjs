@@ -26,6 +26,8 @@ const {
   DESIGN_TASK_STATUS_LABEL,
   canReview,
   canSubmit,
+  canAssign,
+  statusAfterAssign,
   nextStatusAfterReview,
   assertReviewTransition,
 } = status;
@@ -245,6 +247,22 @@ const oracleAvgReworkRounds = (tasks) => {
   }
   check("独立预言机：reworkRate 与实现一致（7 组用例）", allMatchRate);
   check("独立预言机：avgReworkRounds 与实现一致（7 组用例）", allMatchRounds);
+}
+
+// ── canAssign（M5-e 指派门控）───────────────────────────────────
+{
+  check("canAssign: pending → true（待分配可指派）", canAssign("pending") === true);
+  check("canAssign: assigned → true（可改派）", canAssign("assigned") === true);
+  check("canAssign: revisions → true（返修可改派）", canAssign("revisions") === true);
+  check("canAssign: submitted → false（已提交待审不可指派）", canAssign("submitted") === false);
+  check("canAssign: approved → false（收尾态不可指派）", canAssign("approved") === false);
+}
+
+// ── statusAfterAssign（指派后状态：仅待分配推进，其余保持原态）──────
+{
+  check("statusAfterAssign: pending → assigned", statusAfterAssign("pending") === "assigned");
+  check("statusAfterAssign: assigned → assigned（改派不重置态）", statusAfterAssign("assigned") === "assigned");
+  check("statusAfterAssign: revisions → revisions（改派不改结论）", statusAfterAssign("revisions") === "revisions");
 }
 
 // ── 输出禁 emoji 自检（与 verify-crm / verify-health 同一纪律）────

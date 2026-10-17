@@ -14,8 +14,10 @@ import {
   listDesignTasksForCalendar,
   type DesignTaskListItem,
 } from "@/modules/design/server/tasks";
+import { listDesignFormOptions } from "@/modules/design/server/create";
 import { parseMonthParam } from "@/modules/design/calendar";
 import { DesignCalendar } from "./DesignCalendar";
+import { NewTaskModal } from "./NewTaskModal";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "设计管理" };
@@ -180,11 +182,12 @@ export default async function DesignBoardPage({
 
   // 看板视图（默认）：按状态分列推进，逾期标红。
   // 统计与看板分两次取数：统计永远看全量（任务池口径），看板按当前视角过滤。
-  const [allTasks, tasks, totalCount, placeholder] = await Promise.all([
+  const [allTasks, tasks, totalCount, placeholder, options] = await Promise.all([
     listDesignTasks({ scope: "all" }),
     listDesignTasks({ scope }),
     getDesignTaskCount(),
     getPlaceholderUser(),
+    listDesignFormOptions(),
   ]);
   const reviewCount = allTasks.filter((t) => t.status === "submitted").length;
   const overdueCount = allTasks.filter((t) => isOverdue(t.deadline, t.status, now)).length;
@@ -209,6 +212,7 @@ export default async function DesignBoardPage({
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
+            <NewTaskModal projects={options.projects} users={options.users} />
             <ScopeToggle scope={scope} />
             <ViewModeToggle view={view} scope={scope} />
           </div>
@@ -261,7 +265,7 @@ export default async function DesignBoardPage({
             <p className="mt-2 text-[13px] leading-relaxed text-secondary">
               {scope === "mine"
                 ? "该用户名下没有指派的设计任务；切换「设计任务池」可查看全部任务。"
-                : "设计任务在项目详情或签约后创建；录入任务后将在此按状态分列展示。"}
+                : "点击右上角「+ 新建任务」创建设计任务；录入后将在此按状态分列展示。"}
             </p>
             {scope === "mine" && (
               <Link

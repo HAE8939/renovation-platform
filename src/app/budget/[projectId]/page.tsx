@@ -41,8 +41,12 @@ export default async function BudgetDetailPage({ params }: PageProps) {
       endDate: detail.endDate ? detail.endDate.toLocaleDateString("zh-CN") : null,
     },
     taxRate: detail.taxRate,
+    quoteStatus: detail.quoteStatus,
     quoteStatusLabel:
       QUOTE_STATUS_LABEL[detail.quoteStatus as QuoteStatus] ?? detail.quoteStatus,
+    quoteLockedAt: detail.quoteLockedAt
+      ? detail.quoteLockedAt.toLocaleDateString("zh-CN")
+      : null,
     items: detail.items,
     picker,
   };

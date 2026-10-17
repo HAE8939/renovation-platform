@@ -83,6 +83,26 @@ export function submissionResultTone(result: string): StatusBadgeTone {
 }
 
 /**
+ * 指派门控（M5-e 新建与指派入口）：待分配 / 进行中 / 待返修 可被指派或改派；
+ * submitted（已提交待审）与 approved（收尾）不开放——指派语义只覆盖「执行前/执行中」，
+ * 已提交成果再改派会把负责人和版本历史对不齐（与 canSubmit 同源排除收尾态的思路）。
+ * 返回 false 时服务层抛中文错，页面据此决定显隐，不硬编码状态字面量。
+ */
+const ASSIGNABLE_STATUSES = new Set<string>(["pending", "assigned", "revisions"]);
+
+export function canAssign(status: string): boolean {
+  return ASSIGNABLE_STATUSES.has(status);
+}
+
+/**
+ * 指派后的状态：只有「待分配（pending）」会因指派而推进为「进行中（assigned）」；
+ * 已在执行/返修的改派保持原态（不改历史结论，与「改派不重置进度」同义）。
+ */
+export function statusAfterAssign(status: string): DesignTaskStatus {
+  return status === "pending" ? "assigned" : (status as DesignTaskStatus);
+}
+
+/**
  * 审核谓词（M5-c）：仅「待审核（submitted）」态可执行审核。
  * approved 是收尾态、revisions 需重新提交后才能再审、pending/assigned 尚未提交。
  */

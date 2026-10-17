@@ -5,6 +5,13 @@ import type { QuoteItemRow } from "@/modules/budget/types";
 import { createProject, updateProject, ValidationError } from "@/core/domain/projects";
 import { saveQuoteItems, type QuoteItemPayload } from "@/modules/budget/server/quote";
 import {
+  QuoteStatusError,
+  setQuoteStatus,
+  updateQuoteTaxRate,
+} from "@/modules/budget/server/quote";
+import { QUOTE_STATUS_LABEL } from "@/core/domain/types";
+import type { QuoteStatus } from "@/core/domain/types";
+import {
   createCategory,
   createItem,
   deleteCategory,
@@ -353,6 +360,74 @@ export async function saveQuoteItemsAction(
     if (e instanceof ValidationError) return { ok: false, error: e.message };
     logAppError("[saveQuoteItemsAction]", e);
     return { ok: false, error: "保存失败，请稍后重试" };
+  }
+}
+
+/* ── 报价状态与税率（M15 断点③：接通写入路径）─────────────────────
+   状态推进（确认/退回/锁定）+ 税率编辑（0–1，如 3% 传 0.03）。
+   两者都仅 draft 可编辑（confirmed/locked 由服务层拒）；locked 首次进入才写 lockedAt。
+   revalidatePath 三处：报价单页 + 项目中心 + 预算列表（徽章 / 明细计数 / 汇总都吃 status）。
+   ── */
+
+export interface QuoteStatusState {
+  ok: boolean;
+  error?: string;
+}
+
+export async function setQuoteStatusAction(
+  projectId: string,
+  next: "draft" | "confirmed" | "locked"
+): Promise<QuoteStatusState> {
+  try {
+    const before = await prisma.budgetQuote.findUnique({
+      where: { projectId },
+      select: { status: true },
+    });
+    const res = await setQuoteStatus(projectId, next);
+    const beforeLabel = QUOTE_STATUS_LABEL[before?.status as QuoteStatus] ?? before?.status ?? "（无）";
+    const afterLabel = QUOTE_STATUS_LABEL[next as QuoteStatus] ?? next;
+    await recordOperation({
+      action: `quote.${next === "confirmed" ? "confirm" : next === "locked" ? "lock" : "reopen"}`,
+      entity: "quote",
+      projectId,
+      summary: `报价状态：${beforeLabel} → ${afterLabel}`,
+      before: res.before,
+      after: res.after,
+    });
+    revalidatePath("/budget");
+    revalidatePath(`/budget/${projectId}`);
+    revalidatePath(`/projects/${projectId}`);
+    return { ok: true };
+  } catch (e) {
+    if (e instanceof QuoteStatusError || e instanceof ValidationError) return { ok: false, error: e.message };
+    logAppError("[setQuoteStatusAction]", e);
+    return { ok: false, error: "状态更新失败，请稍后重试" };
+  }
+}
+
+export async function updateQuoteTaxRateAction(
+  projectId: string,
+  taxRate: number
+): Promise<QuoteStatusState & { taxRate?: number }> {
+  try {
+    const res = await updateQuoteTaxRate(projectId, taxRate);
+    const pct = (n: number) => `${Math.round(n * 10000) / 100}%`;
+    await recordOperation({
+      action: "quote.taxRate",
+      entity: "quote",
+      projectId,
+      summary: `改税率：${pct(res.before)} → ${pct(res.after)}`,
+      before: pct(res.before),
+      after: pct(res.after),
+    });
+    revalidatePath("/budget");
+    revalidatePath(`/budget/${projectId}`);
+    revalidatePath(`/projects/${projectId}`);
+    return { ok: true, taxRate: res.after };
+  } catch (e) {
+    if (e instanceof QuoteStatusError || e instanceof ValidationError) return { ok: false, error: e.message };
+    logAppError("[updateQuoteTaxRateAction]", e);
+    return { ok: false, error: "税率更新失败，请稍后重试" };
   }
 }
 

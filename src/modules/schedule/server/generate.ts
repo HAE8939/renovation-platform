@@ -1,5 +1,6 @@
 import prisma from "@/core/db";
 import { areaTier, buildSchedule, chainEdges } from "../plan";
+import { syncProjectActualEnd } from "@/core/domain/projectCompletion";
 
 /**
  * 排程生成 / 清空服务（M6-b）。
@@ -95,6 +96,8 @@ export async function generateSchedule(projectId: string): Promise<void> {
     if (depRows.length > 0) {
       await tx.scheduleTaskDependency.createMany({ data: depRows });
     }
+    // 新生成全是 pending → 项目未完工，actualEndDate 归 null（幂等，见 projectCompletion）。
+    await syncProjectActualEnd(projectId, tx);
   });
 }
 
@@ -105,5 +108,7 @@ export async function generateSchedule(projectId: string): Promise<void> {
 export async function clearSchedule(projectId: string): Promise<void> {
   return prisma.$transaction(async (tx) => {
     await tx.scheduleTask.deleteMany({ where: { projectId } });
+    // 清空后无工序 = 项目未完工：实际完工日复位 null（否则工期红灯/保修金会吃一个已失效的旧完工日）。
+    await syncProjectActualEnd(projectId, tx);
   });
 }

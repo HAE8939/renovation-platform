@@ -240,6 +240,40 @@ async function main() {
   }
   chk("模板行不存在被拒", tplErr2.includes("不存在"), tplErr2);
 
+  // ── 7) M15 断点④：实际完工日自动回填（全工序 completed → Project.actualEndDate）──────
+  // 用 004 独立验证：先生成排程（11 工序全 pending、项目 actualEndDate=null），逐条推到 100，
+  // 断言项目实际完工日被回写 = 各工序 actualEnd 最大值；再把一条回落，断言重新变 null。
+  await generateSchedule(p4.id);
+  const p4before = await prisma.project.findUnique({ where: { id: p4.id }, select: { actualEndDate: true } });
+  chk("回填前置：004 排程后未全完工 → actualEndDate=null", !p4before?.actualEndDate);
+
+  const p4Tasks = await prisma.scheduleTask.findMany({ where: { projectId: p4.id }, orderBy: { order: "asc" } });
+  for (const t of p4Tasks) {
+    // 每条推进时 today 略不同（用同一 now 保证 actualEnd 可比；用当前时刻即可）
+    await updateTaskProgress(t.id, 100);
+  }
+  const p4TasksAfter = await prisma.scheduleTask.findMany({ where: { projectId: p4.id }, select: { actualEnd: true, status: true } });
+  const maxEnd = p4TasksAfter.reduce<Date | null>(
+    (m, t) => (t.actualEnd && (!m || t.actualEnd.getTime() > m.getTime()) ? t.actualEnd : m),
+    null
+  );
+  const p4after = await prisma.project.findUnique({ where: { id: p4.id }, select: { actualEndDate: true } });
+  chk(
+    "全工序 completed → Project.actualEndDate 回填 = 各 actualEnd 最大值",
+    !!p4after?.actualEndDate && !!maxEnd && p4after.actualEndDate.getTime() === maxEnd.getTime(),
+    `project=${p4after?.actualEndDate?.toISOString()} max=${maxEnd?.toISOString()}`
+  );
+
+  // 回落一条 → 项目未完工 → actualEndDate 复位 null（与"全完工才回填"对称）
+  await updateTaskProgress(p4Tasks[0].id, 50);
+  const p4reverted = await prisma.project.findUnique({ where: { id: p4.id }, select: { actualEndDate: true } });
+  chk("回落一条工序 → Project.actualEndDate 复位 null", !p4reverted?.actualEndDate);
+
+  // 旁证：迁移回填只补 NULL、不覆盖已有值——001 在 seed 期已定态（in_progress、非全完工），
+  // 全程未被本测试改写其 actualEndDate；此处仅断言它仍是 null（未被误填）。
+  const p1untouched = await prisma.project.findUnique({ where: { id: p1.id }, select: { actualEndDate: true } });
+  chk("旁证：001（非全完工）actualEndDate 仍 null（回填只补空不猜）", !p1untouched?.actualEndDate);
+
   const failed = results.filter((r) => !r.ok).length;
   console.log(`\n${failed === 0 ? "全部通过" : `失败 ${failed} 项`} · 共 ${results.length} 项检查\n`);
   process.exit(failed === 0 ? 0 : 1);

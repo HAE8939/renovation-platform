@@ -38,6 +38,12 @@ const {
   applyProgressUpdate,
 } = status;
 
+// M15 断点④：项目完工日派生已上收 core/domain/health.ts（跨模块共享 + core 不反向依赖模块）。
+const health = await import(
+  pathToFileURL(join(ROOT, "src/core/domain/health.ts")).href
+);
+const { computeProjectActualEnd } = health;
+
 const results = [];
 let failed = 0;
 function check(name, ok, detail = "") {
@@ -439,6 +445,90 @@ const tierSum = (tier) =>
   check("statusBadgeTone: in_progress → accent", statusBadgeTone("in_progress") === "accent");
   check("statusBadgeTone: completed → success", statusBadgeTone("completed") === "success");
   check("statusBadgeTone: 未知 → neutral", statusBadgeTone("xx") === "neutral");
+}
+
+// ── 项目实际完工日推算（M15 断点④，与 updateTaskProgress 同事务回写 Project.actualEndDate）
+{
+  const D = (iso) => new Date(iso);
+  const cmp = (got, want, name) => {
+    const ok =
+      (got === null && want === null) ||
+      (got !== null && want !== null && got.getTime() === want.getTime());
+    check(name, ok, `got=${got ? got.toISOString() : "null"} want=${want ? want.toISOString() : "null"}`);
+  };
+
+  // 全 completed，取最大 actualEnd（乱序给入仍取最大）
+  cmp(
+    computeProjectActualEnd([
+      { status: "completed", actualEnd: D("2026-11-01T00:00:00.000Z") },
+      { status: "completed", actualEnd: D("2026-12-15T00:00:00.000Z") },
+      { status: "completed", actualEnd: D("2026-11-20T00:00:00.000Z") },
+    ]),
+    D("2026-12-15T00:00:00.000Z"),
+    "computeProjectActualEnd: 全完工取最大 actualEnd（乱序）"
+  );
+
+  // 任一 pending/in_progress → null（未完工不猜）
+  cmp(
+    computeProjectActualEnd([
+      { status: "completed", actualEnd: D("2026-11-01T00:00:00.000Z") },
+      { status: "in_progress", actualEnd: null },
+    ]),
+    null,
+    "computeProjectActualEnd: 有 in_progress → null"
+  );
+  cmp(
+    computeProjectActualEnd([
+      { status: "completed", actualEnd: D("2026-11-01T00:00:00.000Z") },
+      { status: "pending", actualEnd: null },
+    ]),
+    null,
+    "computeProjectActualEnd: 有 pending → null"
+  );
+
+  // 全 completed 但某条缺 actualEnd（数据不自洽）→ null（宁缺毋滥）
+  cmp(
+    computeProjectActualEnd([
+      { status: "completed", actualEnd: D("2026-11-01T00:00:00.000Z") },
+      { status: "completed", actualEnd: null },
+    ]),
+    null,
+    "computeProjectActualEnd: completed 缺 actualEnd → null（不猜）"
+  );
+
+  // 空工序数组 → null
+  cmp(computeProjectActualEnd([]), null, "computeProjectActualEnd: 无工序 → null");
+
+  // 传 ISO 字符串也支持（prisma 返回 Date，但纯函数入口容错以便门禁与页面复用）
+  cmp(
+    computeProjectActualEnd([
+      { status: "completed", actualEnd: "2026-11-01T00:00:00.000Z" },
+      { status: "completed", actualEnd: "2026-12-01T00:00:00.000Z" },
+    ]),
+    D("2026-12-01T00:00:00.000Z"),
+    "computeProjectActualEnd: 接受 ISO 字符串 actualEnd"
+  );
+
+  // 与既有 scheduleLight 联动的关键 case：actualEndDate > endDate → red（回归锁）
+  const { scheduleLight } = health;
+  const red = scheduleLight(
+    {
+      endDate: D("2026-11-30T00:00:00.000Z"),
+      actualEndDate: D("2026-12-15T00:00:00.000Z"),
+      progress: 100,
+    },
+    D("2027-01-01T00:00:00.000Z")
+  );
+  check("联动：actualEnd>planEnd 且已回填 → scheduleLight=red", red === "red", red);
+  const notRed = scheduleLight(
+    {
+      endDate: D("2026-11-30T00:00:00.000Z"),
+      actualEndDate: null, // 未回填 → 走原有降级（不因新逻辑回归变红）
+      progress: 100,
+    },
+    D("2027-01-01T00:00:00.000Z")
+  );
+  check("联动：actualEnd=null（未完工/未回填） → scheduleLight 不误判红", notRed === "green", notRed);
 }
 
 // ── 输出禁 emoji 自检（与 verify-design / verify-crm 同一纪律）────

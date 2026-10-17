@@ -98,6 +98,7 @@ export interface ProjectDetail {
   contractAmount: number;
   taxRate: number;
   quoteStatus: string;
+  quoteLockedAt: Date | null;
   items: QuoteItemRow[];
 }
 
@@ -152,6 +153,7 @@ export async function getProjectDetail(projectId: string): Promise<ProjectDetail
     contractAmount: project.contractAmount,
     taxRate: quote?.taxRate ?? 0.03,
     quoteStatus: quote?.status ?? "draft",
+    quoteLockedAt: quote?.lockedAt ?? null,
     items,
   };
 }

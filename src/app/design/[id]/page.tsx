@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Badge } from "@/core/ui";
 import { getPlaceholderUser } from "@/modules/design/currentUser";
 import {
+  canAssign,
   canReview,
   canSubmit,
   DESIGN_TASK_STATUS_LABEL,
@@ -16,8 +17,10 @@ import {
   getTaskDetail,
   type TaskSubmissionItem,
 } from "@/modules/design/server/submissions";
+import { listDesignFormOptions } from "@/modules/design/server/create";
 import { SubmitTaskForm } from "./SubmitTaskForm";
 import { ReviewForm } from "./ReviewForm";
+import { AssignTaskForm } from "../AssignTaskForm";
 
 export const dynamic = "force-dynamic";
 
@@ -112,9 +115,10 @@ export default async function DesignTaskDetailPage({
 }: {
   params: { id: string };
 }) {
-  const [task, placeholder] = await Promise.all([
+  const [task, placeholder, options] = await Promise.all([
     getTaskDetail(params.id),
     getPlaceholderUser(),
+    listDesignFormOptions(),
   ]);
   if (!task) notFound();
 
@@ -206,6 +210,25 @@ export default async function DesignTaskDetailPage({
           </>
         )}
       </section>
+
+      {/* 指派 / 改派：仅 canAssign 状态出现（待分配 / 进行中 / 待返修），门控走纯函数不硬编码。 */}
+      {canAssign(task.status) && (
+        <section className="rounded-card border border-line bg-surface p-6">
+          <h2 className="text-[15px] font-semibold">
+            {task.assigneeId ? "改派负责人" : "指派负责人"}
+          </h2>
+          <p className="mt-2 text-[13px] text-secondary">
+            当前负责人：
+            <span className="text-primary">{task.assigneeName ?? "待分配"}</span>
+            。指派后「待分配」任务即进入「进行中」。
+          </p>
+          <AssignTaskForm
+            taskId={task.id}
+            currentAssigneeId={task.assigneeId}
+            users={options.users}
+          />
+        </section>
+      )}
 
       {/* 提交成果：仅可提交状态显示（canSubmit 谓词门控，不在页面硬编码状态） */}
       {canSubmit(task.status) ? (

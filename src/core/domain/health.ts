@@ -45,6 +45,28 @@ export function scheduleLight(
   return "green";
 }
 
+/**
+ * 从工序推算项目「实际完工日」（M15 · 断点④，与 scheduleLight 同族派生）。
+ * 语义：项目**只有全部工序 completed 才算真完工**，完工日 = 各工序 actualEnd 的最大值。
+ * 未完工 / 无工序 / 已完工工序缺 actualEnd → 返回 null（数据不自洽宁缺毋滥，不猜日期）。
+ * 消费方据此 null 回落到既有诚实降级：scheduleLight 不判红、保修金基准回落到计划日。
+ * 放 core（不放 schedule 模块）的原因：health.scheduleLight 与 finance 保修金都吃这条口径，
+ * 且 core 不得反向依赖单一模块（AGENTS §2）。
+ */
+export function computeProjectActualEnd(
+  tasks: { status: string; actualEnd: Date | string | null }[]
+): Date | null {
+  if (!tasks || tasks.length === 0) return null;
+  let max: Date | null = null;
+  for (const t of tasks) {
+    if (t.status !== "completed") return null; // 任一未完工 → 项目未完工
+    const d = t.actualEnd instanceof Date ? t.actualEnd : t.actualEnd ? new Date(t.actualEnd) : null;
+    if (!d || Number.isNaN(d.getTime())) return null; // 完工工序缺/非法实际日 → 不猜
+    if (!max || d.getTime() > max.getTime()) max = d;
+  }
+  return max;
+}
+
 /** 质量灯：openIssues > 0 → red；否则 pendingNodes > 0 → yellow；否则 green。 */
 export function qualityLight(a: { openIssues: number; pendingNodes: number }): Light {
   if (a.openIssues > 0) return "red";

@@ -71,6 +71,12 @@ export function isTaskOverdue(
 }
 
 /**
+ * 项目完工日语义（M15 · 断点④）已上收 core/domain/health.ts 的 computeProjectActualEnd。
+ * 原因：这是跨模块共享派生（health.scheduleLight 与 finance 保修金基准都吃它），
+ * core 不得反向依赖单一模块（AGENTS §2 边界纪律），故不放本文件；调用方直接引 core。
+ */
+
+/**
  * 进度更新联动（单一真源，§1-4）：
  * - 钳 0–100 取整（非法输入归 0 或 100 端点）
  * - 0 → 重置为 pending（清 actualStart 与 actualEnd，不留"未开始却有开工日"矛盾态）

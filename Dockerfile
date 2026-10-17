@@ -62,8 +62,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
 RUN mkdir -p /app/prisma-data /app/public/uploads /app/logs && chown -R nextjs:nodejs /app/prisma-data /app/public/uploads /app/logs
 USER nextjs
 EXPOSE 3000
-# 三段各有理由：
-#   migrate deploy  只做前滚，不重置数据（旧卷升级即靠它 + m13b 回填存量变更单）
-#   bootstrap       空库补最小骨架（组织 + boss 账号），幂等且不灌演示数据
-#   exec node       让 node 成为 PID1；否则 SIGTERM 落在 sh 上不转发，10s 后 SIGKILL 可能打断 SQLite 写入
-CMD ["sh", "-c", "./node_modules/.bin/prisma migrate deploy && node prisma/bootstrap.mjs && exec node server.js"]
+# 四段各有理由：
+#   migrate deploy    只做前滚，不重置数据（旧卷升级即靠它 + m13b 回填存量变更单）
+#   bootstrap         空库补最小骨架（组织 + boss 账号），幂等且不灌演示数据
+#   seed-templates    确保工序模板 11×3 存在（业务配置，非演示数据），自愈幂等
+#   exec node         让 node 成为 PID1；否则 SIGTERM 落在 sh 上不转发，10s 后 SIGKILL 可能打断 SQLite 写入
+CMD ["sh", "-c", "./node_modules/.bin/prisma migrate deploy && node prisma/bootstrap.mjs && node prisma/seed-templates.mjs && exec node server.js"]

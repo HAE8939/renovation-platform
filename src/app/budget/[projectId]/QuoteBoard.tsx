@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Badge,
   Button,
@@ -27,7 +28,11 @@ import type {
   CatalogPickerCategory,
   CatalogSnapshot,
 } from "@/modules/budget/server/catalog";
-import { saveQuoteItemsAction } from "../actions";
+import {
+  saveQuoteItemsAction,
+  setQuoteStatusAction,
+  updateQuoteTaxRateAction,
+} from "../actions";
 import { CatalogPicker } from "./CatalogPicker";
 
 /** 服务端序列化后的报价数据（含展示用的中文标签）。 */
@@ -47,7 +52,9 @@ export interface QuoteBoardData {
     endDate: string | null;
   };
   taxRate: number;
+  quoteStatus: string;
   quoteStatusLabel: string;
+  quoteLockedAt: string | null;
   items: QuoteItemRow[];
   picker: CatalogPickerCategory[];
 }
@@ -131,8 +138,11 @@ function fingerprint(rows: QuoteItemRow[]): string {
  * 用数据库返回的行整体替换本地草稿（id 与 order 重分配）。
  */
 export function QuoteBoard({ data }: { data: QuoteBoardData }) {
-  const { project, taxRate, quoteStatusLabel, picker } = data;
+  const { project, quoteStatus, quoteStatusLabel, quoteLockedAt, picker } = data;
+  // draft 才可编辑明细与税率；confirmed/locked 只读（服务层同样硬门控，界面只是不显示入口）。
+  const editable = quoteStatus === "draft";
 
+  const router = useRouter();
   const draftSeq = useRef(0);
   const [drafts, setDrafts] = useState<DraftRow[]>(() => data.items.map(toDraft));
   const [baseline, setBaseline] = useState<QuoteItemRow[]>(data.items);
@@ -141,12 +151,19 @@ export function QuoteBoard({ data }: { data: QuoteBoardData }) {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [saving, startSaving] = useTransition();
+  // 税率本地值：以服务端为真源初始化，编辑期本地实时参与汇总；「保存税率」落库后 refresh 回读。
+  const [tax, setTax] = useState<string>(() => String(data.taxRate));
+  const [statusBusy, startStatus] = useTransition();
 
   const items = useMemo(() => toItems(drafts), [drafts]);
   const groups = useMemo(() => groupByCategory(items), [items]);
+  const taxNum = useMemo(() => {
+    const n = Number(tax);
+    return Number.isFinite(n) && n >= 0 && n <= 1 ? n : data.taxRate;
+  }, [tax, data.taxRate]);
   const totals = useMemo(
-    () => computeTotals(items, taxRate, project.area),
-    [items, taxRate, project.area]
+    () => computeTotals(items, taxNum, project.area),
+    [items, taxNum, project.area]
   );
   const indexById = useMemo(() => {
     const map = new Map<string, number>();
@@ -297,10 +314,48 @@ export function QuoteBoard({ data }: { data: QuoteBoardData }) {
       {/* 实时预算看板：表格上方一条紧凑汇总条，整体右对齐，窄屏折行 */}
       <div className="grid grid-cols-2 items-end gap-x-6 gap-y-3 rounded-inner border border-line bg-surface px-4 py-3 sm:grid-cols-[1fr_auto_auto_auto]">
         <SummaryItem label="直接费" value={formatCny(totals.directSubtotal)} />
-        <SummaryItem
-          label={`税金（${formatPercent(taxRate)}）`}
-          value={formatCny(totals.tax)}
-        />
+        <div className="flex flex-col items-end gap-1 text-right">
+          <span className="text-xs text-secondary whitespace-nowrap">
+            税率{editable ? "（可编辑，小数如 0.03）" : `（${formatPercent(taxNum)}）`}
+          </span>
+          {editable ? (
+            <span className="flex items-center gap-2">
+              <span className="w-24">
+                <Input
+                  compact
+                  type="number"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value={tax}
+                  onChange={(e) => setTax(e.target.value)}
+                  aria-label="税率"
+                  className="num w-24 text-right"
+                />
+              </span>
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={statusBusy}
+                onClick={() =>
+                  startStatus(async () => {
+                    setError(null);
+                    const r = await updateQuoteTaxRateAction(project.id, taxNum);
+                    if (!r.ok) setError(r.error ?? "税率保存失败");
+                    else {
+                      setNotice("税率已保存");
+                      router.refresh();
+                    }
+                  })
+                }
+              >
+                存税率
+              </Button>
+            </span>
+          ) : (
+            <dd className="num text-[15px]">{formatCny(totals.tax)}</dd>
+          )}
+        </div>
         <SummaryItem
           label="单方造价"
           value={
@@ -317,6 +372,17 @@ export function QuoteBoard({ data }: { data: QuoteBoardData }) {
         />
       </div>
 
+      {/* 报价状态控制区（M15 断点③：确认 / 退回 / 锁定的写入入口）*/}
+      <QuoteStatusControls
+        projectId={project.id}
+        quoteStatus={quoteStatus}
+        quoteStatusLabel={quoteStatusLabel}
+        quoteLockedAt={quoteLockedAt}
+        busy={statusBusy}
+        onDone={() => router.refresh()}
+        onError={setError}
+      />
+
       {/* 明细编辑器：占满内容区宽度，不再与侧栏并排 */}
       <section className="min-w-0">
         <div className="flex flex-col gap-3">
@@ -328,17 +394,21 @@ export function QuoteBoard({ data }: { data: QuoteBoardData }) {
               </span>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <Button
-                variant="secondary"
-                disabled={saving || picker.length === 0}
-                onClick={() => setPickerOpen((v) => !v)}
-                aria-expanded={pickerOpen}
-              >
-                {pickerOpen ? "收起选入面板" : "从科目库选入"}
-              </Button>
-              <Button variant="secondary" disabled={saving} onClick={addBlankRow}>
-                新增空行
-              </Button>
+              {editable && (
+                <>
+                  <Button
+                    variant="secondary"
+                    disabled={saving || picker.length === 0}
+                    onClick={() => setPickerOpen((v) => !v)}
+                    aria-expanded={pickerOpen}
+                  >
+                    {pickerOpen ? "收起选入面板" : "从科目库选入"}
+                  </Button>
+                  <Button variant="secondary" disabled={saving} onClick={addBlankRow}>
+                    新增空行
+                  </Button>
+                </>
+              )}
               {/* 项目级页面的入口只能放在这里 —— 全局导航是静态清单，拿不到 projectId。 */}
               <Link
                 href={`/budget/${project.id}/settings`}
@@ -369,10 +439,14 @@ export function QuoteBoard({ data }: { data: QuoteBoardData }) {
             </div>
           </div>
           <div className="flex flex-wrap items-center justify-between gap-3 px-1">
-            <span className="text-xs text-secondary">{statusText}</span>
-            <Button disabled={saving || !dirty} onClick={save}>
-              {saving ? "保存中…" : "保存"}
-            </Button>
+            <span className="text-xs text-secondary">
+              {editable ? statusText : "报价非草稿态，明细只读；如需修改请先退回草稿"}
+            </span>
+            {editable && (
+              <Button disabled={saving || !dirty} onClick={save}>
+                {saving ? "保存中…" : "保存"}
+              </Button>
+            )}
           </div>
         </div>
 
@@ -415,6 +489,7 @@ export function QuoteBoard({ data }: { data: QuoteBoardData }) {
                     drafts={drafts}
                     indexById={indexById}
                     expanded={expanded}
+                    editable={editable}
                     onPatch={patch}
                     onMove={moveRow}
                     onDelete={deleteRow}
@@ -461,6 +536,7 @@ function GroupRows({
   drafts,
   indexById,
   expanded,
+  editable,
   onPatch,
   onMove,
   onDelete,
@@ -470,6 +546,7 @@ function GroupRows({
   drafts: DraftRow[];
   indexById: Map<string, number>;
   expanded: Set<string>;
+  editable: boolean;
   onPatch: (id: string, changes: Partial<Omit<DraftRow, "id">>) => void;
   onMove: (id: string, dir: -1 | 1) => void;
   onDelete: (id: string) => void;
@@ -503,6 +580,7 @@ function GroupRows({
             first={index === 0}
             last={index === drafts.length - 1}
             open={expanded.has(row.id)}
+            editable={editable}
             onPatch={(changes) => onPatch(row.id, changes)}
             onMove={(dir) => onMove(row.id, dir)}
             onDelete={() => onDelete(row.id)}
@@ -520,6 +598,7 @@ function EditableRow({
   first,
   last,
   open,
+  editable,
   onPatch,
   onMove,
   onDelete,
@@ -529,6 +608,7 @@ function EditableRow({
   first: boolean;
   last: boolean;
   open: boolean;
+  editable: boolean;
   onPatch: (changes: Partial<Omit<DraftRow, "id">>) => void;
   onMove: (dir: -1 | 1) => void;
   onDelete: () => void;
@@ -538,26 +618,28 @@ function EditableRow({
     <>
       <tr className="hover:bg-canvas">
         <Td className="w-28">
-          <span className="flex items-center gap-1">
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={first}
-              onClick={() => onMove(-1)}
-              aria-label="上移一行"
-            >
-              ↑
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={last}
-              onClick={() => onMove(1)}
-              aria-label="下移一行"
-            >
-              ↓
-            </Button>
-          </span>
+          {editable ? (
+            <span className="flex items-center gap-1">
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={first}
+                onClick={() => onMove(-1)}
+                aria-label="上移一行"
+              >
+                ↑
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={last}
+                onClick={() => onMove(1)}
+                aria-label="下移一行"
+              >
+                ↓
+              </Button>
+            </span>
+          ) : null}
         </Td>
         <Td className="min-w-[220px]">
           <div className="flex items-center gap-2">
@@ -566,6 +648,7 @@ function EditableRow({
             <span className="w-24 shrink-0">
               <Input
                 compact
+                disabled={!editable}
                 value={row.code}
                 onChange={(e) => onPatch({ code: e.target.value })}
                 placeholder="编号"
@@ -575,6 +658,7 @@ function EditableRow({
             </span>
             <Input
               compact
+              disabled={!editable}
               value={row.name}
               onChange={(e) => onPatch({ name: e.target.value })}
               placeholder="项目名称"
@@ -586,6 +670,7 @@ function EditableRow({
         <Td className="w-20">
           <Input
             compact
+            disabled={!editable}
             value={row.unit}
             onChange={(e) => onPatch({ unit: e.target.value })}
             placeholder="项"
@@ -599,6 +684,7 @@ function EditableRow({
             type="number"
             min="0"
             step="0.01"
+            disabled={!editable}
             value={row.unitPrice}
             onChange={(e) => onPatch({ unitPrice: e.target.value })}
             aria-label="单价"
@@ -611,6 +697,7 @@ function EditableRow({
             type="number"
             min="0"
             step="0.01"
+            disabled={!editable}
             value={row.quantity}
             onChange={(e) => onPatch({ quantity: e.target.value })}
             aria-label="数量"
@@ -630,9 +717,11 @@ function EditableRow({
             >
               {open ? "收起" : "材料"}
             </Button>
-            <Button size="sm" variant="danger" onClick={onDelete}>
-              删除
-            </Button>
+            {editable && (
+              <Button size="sm" variant="danger" onClick={onDelete}>
+                删除
+              </Button>
+            )}
           </span>
         </Td>
       </tr>
@@ -643,6 +732,7 @@ function EditableRow({
               <Field label="材料说明">
                 <Textarea
                   rows={2}
+                  disabled={!editable}
                   value={row.materials}
                   onChange={(e) => onPatch({ materials: e.target.value })}
                   placeholder="如：16A 开关 × 2，国标 BVR 2.5㎡ 线"
@@ -651,6 +741,7 @@ function EditableRow({
               <Field label="施工要求" hint="多行按换行分隔">
                 <Textarea
                   rows={3}
+                  disabled={!editable}
                   value={row.sop}
                   onChange={(e) => onPatch({ sop: e.target.value })}
                   placeholder={"按图定位并标记\n开槽深度 ≤ 线管外径 1.5 倍\n隐蔽前拍照留档"}
@@ -661,6 +752,71 @@ function EditableRow({
         </tr>
       )}
     </>
+  );
+}
+
+/**
+ * 报价状态控制区（M15 断点③）。按钮按当前态只显合法下一步（与服务层 QUOTE_TRANSITIONS 对齐）：
+ *  draft → [确认报价]；confirmed → [退回草稿] [锁定]；locked 为终态，仅显示锁定日提示。
+ * 调 setQuoteStatusAction，成功 refresh，失败把中文错回传给上层 error 展示。
+ */
+function QuoteStatusControls({
+  projectId,
+  quoteStatus,
+  quoteStatusLabel,
+  quoteLockedAt,
+  busy,
+  onDone,
+  onError,
+}: {
+  projectId: string;
+  quoteStatus: string;
+  quoteStatusLabel: string;
+  quoteLockedAt: string | null;
+  busy: boolean;
+  onDone: () => void;
+  onError: (msg: string) => void;
+}) {
+  const run = (next: "draft" | "confirmed" | "locked") => {
+    if (busy) return;
+    void (async () => {
+      const r = await setQuoteStatusAction(projectId, next);
+      if (!r.ok) onError(r.error ?? "状态更新失败");
+      else onDone();
+    })();
+  };
+
+  return (
+    <div className="flex flex-wrap items-center gap-3 rounded-inner border border-line bg-surface px-4 py-3">
+      <span className="text-[13px] text-secondary whitespace-nowrap">
+        报价状态：<span className="font-medium text-primary">{quoteStatusLabel}</span>
+      </span>
+      {quoteStatus === "locked" && quoteLockedAt && (
+        <span className="text-[13px] num text-secondary whitespace-nowrap">
+          锁定于 {quoteLockedAt}
+        </span>
+      )}
+      <span className="ml-auto flex items-center gap-2">
+        {quoteStatus === "draft" && (
+          <Button variant="secondary" size="sm" disabled={busy} onClick={() => run("confirmed")}>
+            确认报价
+          </Button>
+        )}
+        {quoteStatus === "confirmed" && (
+          <>
+            <Button variant="ghost" size="sm" disabled={busy} onClick={() => run("draft")}>
+              退回草稿
+            </Button>
+            <Button size="sm" disabled={busy} onClick={() => run("locked")}>
+              锁定（签约锁单）
+            </Button>
+          </>
+        )}
+        {quoteStatus === "locked" && (
+          <span className="text-[13px] text-secondary">已锁定为终态，如需变更请走合同变更流程。</span>
+        )}
+      </span>
+    </div>
   );
 }
 
