@@ -13,8 +13,8 @@
 #   sh deploy/nas-deploy.sh status       看状态与访问地址
 #   sh deploy/nas-deploy.sh logs         跟应用日志
 #
-# 前置：同目录的 .env 里要有 CADDY_USER / CADDY_HASH（口令哈希，见 runbook §0）。
-# 刻意不在仓库里存任何凭据：.env 已被 gitignore，缺失时脚本直接退出而不是回退到无保护。
+# 前置：同目录 .env 已不再是必需（2026-10-17 取消口令保护，CADDY_USER/HASH 不再使用）。
+# 可选项只剩 CADDY_PORT（默认 8181）与 BOOTSTRAP_ADMIN_NAME / BOOTSTRAP_ADMIN_EMAIL。
 
 set -e
 
@@ -36,14 +36,10 @@ S() {
 }
 
 if [ ! -f "$ENV_FILE" ]; then
-  echo "✗ 缺 $ENV_FILE —— 需要 CADDY_USER 与 CADDY_HASH。生成方法见 docs/INTERNAL_DOCKER_RUNBOOK.md §0。"
-  echo "  没有口令就不部署，是有意设计：宁可停住，也不把 HR 与财务数据裸放进内网。"
-  exit 1
+  echo "ℹ 无 $ENV_FILE —— 可选；口令保护已取消（2026-10-17）。如需自定义 CADDY_PORT / BOOTSTRAP_ADMIN_* 再创建。"
 fi
 
-# 逐行读取 KEY=VALUE，**不做变量展开**。
-# 绝不能用 `. "$ENV_FILE"`：bcrypt 哈希形如 $2a$14$...，被 shell 当位置参数展开后
-# 传给 Caddy 的就是残缺值，表现为「口令正确也一律 401」（NAS 首跑实测撞出）。
+# 逐行读取 KEY=VALUE，**不做变量展开**（保留历史坑位说明：bcrypt 哈希曾被 shell 展开）。
 if [ -f "$ENV_FILE" ]; then
   while IFS= read -r line || [ -n "$line" ]; do
     case "$line" in
@@ -55,11 +51,9 @@ if [ -f "$ENV_FILE" ]; then
     export "$key=$val"                        # 引号包住，val 里的 $ 原样保留
   done < "$ENV_FILE"
 fi
-: "${CADDY_USER:?CADDY_USER 未设置}"
-: "${CADDY_HASH:?CADDY_HASH 未设置}"
 PORT=${CADDY_PORT:-8181}
-# 引导出的 boss 账号名要与 CADDY_USER 一致，流水才能按 User.name 匹配到真人。
-ADMIN_NAME=${BOOTSTRAP_ADMIN_NAME:-$CADDY_USER}
+# 无 Caddy 口令后流水不再能区分到人（测试期接受）；boss 引导名默认 admin。
+ADMIN_NAME=${BOOTSTRAP_ADMIN_NAME:-admin}
 ADMIN_EMAIL=${BOOTSTRAP_ADMIN_EMAIL:-admin@renovation.local}
 
 case "${1:-up}" in
@@ -100,7 +94,7 @@ echo "── 4/6 启动应用（刻意不发布任何端口：外部只能经 Ca
 S run -d --name "$APP" --restart unless-stopped --network "$NET" --network-alias app \
   -e NODE_ENV=production -e PORT=3000 -e HOSTNAME=0.0.0.0 \
   -e DATABASE_URL=file:/app/prisma-data/dev.db \
-  -e PLATFORM_GATE=on \
+  -e PLATFORM_GATE=off \
   -e BOOTSTRAP_ADMIN_NAME="$ADMIN_NAME" \
   -e BOOTSTRAP_ADMIN_EMAIL="$ADMIN_EMAIL" \
   -v "$V_DB:/app/prisma-data" \
@@ -120,10 +114,9 @@ while [ $i -lt 60 ]; do
 done
 [ $i -ge 60 ] && { echo "   ✗ 等待超时，日志尾部："; S logs --tail=40 "$APP"; exit 1; }
 
-echo "── 6/6 启动 Caddy（唯一对外入口 + 口令 + 身份注入）──"
+echo "── 6/6 启动 Caddy（唯一对外入口；口令保护已取消，纯反代）──"
 S run -d --name "$PROXY" --restart unless-stopped --network "$NET" \
   -p "$PORT:80" \
-  -e CADDY_USER -e CADDY_HASH \
   -v "$ROOT/Caddyfile:/etc/caddy/Caddyfile:ro" \
   -v caddy_data:/data -v caddy_config:/config \
   caddy:2 >/dev/null
@@ -134,8 +127,8 @@ echo "── 结果 ──"
 S ps --filter "name=renovation-" --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
 IP=$(hostname -I 2>/dev/null | awk '{print $1}')
 echo
-echo "员工访问地址： http://${IP:-<NAS IP>}:$PORT   （会弹口令）"
+echo "员工访问地址： http://${IP:-<NAS IP>}:$PORT   （已无口令，直接进入）"
 echo "自检两条："
-echo "  无口令应被拦：   curl -s -o /dev/null -w '%{http_code}\\n' http://127.0.0.1:$PORT/hr     → 期望 401"
-echo "  健康端点经 Caddy：curl -s -u 用户:口令 http://127.0.0.1:$PORT/api/health                → 期望 {\"ok\":true}"
+echo "  业务页直通：  curl -s -o /dev/null -w '%{http_code}\\n' http://127.0.0.1:$PORT/projects → 期望 200（或登录页 3xx）"
+echo "  健康端点经 Caddy：curl -s http://127.0.0.1:$PORT/api/health                            → 期望 {\"ok\":true}"
 echo "完整六步验收见 docs/INTERNAL_DOCKER_RUNBOOK.md §4。"

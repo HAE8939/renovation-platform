@@ -1,35 +1,14 @@
-# Caddyfile —— 内测期唯一对外入口（M13-c 最小访问保护）
+# Caddyfile —— 内测期唯一对外入口
 #
-# 三个职责，缺一不可：
-#   ① basic auth：口令是唯一门槛
-#   ② 认证成功后把用户名注入 x-platform-user，让操作流水第一次能回答「是谁改的」
-#   ③ 应用容器**不发布任何端口**，外部只有这一个入口可达（见 compose.internal.yml）
-#
-# 口令哈希不进仓库：用户名与哈希经环境变量注入。生成方法：
-#   docker run --rm caddy:2 caddy hash-password --plaintext '你的口令'
-# 把输出填进 .env 的 CADDY_HASH，用户名填 CADDY_USER。
-# 两者任一未设置，Caddy 启动即失败——这是有意的 fail-fast，
-# 避免「忘了配口令＝全站敞开」变成静默的默认态。
-#
-# 需要每人独立身份（流水才能区分到人）时，在下面的块里每人加一行即可：
-#   basic_auth {
-#       zhang  $2a$14$....
-#       li     $2a$14$....
-#   }
+# 2026-10-17 按用户决定取消口令保护：NAS 在公司内网、数据处于测试阶段无敏感内容。
+# 取消了两层：① 本文件不再做 basic auth；② app 不再设 PLATFORM_GATE=on
+# （见 compose.internal.yml / deploy/nas-deploy.sh）。
+# 若日后要恢复保护，历史口径见 git 历史本文件旧版 + docs/INTERNAL_DOCKER_RUNBOOK.md。
 
 :80 {
-	# 必须用块形式。写成 `basic_auth {$CADDY_USER} {$CADDY_HASH}` 这种行内两参数时，
-	# Caddy 会把第一个 token 当成哈希算法名，报
-	# "unrecognized hash algorithm: admin" 并进入重启循环（NAS 实测）。
-	basic_auth {
-		{$CADDY_USER} {$CADDY_HASH}
-	}
-
-	# header_up 是 Set 语义（覆盖而非追加），客户端自带的 x-platform-user 到这里会被替换，
-	# 因此身份不可伪造。应用层闸（src/middleware.ts）只认这个头。
-	reverse_proxy app:3000 {
-		header_up x-platform-user {http.auth.user.user}
-	}
+	# 无 basic auth 时不再注入 x-platform-user（此前由 http.auth.user.user 提供，
+	# 值恒为空）。resolveActor() 会落到兜底身份，操作流水不再能区分到人——测试期接受。
+	reverse_proxy app:3000
 
 	encode zstd gzip
 

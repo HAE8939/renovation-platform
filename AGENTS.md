@@ -221,6 +221,8 @@ export interface ModuleManifest {
 
 三层，缺一层就退化成"看起来有保护"：
 
+> **⚠ 2026-10-17 用户拍板：口令保护已全面取消**（NAS 在公司内网、测试期无敏感数据）。Caddyfile 已去 basic_auth 与身份注入、`PLATFORM_GATE=off`、`.env` 口令变量非必需。以下三层描述为**历史口径**，恢复保护时照 git 历史还原。当前操作流水 `resolveActor()` 落占位 boss、启动日志有一条 `[accessGate]` 告警，均为预期。
+
 - **应用不发布端口**。`compose.internal.yml` 里 `app` 服务**没有 `ports:`**，外部唯一入口是 `caddy`。别为调试方便把 `"3000:3000"` 加回去——那会同时绕过口令与身份注入两层。
 - **Caddy 做 basic auth 并注入身份**。`Caddyfile` 里口令哈希经 `CADDY_USER` / `CADDY_HASH` 环境变量注入，**不入库**；缺任一项 Caddy 直接启动失败，是有意 fail-fast（免得"忘了配口令"变成静默敞开）。认证成功后 `header_up x-platform-user {http.auth.user.user}`——`header_up` 是 Set 语义会覆盖客户端自带同名头，加上应用只在内网可达，这个头**不可伪造**。
 - **应用层闸 `src/middleware.ts`**（`PLATFORM_GATE=on` 时生效）。默认**全站都拦**，只放行 `/`、`/about`、`/api/health`、`/api/client-errors` 与 `/uploads/*`（见 `core/domain/accessGate.ts` 的 `isPublicPath`）。刻意不挑"/hr 与 /finance 才保护"——经营数据没有不敏感的那一页，挑两页上闸给的是虚假安全感。
