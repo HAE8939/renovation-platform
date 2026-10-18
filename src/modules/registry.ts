@@ -7,6 +7,7 @@ import { scheduleManifest } from "./schedule/manifest";
 import { qualityManifest } from "./quality/manifest";
 import { financeManifest } from "./finance/manifest";
 import { hrManifest } from "./hr/manifest";
+import { panoManifest } from "./pano/manifest";
 import type { DeferredModule, ModuleManifest } from "./types";
 
 /**
@@ -25,6 +26,7 @@ export const modules: ModuleManifest[] = [
   qualityManifest,
   financeManifest,
   hrManifest,
+  panoManifest,
 ].sort((a, b) => a.order - b.order);
 
 /** DEFERRED 占位模块：首页可见、不可点、不进导航。

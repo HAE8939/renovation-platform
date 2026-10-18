@@ -19,6 +19,9 @@ services:
       PLATFORM_GATE: "off"
     volumes:
       - renovation_db:/app/prisma-data
+      # 全景导览成品（M15-a）刻意**不另开卷**：它们落在 public/uploads/pano/ 下，
+      # 与附件、品牌 Logo 共用同一条 uploads 卷，容器重建不丢、备份口径也只有一条。
+      # 代价是这些文件住在 docker 卷里而不是友好路径——放文件的方式与磁盘余量见 docs/PANO_MODULE.md。
       - renovation_uploads:/app/public/uploads
       - renovation_logs:/app/logs
     healthcheck:

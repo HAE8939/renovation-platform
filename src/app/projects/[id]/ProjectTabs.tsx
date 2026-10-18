@@ -15,6 +15,7 @@ const TABS = [
   { key: "quality", label: "质量验收" },
   { key: "budget", label: "预算收支" },
   { key: "people", label: "人员分配" },
+  { key: "pano", label: "全景导览" },
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
@@ -56,6 +57,7 @@ export function ProjectTabs({ hub, initialTab }: { hub: ProjectHub; initialTab?:
         {tab === "quality" && <QualityTab hub={hub} />}
         {tab === "budget" && <BudgetTab hub={hub} />}
         {tab === "people" && <PeopleTab hub={hub} />}
+        {tab === "pano" && <PanoTab hub={hub} />}
       </div>
     </div>
   );
@@ -627,6 +629,69 @@ function QualityTab({ hub }: { hub: ProjectHub }) {
       >
         打开质量管控 →
       </Link>
+    </div>
+  );
+}
+
+/**
+ * 全景导览页签（M15-a）。
+ * 全景成品在本地编辑器制作，这里只做两件事：把该项目已登记的导览列出来、给一个能点开的入口。
+ * 已下架的**照样列出并标注**——项目视角里“少一条”必须是可见的原因，不能是沉默的数字变小（§4.3）。
+ * 次序与上下架都在“登记管理”做，这里不放行内编辑：hub 是只读聚合，写动作跨模块会把依赖搅浑。
+ */
+function PanoTab({ hub }: { hub: ProjectHub }) {
+  const p = hub.pano;
+  if (p.total === 0) {
+    return (
+      <EmptyTab
+        title="该项目暂无全景导览"
+        note="在本地全景编辑器导出导览后，把整个目录放到服务器 public/uploads/pano/ 下，到“全景管理 · 登记管理”登记并挂到本项目，这里就会出现。"
+      />
+    );
+  }
+  return (
+    <div className="space-y-6">
+      <div className="rounded-card border border-line bg-surface p-6">
+        <div className="flex items-baseline justify-between gap-4">
+          <SectionTitle>全景导览</SectionTitle>
+          <span className="num text-[20px] font-semibold text-primary whitespace-nowrap">
+            共 {p.total}
+          </span>
+        </div>
+        <div className="mt-4 flex flex-wrap gap-3">
+          <Badge variant="success">已上架 {p.published}</Badge>
+          {p.total - p.published > 0 && <Badge variant="neutral">已下架 {p.total - p.published}</Badge>}
+        </div>
+      </div>
+      <ul className="divide-y divide-line border-y border-line">
+        {p.tours.map((t) => (
+          <li key={t.id} className="flex flex-wrap items-start justify-between gap-4 py-4">
+            <div className="min-w-0">
+              <Link
+                href={`/pano/${t.id}`}
+                className="text-[15px] font-medium text-primary hover:text-accent-ink"
+              >
+                {t.title}
+              </Link>
+              <p className="num mt-2 text-[13px] text-secondary">
+                {t.sceneCount > 0 ? `${t.sceneCount} 个场景` : "场景数未记录"}
+                <span className="mx-2 text-muted">/</span>
+                <code className="font-mono text-[12px] text-muted">uploads/pano/{t.dirName}</code>
+              </p>
+            </div>
+            <Badge variant={t.status === "published" ? "success" : "neutral"}>
+              {t.status === "published" ? "已上架" : "已下架（不在项目归纳页）"}
+            </Badge>
+          </li>
+        ))}
+      </ul>
+      <p className="text-[13px] leading-relaxed text-secondary">
+        要调整展示次序、上下架或换关联项目，去
+        <Link href="/pano/manage" className="mx-1 text-accent-ink hover:underline">
+          全景管理 · 登记管理
+        </Link>
+        。
+      </p>
     </div>
   );
 }

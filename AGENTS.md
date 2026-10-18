@@ -1,7 +1,8 @@
 # AGENTS.md — 装修经营管理数字化平台（renovation-platform）
 
 > 本文件是本项目对**所有 AI 编程助手（含 opencode / codex）的权威契约**。任何模块开发前先读本文件 + `docs/`。
-> 版本：契约 v0.5 · 更新：2026-10-14 · 维护人：HAE（AI 视频导演 / 家装业务数字化）
+> 版本：契约 v0.6 · 更新：2026-10-18 · 维护人：HAE（AI 视频导演 / 家装业务数字化）
+> v0.6 变更（M15-a 全景管理模块）：§0 模块数 9→10；§2 目录补 `modules/pano` 与 `/pano` 路由；§4 模块自有实体补 `pano 1`；新增 **§4.7 全景成品：文件在磁盘、登记在库里**（dirName 是唯一锚 · 解除登记不删文件 · 归纳页排除归档与下架 · 对内网托管不对外发布）。同日另一条实见教训进了 §6.4：**关键底色不得只靠现代 CSS 函数单条声明承载**（iPad 首屏丢底的根因）。
 > v0.5 变更（M13 系统性体检后的双向对齐）：**契约终于追上实现**——§0 模块范围从"只构建第 1 个模块"改为实际的 9 个模块；§2 目录补 `core/storage`、`scripts/`、`middleware.ts` 与三个部署文件；§4 补平台原语全清单。新增两处硬约束：**§4.6 变更单确认门**（只有客户已确认进金额口径 + 存量回填教训）、**§7.1 内测期最小访问保护**（零鉴权已从"未来项"变成"现实风险"）。并补：§4.3 收 `WorkLog.archived`（工时属事实族）、§6 间距阶梯补"长页 section 上探 64/96"与控件高度组、§6.1 accent 族四值必须同时落 `tailwind.config.ts`、§8 质量门槛改挂 `pnpm verify`。
 > v0.4 变更（M10-c 归档口径收口）：§4.3 改写为「**钱按事实 · 事按可见性**」二分（原句「全司读侧早已排除 archived」只对一半，事实类账不许因归档消失），并补：归档确认框须列未闭环事项、`OperationLog.before` 只能存机器值。
 > v0.3 变更（M10-a 备料批）：新增 §4.3 归档/作废口径、§4.4 操作流水与错误现场、§4.5 主题插槽双声明锁；§6.1 局部预览依赖元素级插槽（同条锁死）。
@@ -9,7 +10,9 @@
 
 ## 0. 项目定位（一句话）
 
-这是一个**面向装修经营全流程的数字化管理平台**，由多个可插拔模块组成。**已建成 9 个模块**（`src/modules/registry.ts` 为准）：预算报价、驾驶舱、线索 CRM、项目中心、设计管理、排程、质量验收、财务台账、人员工控；外加平台设置 `/settings`（不占模块位）。全部集成进同一个平台外壳，共享登录、主数据与视觉语言。
+这是一个**面向装修经营全流程的数字化管理平台**，由多个可插拔模块组成。**已建成 10 个模块**（`src/modules/registry.ts` 为准）：预算报价、驾驶舱、线索 CRM、项目中心、设计管理、排程、质量验收、财务台账、人员工控、全景管理；外加平台设置 `/settings`（不占模块位）。全部集成进同一个平台外壳，共享登录、主数据与视觉语言。
+
+> 全景管理（M15-a，2026-10-18）是第一个**展示型**模块：它不产生经营数据，只把本地全景编辑器导出的静态导览按项目归集。口径见 §4.7，运维见 `docs/PANO_MODULE.md`。
 
 > 本条 v0.4 及以前写的是"当前只构建第 1 个模块"，与实现脱节三个月——保留此教训：**代码已有的实体与口径必须回写本契约**，否则新会话冷启动会照旧契约做出与现状冲突的决策。体检报告见 `docs/HEALTH_CHECK_2026-10-14.md` §7。
 
@@ -37,7 +40,7 @@ renovation-platform/
       layout.tsx               # 全局外壳：左侧模块导航(由注册表动态生成)+ 顶栏
       page.tsx                 # 平台首页：模块入口卡片网格（保持 force-dynamic，§6.1）
       HeroSplash.tsx           # 启动首屏（§6.3 成文例外，作用域锁 .splash-*）
-      budget/  dashboard/  crm/  projects/  design/  schedule/  quality/  finance/  hr/  settings/  fields/  api/
+      budget/  dashboard/  crm/  projects/  design/  schedule/  quality/  finance/  hr/  pano/  settings/  fields/  api/
     modules/                   # ★ 可插拔业务模块（每个功能=一个目录，清单见 registry.ts）
       registry.ts              # 模块注册表（单一清单，外壳据此渲染导航/首页）
       budget/
@@ -106,7 +109,7 @@ export interface ModuleManifest {
 
 `ledger.ts`（收/支/毛利/毛利率/变更累计，事实族口径）· `pricing.ts`（金额格式化与报价算式）· `health.ts`（三色灯）· `dashboard.ts` · `acceptance.ts` · `theme.ts`（四套插槽键名）· `customField.ts` + `customFieldRepo.ts`（EAV 读写单点）· `operationLog.ts`（流水唯一入口）· `telemetry.ts`（错误现场）· `projects.ts`（项目主数据服务 + 归档/恢复）· `accessGate.ts`（§7.1 闸的口径单点）· `notificationTypes.ts`（形状，不含取数）· `types.ts`（PROJECT_STATUS / USER_ROLE / ENTITY_KIND 等机器值常量）。
 
-**模块自有实体**（不在此列，见 §5 与各模块目录）：budget 5（含 `ChangeOrder`）、quality 5、schedule 3、design 2、finance 2、hr 2。
+**模块自有实体**（不在此列，见 §5 与各模块目录）：budget 5（含 `ChangeOrder`）、quality 5、schedule 3、design 2、finance 2、hr 2、pano 1（`PanoTour`，见 §4.7）。
 
 ### 4.1 跨模块关联主键（R2-①，DECIDED）
 
@@ -168,6 +171,22 @@ export interface ModuleManifest {
 
 **撤销确认（M14 补口，2026-10-15 落地）**：`client_confirmed` 曾是**终态**——`updateChange` 与 `deleteChange` 都拒绝已确认的行，而 `setChangeStatus` 没有任何离开 `client_confirmed` 的边。守卫本身是对的（已确认金额不能被无痕改写或删除），但配合 `m13b` 的回填，一旦员工录错并被自动确认，就没有任何纠正路径。现补一条**唯一的受控出口** `revokeChangeConfirm`：`client_confirmed → pending`，**即时从金额口径摘出**（退回 pending 自然掉出两处 `status:"client_confirmed"` 过滤），并清空 `confirmedAt/confirmedBy/confirmNote`（原始确认信息不丢，全在撤销前后写入的 `change.revoke_confirm` 流水里，§4.4）。退回 pending 后行可编辑、可再次确认，构成「撤销 → 纠错 → 再确认」闭环，而不是把已确认金额变成可无痕改写。三条纪律：① 只对 `client_confirmed` 开放，非该态撤销即拒（防把 pending/draft「撤销」成无意义写入）；② 撤销动作走独立函数与独立流水 `action`（`change.revoke_confirm`），不复用 `setChangeStatus("pending")`——后者语义是「提交确认」（往口径里放钱的前一步），撤销语义相反（把钱拿出来），混用会让流水答反方向；③ 界面**不再给已确认行放编辑/删除按钮**（它们必然被服务层守卫拒绝），只放「撤销确认」。`verify-finance-flow` §13b 钉死「确认进账→撤销摘出→改→再确认」的金额口径与字段清空。仍**保留** `updateChange`/`deleteChange` 对 `client_confirmed` 的拒绝——纠错必须先撤销，不能绕过。
 
+### 4.7 全景成品：文件在磁盘、登记在库里（M15-a，DECIDED）
+
+全景管理是第一个**不产生经营数据、只归集展示物**的模块。它的成品不是数据库记录能装下的东西——一个导览是 MT-Pano 编辑器导出的**整个目录**（`index.html` + `app.js` + `style.css` + `marzipano.js` + `tiles/**`，几百个切片文件）。四条由此推出的口径：
+
+- **成品只在磁盘，库里只存"一条登记"**（`PanoTour`：`dirName` / `title` / `sceneCount` / `coverKey` / `status` / `order` / `projectId`）。文件放 `public/uploads/pano/<目录名>/`，与附件、Logo 共用同一条 uploads 卷（容器重建不丢；备份口径仍只有一条）。
+- **`dirName` 是唯一锚，登记后不可修改**。它是库记录与磁盘目录之间唯一的对应关系，允许改就等于允许失联（改完指向不存在的目录，或与另一条撞名）。要换目录走"解除登记 → 移文件 → 重新登记"。`@unique` 就是这条纪律的机器表达。
+- **不建 `PanoScene` 子表**。场景清单的真源在导览包内（`project.json`），抄进库里等于造第二套真源——包里改了、列表还写着旧的，且无从发现。故只存登记那一刻读到的 `sceneCount`，**0 的含义是"未记录"而不是"没有场景"**（托管版导出会删掉 `project.json`），界面必须这样表述。
+- **解除登记只摘登记，一个字节都不删文件**（§4.3 不硬删业务数据的延伸）。所以流水措辞必须写清"文件保留"，否则日后看流水的人会以为成品被删了。
+- **可见性按 §4.3 的"事按可见性"**：已下架、或归属项目已归档 → 不进项目归纳页；但管理页与项目详情的"全景导览"页签照样列出并标注原因。未关联项目的导览**仍然出现在归纳页**，单独一组"未关联项目"——藏起来会让放文件的人以为成品丢了。
+- **对内网托管，不做对外发布**（HAE 2026-10-18 拍板）：内测期不发公网链接。将来给客户看的路子是"阿里云阶段把导出成品放 OSS 桶"，属独立事项；本轮**不预留** `shareUrl` 之类的未来字段——留了就是提前实现未来需求。
+- 导览包内资源全部是**相对路径**（实测 `MT-Panoramic/server/index.js` 的导出生成器；只有编辑器自己的预览路由才改写成根绝对），所以挂在 `/uploads/pano/<目录>/` 前缀下可直接 iframe 打开，**不需要改写产物**。这就是用 iframe 而非"把导览搬进平台页面"的原因：搬进来等于把别人的构建产物纳入本仓编译与视觉约束，每次重新导出都要重来。
+
+### 4.8 门禁现场
+
+`scripts/verify-pano.mjs`（纯函数 62 项：目录名安全、URL 转义与越界、状态与脏值回显、可见性矩阵、排序全序、封面取第一幕）+ `scripts/verify-pano-flow.mts`（集成 59 项：扫描、登记拒绝路径、上下架与 **noop**、归档排除、次序交换、**解除登记后文件仍在**、`missingOnDisk` 对账、服务层零流水）。这两道是 §4.7 各条的机器表达，改口径必须同批改断言（§8）。
+
 ## 5. 预算模块数据模型（modules/budget 自有实体）
 - `CatalogCategory` 工程科目：id、name、order。（全局模板库，可增删改）
 - `CatalogItem` 科目项模板：category→CatalogCategory、code、name、unit、defaultPrice、defaultQty、materials(文本)、sop(文本/多行)、order。
@@ -207,6 +226,22 @@ export interface ModuleManifest {
 - **例外只锁在 `.splash-*` 一个作用域内**：业务页一律不得引用这些类，不得把展示级字号、深色块、柔光背景带进内页；跨页复用的组件（`core/ui/*`）不得为首屏改形态。越界即按 §6 令牌阶梯的"任意值越界"同类处理。
 - 两条不豁免的硬要求：**① 配色仍全部取本仓 CSS 变量**（纸底 + 当前主题 accent 族），不为首屏引入新 hex——换主题时首屏必须跟着换；**② `prefers-reduced-motion` 必须支持**（全局规则压时长 + 脚本跳过逐字写入），这是 V0.3 §5.1 的无障碍底线，不在例外范围内。
 - 首屏是 `fixed` 覆盖层，不改变 `/` 的既有 DOM：收起即原模块索引页，回归面为零。
+
+### 6.4 关键底色不得只靠现代 CSS 函数承载（M15 同期实见，硬约束）
+
+HAE 用一台旧 iPad（iPadOS 14.5~16.1 区间的 Safari）在内网打开平台，首屏**整片丢底**、直接透出下面的模块列表。根因不是"少了个渐变"，而是一个会连坐的写法：
+
+```css
+/* 错：柔光用 color-mix()，纸底写在同一条 background 简写里 */
+background: radial-gradient(… color-mix(in srgb, var(--accent-tint) 62%, transparent) …), var(--canvas);
+```
+
+该值含 `var()` → 浏览器在**计算值阶段**才判 `color-mix()` 无效 → 整条 `background` 作废（IACVT）→ **连纸底一起消失**，且这种失败救不回来：在它前面再写一条兜底声明也会被这条简写覆盖。
+
+- **底色与装饰层必须拆开**：`background-color: var(--canvas)` 单独一条，装饰层另用伪元素承载。
+- **透明度用 `opacity`，不用 `color-mix(… , transparent)`**：`var(--x) + opacity: .62` 与 `color-mix(in srgb, var(--x) 62%, transparent)` 叠在同一底色上**逐像素等价**（实测对照页最大单通道差 1），但前者人人能渲染。浮层遮罩同理（`.overlay-veil` = `var(--text-primary)` + `opacity: .42`）。
+- 一定要用现代色彩函数时，**外面必须套 `@supports (background-color: color-mix(in srgb, red 50%, transparent))`**（该测试式不含 `var()`，才会在旧引擎里被判为 false）。
+- **不为旧设备专门优化、也不许为此引入新色值**（HAE 2026-10-18 拍板：旧设备大多已淘汰）。这条只是"别把关键视觉压在一次函数失败上"的写法纪律，不是兼容层工程。`Badge` 与 `quality/nodes/[id]` 的状态淡底仍是 `color-mix()`——旧设备上只是淡底缺失、文字与描边都在（可读），**接受该降级**，不为此自造色值（§6.1 禁）。
 
 ## 7. 阶段与状态（DECIDED / EXPLORING / DEFERRED / REJECTED）
 - 开发分期：P0 契约(本文) → P1 平台壳+预算端到端(SQLite)〔已走过〕→ P2 补全交互+导出〔已走过〕→ **内网 Docker Compose 内测〔当前〕** → P3 部署阿里云（HTTPS）→ **P4 引入登录/多用户** → P5 迁 PostgreSQL（QA 关卡）→ P6 项目管理模块 …

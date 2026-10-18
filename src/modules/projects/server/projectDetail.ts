@@ -129,6 +129,29 @@ export interface HubFinance {
   budgetLight: Light;
 }
 
+/**
+ * 全景导览聚合（M15-a）。
+ * prisma 直读 PanoTour，不 import pano 模块内部（AGENTS §2：模块之间只经 core 与注册表协作）。
+ * 这里刻意**不**排除已下架的那几条：项目页签是管理视角，看不见就等于不知道为什么少一条
+ * （§4.3「沉默地少一个数字，比数字变小更糟」）。归纳页的可见性过滤在 pano 模块自己那侧。
+ */
+export interface HubPanoTour {
+  id: string;
+  title: string;
+  status: string;
+  sceneCount: number;
+  dirName: string;
+}
+
+export interface HubPano {
+  total: number;
+  published: number;
+  tours: HubPanoTour[];
+}
+
+/** 与 modules/pano/types.ts 的 PANO_STATUS 同值。跨模块禁引，故此处抄录字面量。 */
+const PANO_STATUS_PUBLISHED = "published";
+
 export interface ProjectHub {
   /** 未闭环事项（M10-c 归档确认框用）：未整改问题数 / 未收付款段数与金额 */
   unclosed: { issues: number; unpaidSegs: number; unpaidAmount: number };
@@ -170,6 +193,7 @@ export interface ProjectHub {
   design: HubDesign;
   quality: HubQuality;
   finance: HubFinance;
+  pano: HubPano;
 }
 
 function fmtDate(d: Date | null): string | null {
@@ -402,6 +426,18 @@ export async function getProjectHub(projectId: string): Promise<ProjectHub | nul
   // 不 import fields 模块内部（AGENTS §2）；无定义时返回空数组，页面走诚实空态。
   const customFields: EntityFieldValue[] = await getEntityValues("project", project.id);
 
+  // ── 全景导览聚合（M15-a）：prisma 直读，不 import pano 模块内部（AGENTS §2）──
+  const panoTours = await prisma.panoTour.findMany({
+    where: { projectId },
+    select: { id: true, title: true, status: true, sceneCount: true, dirName: true },
+    orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+  });
+  const pano: HubPano = {
+    total: panoTours.length,
+    published: panoTours.filter((t) => t.status === PANO_STATUS_PUBLISHED).length,
+    tours: panoTours,
+  };
+
   return {
     unclosed: {
       issues: openIssues,
@@ -435,5 +471,6 @@ export async function getProjectHub(projectId: string): Promise<ProjectHub | nul
     design,
     quality,
     finance,
+    pano,
   };
 }

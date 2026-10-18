@@ -102,6 +102,7 @@ model Project {
   members         ProjectMember[] // 人员工控：项目责任关系（M12-a）
   workLogs        WorkLog[]
   fileAssets      FileAsset[]
+  panoTours       PanoTour[] // 反向：全景导览（M15-a，真源在 PanoTour.projectId）
 
   @@map("projects")
 }
@@ -710,4 +711,41 @@ model OperationLog {
 // Lead 只有 stage（商务阶段），没有“这条不做了/录错了”的位——签约不可逆 + 无删除入口，
 // 误建线索只能永久留在漏斗里污染阶段存量与签约率。故补作废位，语义＝**从漏斗与统计里摘出去、可恢复**。
 // 不做硬删：线索可能已回写 projectId（签约过），删线索会切断项目↔线索的 1-1 溯源（§4.1）。
+
+// ─────────────────────────────────────────────────────────────
+// M15-a 全景管理模块（pano）
+// 全景**成品**不入库，只进磁盘：MT-Pano 编辑器导出的 `_web` 整包放在
+//   public/uploads/pano/<dirName>/  （入口 index.html；资源全为相对路径，实测
+//   MT-Panoramic/server/index.js 导出生成器——style.css/marzipano.js/tiles/ 都写相对，
+//   只有编辑器自己的预览路由才把它们改写成根绝对。所以整包挂在这个前缀下可直接 iframe 打开）。
+// 库里存的是「一条已登记的导览」：属于哪个项目、叫什么、当前是否上架、排第几。
+//
+// 为什么 dirName 唯一：磁盘目录是全平台唯一的物理位置。两条记录指向同一目录会让
+// 上下架与改名互相打架，也让"扫描登记"无法幂等判断「这个目录已经入过库」。
+// 为什么不建 PanoScene 子表：场景清单的真源在导览包内（project.json / app.js），
+// 抄进库里等于造第二套真源——包里改了、列表还写着旧的，且无从发现。
+// 故只存登记那一刻读到的 sceneCount（可为 0：托管版导出会删掉 project.json）。
+//
+// 删除口径（§4.3）：平台不硬删业务数据。"这条不展示"= status=hidden，**磁盘文件保留**；
+// 真要腾空间由人工在服务器上删目录，下一次扫描会把它列成「未登记」而不是报错。
+// ─────────────────────────────────────────────────────────────
+model PanoTour {
+  id         String   @id @default(cuid())
+  projectId  String? // 归属项目；null=已登记但还没挂上项目（管理页单列出来提醒，不静默隐藏）
+  dirName    String   @unique // 磁盘目录名 = public/uploads/pano/<dirName>，登记后不可改（改了就和文件失联）
+  title      String // 展示标题（登记时默认取导览包 settings.title，可在管理页改）
+  sceneCount Int      @default(0) // 登记时从包里读到的场景数；0=托管版导出没留 project.json，只能人工填
+  coverKey   String? // 封面相对 public 的键，**不存前导斜杠**（与 FileAsset.storageKey 同口径）
+  status     String   @default("published") // published / hidden
+  order      Int      @default(0) // 同一项目内的展示次序，小在前
+  note       String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, status, order])
+  @@index([status])
+  @@map("pano_tours")
+}
 // ─────────────────────────────────────────────────────────────
