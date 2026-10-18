@@ -118,15 +118,23 @@ for f in deploy/nas-deploy.sh Dockerfile Caddyfile; do
 done
 ```
 
-#### 第 3 步 · 后台启动部署（**独占时间戳日志，别复用 `deploy8.log`**）
+#### 第 3 步 · 后台启动部署（**必须 `setsid --fork` 脱离会话；独占时间戳日志，别复用 `deploy8.log`**）
 ```bash
 ssh -p 10000 NAS_USER@192.168.1.135 '
 cd /opt/renovation-platform
 LOG="deploy_$(date +%s).log"
 echo "$LOG" > .current_deploy_log
-nohup sudo -n sh deploy/nas-deploy.sh </dev/null >"$LOG" 2>&1 &
-echo "STARTED=$! LOG=$LOG"'
+setsid --fork sudo -n sh deploy/nas-deploy.sh </dev/null >"$LOG" 2>&1
+echo "STARTED LOG=$LOG"'
 ```
+> **为什么是 `setsid --fork` 而不是 `nohup ... &`（2026-10-18 实见）**：`nohup` 只挡 `SIGHUP`，被后台化的 `sudo`/build 仍挂在这条 ssh 会话的通道上——**远端其实跑完了，本地 ssh 客户端却一直不返回、直到工具 60s 超时**，于是把一次成功部署误判成「可能没起来」，白白多绕两轮只读检查。`setsid --fork` 把构建放进一个全新会话、无控制终端、不继承 ssh 的 fd，`setsid` 自身立即返回 → ssh 通道秒关、本地命令 1 秒内干净退出，构建在服务端继续。**末尾不要加 `&`**（`--fork` 已负责脱离，加 `&` 反而多余）。
+>
+> **起完别急着信「STARTED」**：起进程秒回不代表 build 成功。另开一条快查确认它真在跑，再进第 4 步轮询：
+> ```bash
+> ssh -p 10000 NAS_USER@192.168.1.135 'pgrep -af "docker build" | grep -v "pgrep\|bash -c" | head -1; sudo wc -l "/opt/renovation-platform/$(cat /opt/renovation-platform/.current_deploy_log)"'
+> ```
+> 看到 `docker build` 进程 + 日志行数在涨即确认已启动。
+
 脚本内 `set -e` + 「先 build 后停旧」顺序 → **build 失败会在第 2 步退出，根本不碰线上容器**。
 
 #### 第 4 步 · 轮询到 `app healthy`（sleep 到接近完成再查，省往返）
