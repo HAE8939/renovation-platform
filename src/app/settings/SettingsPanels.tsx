@@ -70,7 +70,7 @@ function ThemePicker({ initial }: { initial: ThemeKey }) {
 
   return (
     <section>
-      {/* M10-a UI-4（HAE 意见 4）：标题就叫「主题」，技术口径的说明文字去掉——
+      {/* M10-a UI-4（HAE 意见 4）：标题就叫“主题”，技术口径的说明文字去掉——
           设置页是给老板点的，不是给设计系统作者看的。四色含义已由色块下方标签承担。 */}
       <h2 className="text-[17px] font-semibold">主题</h2>
 
@@ -207,7 +207,7 @@ function LogoPanel({ logoFile, logoUrl }: { logoFile: string | null; logoUrl: st
     <section>
       <h2 className="text-[17px] font-semibold">品牌 Logo</h2>
       <p className="mt-1 text-xs text-secondary">
-        上传后显示在左侧品牌区，替代「Platform」字样（未上传时回落文字标识）。
+        上传后显示在左侧品牌区，替代“Platform”字样（未上传时回落文字标识）。
         仅支持 PNG / JPG / WebP，不超过 512 KB。
       </p>
 

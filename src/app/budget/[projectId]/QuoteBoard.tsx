@@ -134,7 +134,7 @@ function fingerprint(rows: QuoteItemRow[]): string {
  * 报价明细编辑器 + 实时预算看板。
  *
  * 数据流：科目库选入 / 新增空行 / 行内编辑 / 删除 / 上下排序都只改本地草稿 →
- * 草稿派生成 QuoteItemRow[] → lib/quote.ts 算分组与汇总 → 点「保存」整表提交 →
+ * 草稿派生成 QuoteItemRow[] → lib/quote.ts 算分组与汇总 → 点“保存”整表提交 →
  * 用数据库返回的行整体替换本地草稿（id 与 order 重分配）。
  */
 export function QuoteBoard({ data }: { data: QuoteBoardData }) {
@@ -151,7 +151,7 @@ export function QuoteBoard({ data }: { data: QuoteBoardData }) {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [saving, startSaving] = useTransition();
-  // 税率本地值：以服务端为真源初始化，编辑期本地实时参与汇总；「保存税率」落库后 refresh 回读。
+  // 税率本地值：以服务端为真源初始化，编辑期本地实时参与汇总；“保存税率”落库后 refresh 回读。
   const [tax, setTax] = useState<string>(() => String(data.taxRate));
   const [statusBusy, startStatus] = useTransition();
 

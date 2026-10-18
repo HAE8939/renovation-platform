@@ -104,7 +104,7 @@ async function main() {
     guarded = e instanceof ScheduleGenerateError;
     guardMsg = e instanceof Error ? e.message : String(e);
   }
-  chk("重复生成被拒（ScheduleGenerateError「已存在排程」）", guarded && guardMsg.includes("已存在"), guardMsg);
+  chk("重复生成被拒（ScheduleGenerateError“已存在排程”）", guarded && guardMsg.includes("已存在"), guardMsg);
   const afterGuard = await prisma.scheduleTask.count({ where: { projectId: p4.id } });
   chk("被拒后数据未变（仍 11 条）", afterGuard === 11, `实际 ${afterGuard}`);
 

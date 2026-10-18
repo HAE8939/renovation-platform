@@ -235,7 +235,7 @@ export async function createProject(
 
   const run = async (tx: Prisma.TransactionClient): Promise<CreateProjectResult> => {
     // Client 解析：若显式传入 clientId → 直接复用（先校验存在），跳过按名 findFirst；
-    // 否则保持原「按客户名 findFirst/create」路径（预算调用方零改动）。
+    // 否则保持原“按客户名 findFirst/create”路径（预算调用方零改动）。
     let client: { id: string; phone: string | null };
     if (input.clientId) {
       const existing = await tx.client.findUnique({ where: { id: input.clientId } });
@@ -330,13 +330,13 @@ export async function updateProject(
     if (!project) throw new ValidationError("项目不存在");
 
     const nextStatus = input.status ?? project.status;
-    // 归档态不可经「项目设置」写入：这条路径没有未闭环事项的知情确认框，也不写
+    // 归档态不可经“项目设置”写入：这条路径没有未闭环事项的知情确认框，也不写
     // project.archive 流水，结果是这样归档的项目**没有流水可恢复**（只能回落 draft）。
-    // 归档一律走 /projects 表格行或项目详情页的归档入口——§4.3「归档入口两处」。
+    // 归档一律走 /projects 表格行或项目详情页的归档入口——§4.3“归档入口两处”。
     // 已是归档态时放行，因为那是"保持原状"，不是绕过。
     if (nextStatus === PROJECT_STATUS.archived && project.status !== PROJECT_STATUS.archived) {
       throw new ValidationError(
-        "请改用项目列表或项目详情页的「归档」入口：那里会列出未闭环事项并记录可恢复的原状态"
+        "请改用项目列表或项目详情页的“归档”入口：那里会列出未闭环事项并记录可恢复的原状态"
       );
     }
 
@@ -375,7 +375,7 @@ export async function updateProject(
  * 项目身份三元组（id / code / name）——给"只需要标题"的页面用。
  *
  * 为什么要单开：项目动态页原先在 page.tsx 里直接 prisma.project.findUnique 取标题。
- * 页面直查主数据表是 §2「路由层薄、主数据归 core/domain」的反面——一次两行看着无害，
+ * 页面直查主数据表是 §2“路由层薄、主数据归 core/domain”的反面——一次两行看着无害，
  * 但每个人都补一次，主数据的读取口径就会散成十份。给一个足够便宜的函数，就不会有人自己写。
  * 刻意不返回 getProjectHub 那样的全量聚合：取个标题不该付一次全站聚合的代价。
  */

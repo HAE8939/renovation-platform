@@ -94,7 +94,7 @@ const J = (x) => JSON.stringify(x);
     J(uniq) === J([...THEME_KEYS].sort()),
     `css=[${uniq.join(",")}]`);
 
-  // 每套插槽都必须重写整族四值（accent / ink / tint / fg）——少一个就会「半换色」错版。
+  // 每套插槽都必须重写整族四值（accent / ink / tint / fg）——少一个就会“半换色”错版。
   for (const k of THEME_KEYS) {
     const block = css.match(new RegExp(`:root\\[data-theme="${k}"\\]\\s*\\{([^}]*)\\}`));
     const body = block ? block[1] : "";

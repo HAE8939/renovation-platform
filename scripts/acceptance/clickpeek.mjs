@@ -15,7 +15,7 @@ const dump = async (label) => {
     return {
       url: location.pathname,
       buttons: [...new Set([...document.querySelectorAll('button,[role=button],summary')].filter(A.visible).map(e=>A.norm(e.innerText)))],
-      fields: ctrls.map(e=>e.tagName.toLowerCase()+(e.type?':'+e.type:'')+(e.name?' name='+e.name:'')+' 「'+(A.labelOf(e).split('|').filter(Boolean)[0]||'').slice(0,46)+'」 值='+JSON.stringify(String(e.value).slice(0,20))),
+      fields: ctrls.map(e=>e.tagName.toLowerCase()+(e.type?':'+e.type:'')+(e.name?' name='+e.name:'')+' “'+(A.labelOf(e).split('|').filter(Boolean)[0]||'').slice(0,46)+'” 值='+JSON.stringify(String(e.value).slice(0,20))),
       tables: [...document.querySelectorAll('table')].map((t,i)=>'表'+i+'：'+[...t.querySelectorAll('thead th')].map(x=>A.norm(x.innerText)).join('·')+'（'+t.querySelectorAll('tbody tr').length+' 行）'),
       rows: [...document.querySelectorAll('table')].slice(0,2).map(t=>[...t.querySelectorAll('tbody tr')].slice(0,4).map(tr=>[...tr.querySelectorAll('td,th')].map(td=>A.norm(td.innerText).slice(0,22)).join(' | '))),
       forms: [...document.querySelectorAll('form')].length,
@@ -38,9 +38,9 @@ try {
   for (const c of clicks) {
     try {
       const r = await br.clickText(c);
-      await dump("点击「" + c + "」→ " + JSON.stringify(r));
+      await dump("点击“" + c + "”→ " + JSON.stringify(r));
     } catch (e) {
-      console.log("\n✗ 点击「" + c + "」失败：" + e.message);
+      console.log("\n✗ 点击“" + c + "”失败：" + e.message);
     }
   }
 } finally {

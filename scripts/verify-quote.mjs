@@ -5,7 +5,7 @@
  * 金额一旦算错就是给客户看的钱数。M1a 只做过一次手算核对，不可重复执行。
  * 本脚本把那次手算变成可重跑的门禁，并且**直接 import 生产代码**
  * src/modules/budget/lib/quote.ts（Node 24 原生可跑 TS），
- * 再独立用「整数分」复算做对照 —— 两边不一致就是口径漂移，当场暴露。
+ * 再独立用“整数分”复算做对照 —— 两边不一致就是口径漂移，当场暴露。
  *
  * 跑法：node scripts/verify-quote.mjs      （exit 0 = 全过；exit 1 = 有 FAIL）
  * 依赖：无新增。需要 prisma generate 已执行过、.env 指向可读的 dev.db。
@@ -38,7 +38,7 @@ function check(level, name, ok, detail = "") {
 const cny = (n) =>
   `¥${n.toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-/* ── 独立预言机：全程整数「分」，不复用生产代码的 round2 ─────────────
+/* ── 独立预言机：全程整数“分”，不复用生产代码的 round2 ─────────────
    业务假设：单价 2 位小数、数量 2 位小数（装修报价的实际输入精度）。 */
 const toCents = (x) => Math.round(x * 100);
 const lineCents = (unitPrice, quantity) =>

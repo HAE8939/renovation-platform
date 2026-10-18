@@ -210,7 +210,7 @@ export async function markPaidAction(
       entity: "paymentNode",
       entityId: id,
       projectId: seg?.projectId ?? null,
-      summary: `标记「${seg?.name ?? id}」已付 ${moneyText(seg?.amountDue)}（不自动生成收入台账，两本账分离）`,
+      summary: `标记“${seg?.name ?? id}”已付 ${moneyText(seg?.amountDue)}（不自动生成收入台账，两本账分离）`,
       after: seg ? `${seg.name} ${moneyText(seg.amountDue)}` : null,
     });
     revalidatePath("/finance/payments");
@@ -238,7 +238,7 @@ export async function unmarkPaidAction(
       entity: "paymentNode",
       entityId: id,
       projectId: seg?.projectId ?? null,
-      summary: `撤销「${seg?.name ?? id}」的已付标记`,
+      summary: `撤销“${seg?.name ?? id}”的已付标记`,
       before: seg ? `${seg.name} ${moneyText(seg.amountDue)} 已付` : null,
     });
     revalidatePath("/finance/payments");

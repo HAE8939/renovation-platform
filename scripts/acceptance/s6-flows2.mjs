@@ -1,7 +1,7 @@
 /**
  * s6-flows2.mjs —— 补齐 s4 里因界面前端定位/数据形状而没跑完的闭环
  * 与 s4 的关键差别：B5/B6 的演示锚点按**实库当前状态**动态选，不写死工序名。
- * （STATUS 与手测清单写的「002 水电待审核、003 泥工已退回」已与实库不符——见验收报告 D 组）
+ * （STATUS 与手测清单写的“002 水电待审核、003 泥工已退回”已与实库不符——见验收报告 D 组）
  */
 import { withPlatform, moneyNear, fmt } from "./runner.mjs";
 
@@ -116,16 +116,16 @@ await withPlatform("s6-flows2", 9366, async ({ br, db, rep, go }) => {
     rep.rejects((await br.text()) + (await br.dialogText() || ""), "0", "GUARD", "越界有反馈（界面拦截或服务端中文报错）");
   });
 
-  /* ═══ B5 整改门控：按实库找「returned + 有 open 问题」的节点 ═══ */
+  /* ═══ B5 整改门控：按实库找“returned + 有 open 问题”的节点 ═══ */
   await rep.scenario("B5 整改中门控（returned 节点 + open 问题 → 禁提交）", async () => {
     const open = await db.issue.findFirst({ where: { status: "open", nodeId: { not: null } } });
-    if (!open) return rep.note("PRE", "实库无「returned 节点 + open 问题」组合，门控位已被走完", "见报告 D 组：清单锚点与实库不同步");
+    if (!open) return rep.note("PRE", "实库无“returned 节点 + open 问题”组合，门控位已被走完", "见报告 D 组：清单锚点与实库不同步");
     const node = await db.acceptanceNode.findUnique({ where: { id: open.nodeId } });
     const proj = await db.project.findUnique({ where: { id: node.projectId } });
-    rep.ok("PRE", "门控位实况", `${proj.code} ${node.name} status=${node.status} · open 问题「${open.title}」`);
+    rep.ok("PRE", "门控位实况", `${proj.code} ${node.name} status=${node.status} · open 问题“${open.title}”`);
     await go("/quality/nodes/" + node.id);
     const t = await br.text();
-    rep.assert(/整改中/.test(t), "UI", "状态渲成「整改中」", (t.match(/整改中/) || ["未见"])[0]);
+    rep.assert(/整改中/.test(t), "UI", "状态渲成“整改中”", (t.match(/整改中/) || ["未见"])[0]);
     const dis = await br.evaluate(`(()=>{const A=window.__A;const bs=[...document.querySelectorAll('button')].filter(A.visible).map(e=>A.textOf(e));return {submit:bs.filter(t=>/提交/.test(t)),all:bs.slice(0,8)}})()`);
     rep.assert(dis.submit.length === 0 || dis.some === true, "GUARD", "整改中：提交验收入口不存在或被禁", JSON.stringify(dis));
     rep.assert(/未整改|禁用|整改中/.test(await br.text()), "UI", "页面说明为什么不能提交");
@@ -137,7 +137,7 @@ await withPlatform("s6-flows2", 9366, async ({ br, db, rep, go }) => {
       await br.settle(1200);
       await br.fillS("整改说明", "验收流·已返工");
       const ok1 = await br.clickS("标记已整改").catch(() => br.clickS("已整改").catch(() => null));
-      if (!ok1) rep.note("UI", "整改入口", "问题抽屉里未找到「标记已整改」按钮：" + (await br.evaluate(`[...document.querySelectorAll('[role=dialog] button')].map(b=>b.innerText.trim()).join(' / ')`)));
+      if (!ok1) rep.note("UI", "整改入口", "问题抽屉里未找到“标记已整改”按钮：" + (await br.evaluate(`[...document.querySelectorAll('[role=dialog] button')].map(b=>b.innerText.trim()).join(' / ')`)));
       await br.settle(2200);
       rep.eq((await db.issue.findUnique({ where: { id: open.id } }))?.status, "rectified", "DB", "问题转待复验");
       await go("/quality/nodes/" + node.id);
@@ -158,7 +158,7 @@ await withPlatform("s6-flows2", 9366, async ({ br, db, rep, go }) => {
     }
     const chosen = pair || { n: nodes[0], hit: null };
     const proj = await db.project.findUnique({ where: { id: chosen.n.projectId } });
-    rep.ok("PRE", "回环位实况", `${proj.code} 节点「${chosen.n.name}」待审核${chosen.hit ? ` · 对应付款段「${chosen.hit.name}」` : " · 无同名段，改验「审核通过 + 段状态不变」"}`);
+    rep.ok("PRE", "回环位实况", `${proj.code} 节点“${chosen.n.name}”待审核${chosen.hit ? ` · 对应付款段“${chosen.hit.name}”` : " · 无同名段，改验“审核通过 + 段状态不变”"}`);
     await go("/finance/payments?projectId=" + proj.id);
     const before = await br.text();
     await go("/quality/nodes/" + chosen.n.id);
@@ -175,7 +175,7 @@ await withPlatform("s6-flows2", 9366, async ({ br, db, rep, go }) => {
         const r = [...document.querySelectorAll('tr')].filter(x=>A.visible(x)).find(x=>A.norm(x.innerText).includes(${JSON.stringify(chosen.hit.name)}));
         return r ? { text: A.norm(r.innerText).slice(0,90), markable: !![...r.querySelectorAll('button')].find(b=>!b.disabled && /标记已付/.test(A.textOf(b))) } : null;
       })()`);
-      rep.assert(st?.markable === true, "UI↔派生", "★ 只改节点状态，付款段派生变「可收款」（解锁不落库）", JSON.stringify(st));
+      rep.assert(st?.markable === true, "UI↔派生", "★ 只改节点状态，付款段派生变“可收款”（解锁不落库）", JSON.stringify(st));
       const seg = await db.paymentNode.findUnique({ where: { id: chosen.hit.id } });
       rep.eq(seg?.paid, false, "DB", "段自身 paid 未被偷偷改写");
       rep.eq(seg?.amountDue, chosen.hit.amountDue, "DB", "应收快照不随状态变", String(seg?.amountDue));
@@ -201,7 +201,7 @@ await withPlatform("s6-flows2", 9366, async ({ br, db, rep, go }) => {
     const rec = await db.financeRecord.findFirst({ where: { description: "验收流·一笔收入" } });
     rep.assert(!!rec, "DB", "记录落库", rec ? `${rec.type}/${rec.category}/${rec.amount}` : "查不到");
     const mid = await moneyNear(br, "已收款");
-    rep.eq(mid, fmt(Number(before) + 12345.67), "UI↔DB", "汇总「已收款」即时增加", `${before} → ${mid}`);
+    rep.eq(mid, fmt(Number(before) + 12345.67), "UI↔DB", "汇总“已收款”即时增加", `${before} → ${mid}`);
     const proj = await db.project.findUnique({ where: { code: "RP-2026-001" } });
     const exp = await db.financeRecord.aggregate({ where: { projectId: proj.id, type: "expense" }, _sum: { amount: true } });
     await go("/projects/" + proj.id + "?tab=budget");

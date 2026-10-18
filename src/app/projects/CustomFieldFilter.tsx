@@ -14,7 +14,7 @@ import type { FieldDef } from "@/core/domain/customFieldRepo";
  * - 深链约定（与 core 的 buildFiltersFromParams 对齐）：
  *   `?cfv=<key>:<值或下界>`、`?cfvto=<key>:<上界>`，可各多条；key 用字段标识而非 cuid，
  *   链接可读也能长期分享。
- * - 点「应用筛选」才写 URL（边打字边跳会打断输入，也会把半成品条件当成筛选）。
+ * - 点“应用筛选”才写 URL（边打字边跳会打断输入，也会把半成品条件当成筛选）。
  * - 本期条件之间是"且"（同时满足），不做"或"。
  */
 export interface CustomFieldFilterProps {

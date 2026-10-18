@@ -46,7 +46,7 @@ export function scheduleLight(
 }
 
 /**
- * 从工序推算项目「实际完工日」（M15 · 断点④，与 scheduleLight 同族派生）。
+ * 从工序推算项目“实际完工日”（M15 · 断点④，与 scheduleLight 同族派生）。
  * 语义：项目**只有全部工序 completed 才算真完工**，完工日 = 各工序 actualEnd 的最大值。
  * 未完工 / 无工序 / 已完工工序缺 actualEnd → 返回 null（数据不自洽宁缺毋滥，不猜日期）。
  * 消费方据此 null 回落到既有诚实降级：scheduleLight 不判红、保修金基准回落到计划日。

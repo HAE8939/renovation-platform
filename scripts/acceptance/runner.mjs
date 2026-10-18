@@ -77,7 +77,7 @@ export async function withPlatform(name, cdpPort, body) {
   return rep.summary();
 }
 
-/** 从页面抓某段文本附近的金额，做「界面显示 ↔ DB 算出」交叉比对 */
+/** 从页面抓某段文本附近的金额，做“界面显示 ↔ DB 算出”交叉比对 */
 export async function moneyNear(br, needle) {
   return br.evaluate(`window.__A.afterMoney(${JSON.stringify(needle)})`);
 }

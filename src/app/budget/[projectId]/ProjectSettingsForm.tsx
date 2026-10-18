@@ -119,9 +119,9 @@ export function ProjectSettingsForm({ values }: { values: ProjectSettingsValues 
           {values.status === PROJECT_STATUS.archived ? (
             // 归档项目不渲染 Select：字段不提交时浏览器会把回落的首项交出去，
             // 等于改个地址就把项目悄悄放回全司口径。这里干脆不传 status，
-            // 由 updateProject 按「未传＝保持原值」处理。
+            // 由 updateProject 按“未传＝保持原值”处理。
             <div className="flex h-9 items-center text-[13px] text-muted">
-              已归档 · 需先在项目详情页点「恢复」
+              已归档 · 需先在项目详情页点“恢复”
             </div>
           ) : (
             <Select name="status" defaultValue={values.status}>

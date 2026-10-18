@@ -38,7 +38,7 @@ const {
   cashTone,
 } = dash;
 // crm 的阶段序列（纯常量文件，无 prisma，plain-node 可直 import）——用于锁死
-// 「驾驶舱漏斗阶段顺序」与「线索真实阶段顺序」不漂移。
+// “驾驶舱漏斗阶段顺序”与“线索真实阶段顺序”不漂移。
 const { LEAD_STAGE_ORDER } = await import(
   pathToFileURL(join(ROOT, "src/modules/crm/stages.ts")).href
 );
@@ -101,7 +101,7 @@ function check(name, ok, detail = "") {
 
 /* ── signedAmountAt ─────────────────────────────────────────────── */
 {
-  const now = new Date(2026, 9, 15); // 固定「本月」= 2026-10
+  const now = new Date(2026, 9, 15); // 固定“本月”= 2026-10
 
   // 场景一：本月计入、unsigned 不计、上月计入、更早月份不计
   const r1 = signedAmountAt([
@@ -364,7 +364,7 @@ function check(name, ok, detail = "") {
 
 /* ── monthKeysDescending / cashSeries / cashPeak / cashTone（M9-b-2b 追加）─ */
 
-// 第 14 条与「跨源不漂移护栏」共用的同一组三个月混合收支 rows
+// 第 14 条与“跨源不漂移护栏”共用的同一组三个月混合收支 rows
 // （2026-08/09/10 全覆盖，含一笔 1234.56 小数尾数；本地构造日期，禁字符串形式）。
 const oracleRows = [
   { type: "income", amount: 50000, date: new Date(2026, 9, 3) },
@@ -378,7 +378,7 @@ const oracleRows = [
 ];
 
 {
-  const NOW = new Date(2026, 9, 11); // 固定「当月」= 2026-10
+  const NOW = new Date(2026, 9, 11); // 固定“当月”= 2026-10
 
   // monthKeysDescending
   check("monthKeysDescending: n=6 由近到远、首元素=当月（JSON 整体比对含顺序）",
@@ -473,7 +473,7 @@ const oracleRows = [
   check("cashSeries: net 可为负（10000-24500=-14500）",
     negative[0].net === -14500, `net=${negative[0].net}`);
 
-  // 独立整数分预言机（不借用被测函数的浮点累加+round2 路径，逐行以「分」手算）：
+  // 独立整数分预言机（不借用被测函数的浮点累加+round2 路径，逐行以“分”手算）：
   //   2026-10 income = 5000000 + 123456 = 5123456 分 = 51234.56
   //          expense = 980050 分 = 9800.50；net = 5123456 - 980050 = 4143406 分 = 41434.06
   //   2026-09 income = 3000005 分 = 30000.05；expense = 1500075 分 = 15000.75
@@ -529,7 +529,7 @@ const oracleRows = [
     noThrowDirty && dirtyRow !== null && dirtyRow[0].income === 5 && dirtyRow[0].expense === 0,
     noThrowDirty ? JSON.stringify(dirtyRow) : "抛出异常");
 
-  // net 必须用「已各自 round2 的 income/expense」相减（手算）：
+  // net 必须用“已各自 round2 的 income/expense”相减（手算）：
   //   income 两笔 8.002 + 2.002 → 原始和 10.004 → round2 → 10.00
   //   expense 一笔 0.005 → round2 → 0.01（0.5 分进位）
   //   net = round2(10.00 - 0.01) = 9.99
@@ -575,7 +575,7 @@ const oracleRows = [
   // 为什么这么测：驾驶舱现金线（cashSeries）与财务台账（ledger 的
   // receivedTotal / expenseTotal）必须是同一把尺子——两处各自演进就会静默
   // 漂移（本项目 §5 已登记过同类口径漂移教训）。两文件互不 import，靠这里
-  // 对「同一组 rows」交叉比对整数分锁死，谁先改口径这里直接红。
+  // 对“同一组 rows”交叉比对整数分锁死，谁先改口径这里直接红。
   const { receivedTotal, expenseTotal } = await import(
     pathToFileURL(join(ROOT, "src/core/domain/ledger.ts")).href
   );

@@ -35,7 +35,7 @@ await withPlatform("s8-final", 9368, async ({ br, db, rep, go }) => {
     const atQuoted = (await db.lead.findUnique({ where: { id: lead.id } }))?.stage === "quoted";
     rep.ok("UI", "推进后停在", atQuoted ? "quoted（可签约）" : (await db.lead.findUnique({ where: { id: lead.id } }))?.stage);
 
-    await br.clickInRow(lead.name, "签约").catch(() => br.clickS("走「签约」→"));
+    await br.clickInRow(lead.name, "签约").catch(() => br.clickS("走“签约”→"));
     await br.settle(1200);
     rep.assert(/签约建项/.test((await br.dialogText()) || ""), "UI", "签约抽屉打开", ((await br.dialogText()) || "").slice(0, 40));
     await br.fillS("合同额", "268000");
@@ -67,10 +67,10 @@ await withPlatform("s8-final", 9368, async ({ br, db, rep, go }) => {
       const hit = segs.find((s) => s.trigger === "stages" && (s.triggerStages || "").split(",").map((x) => x.trim()).includes(n.name) && !s.paid);
       if (hit) { pick = { n, hit }; break; }
     }
-    if (!pick) return rep.note("PRE", "无「submitted 节点 ↔ 同名付款段」配对", "改为仅验审核通过写库");
+    if (!pick) return rep.note("PRE", "无“submitted 节点 ↔ 同名付款段”配对", "改为仅验审核通过写库");
     const { n, hit } = pick;
     const proj = await db.project.findUnique({ where: { id: n.projectId } });
-    rep.ok("PRE", "配对", `${proj.code} 节点「${n.name}」待审核 ↔ 付款段「${hit.name}」trigger=${hit.trigger}(${hit.triggerStages})`);
+    rep.ok("PRE", "配对", `${proj.code} 节点“${n.name}”待审核 ↔ 付款段“${hit.name}”trigger=${hit.trigger}(${hit.triggerStages})`);
 
     await go("/finance/payments?projectId=" + proj.id);
     const page0 = await br.text();
@@ -88,7 +88,7 @@ await withPlatform("s8-final", 9368, async ({ br, db, rep, go }) => {
     const page1 = await br.text();
     const i1 = page1.indexOf(hit.name);
     const segBlock1 = i1 < 0 ? null : page1.slice(i1, i1 + 300);
-    rep.assert(!!segBlock1 && /可收款|标记已付/.test(segBlock1), "UI↔派生", "★ 只改节点状态，付款段派生变「可收款」（解锁是读侧算出来的，没落库）", (segBlock1 || "查无该段").replace(/\s+/g, " ").slice(0, 120));
+    rep.assert(!!segBlock1 && /可收款|标记已付/.test(segBlock1), "UI↔派生", "★ 只改节点状态，付款段派生变“可收款”（解锁是读侧算出来的，没落库）", (segBlock1 || "查无该段").replace(/\s+/g, " ").slice(0, 120));
     const canMark = await br.evaluate(`(() => {
       const A = window.__A;
       const r = [...document.querySelectorAll('tr,li,div')].filter(A.visible).find(x=>A.norm(x.innerText).includes(${JSON.stringify(hit.name)}) && [...x.querySelectorAll('button')].some(b=>/标记已付/.test(A.textOf(b))));
@@ -96,7 +96,7 @@ await withPlatform("s8-final", 9368, async ({ br, db, rep, go }) => {
       const b = [...r.querySelectorAll('button')].find(x=>/标记已付/.test(A.textOf(x)));
       return { disabled: b.disabled === true, text: A.textOf(b) };
     })()`);
-    rep.assert(canMark && canMark.disabled === false, "UI", "该段「标记已付」按钮已解禁", JSON.stringify(canMark));
+    rep.assert(canMark && canMark.disabled === false, "UI", "该段“标记已付”按钮已解禁", JSON.stringify(canMark));
     const seg = await db.paymentNode.findUnique({ where: { id: hit.id } });
     rep.eq(seg?.paid, false, "DB", "段自身 paid 未被偷改（派生≠落库）");
     rep.eq(seg?.amountDue, hit.amountDue, "DB", "应收快照不随解锁变", String(seg?.amountDue));

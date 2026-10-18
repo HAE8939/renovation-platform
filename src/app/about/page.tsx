@@ -4,9 +4,9 @@ import { Card } from "@/core/ui";
 export const metadata = { title: "平台说明" };
 
 /**
- * /about —— 公开「门面页」。只放不含经营数字的定位介绍，
+ * /about —— 公开“门面页”。只放不含经营数字的定位介绍，
  * 完整文档（含教程、架构口径、模块细节、已知边界）在 /docs。
- * 口径来源 docs/PLATFORM_INTRODUCTION_V1.md 附录 C「官网介绍」档，敏感事实不外露。
+ * 口径来源 docs/PLATFORM_INTRODUCTION_V1.md 附录 C“官网介绍”档，敏感事实不外露。
  */
 export default function AboutPage() {
   return (
@@ -16,7 +16,7 @@ export default function AboutPage() {
         <h1 className="mt-3 text-[28px] font-semibold leading-[1.3]">装修经营全流程数字化工作台</h1>
         <p className="mt-4 max-w-prose text-[15px] leading-relaxed text-secondary">
           把线索、报价、项目交付和经营事实放在同一个平台里，让每一次记录都能回到对应的项目与客户。
-          它替代的不是某个软件，而是「Excel 报价单 + 微信群里的现场照片 + 口头汇报的进度 + 月底对不上的账」这套组合。
+          它替代的不是某个软件，而是“Excel 报价单 + 微信群里的现场照片 + 口头汇报的进度 + 月底对不上的账”这套组合。
         </p>
       </header>
 
@@ -32,7 +32,7 @@ export default function AboutPage() {
           <Card padded>
             <h3 className="text-[15px] font-medium">口径一致</h3>
             <p className="mt-2 text-[13px] leading-relaxed text-secondary">
-              全公司关于「钱」的算法只存在于一处，被脚本反复复算校验，从根上消灭「两个页面同一个指标对不上」。
+              全公司关于“钱”的算法只存在于一处，被脚本反复复算校验，从根上消灭“两个页面同一个指标对不上”。
             </p>
           </Card>
           <Card padded>

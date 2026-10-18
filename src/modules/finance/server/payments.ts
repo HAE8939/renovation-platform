@@ -182,9 +182,9 @@ export async function getPlanView(
 
 /**
  * 生成付款计划（守卫仿 schedule/generate.ts）。
- * - 项目不存在 → 「项目不存在」
- * - 已有付款段 → 「已存在付款计划，请先清空再生成」（防重复）
- * - contractAmount <= 0 → 「先在项目设置录入合同额」（UI 链 /budget/[projectId]/settings）
+ * - 项目不存在 → “项目不存在”
+ * - 已有付款段 → “已存在付款计划，请先清空再生成”（防重复）
+ * - contractAmount <= 0 → “先在项目设置录入合同额”（UI 链 /budget/[projectId]/settings）
  * 守卫过后 buildPaymentPlan(contractAmount)，对 unlocksAtOffsetMonths 的段算
  * unlocksAt = addMonthsUTC(actualEndDate ?? endDate ?? today, offset)（UTC 月算术），
  * 其余 unlocksAt=null；单事务 createMany 五行（paid 默认 false）。
@@ -232,7 +232,7 @@ export async function generatePlan(projectId: string): Promise<void> {
 
 /**
  * 清空付款计划。
- * - 存在 paid==true 的段 → 抛「已标记已付的段不可清空（付款事实会丢失）——如需纠正请先撤销已付」
+ * - 存在 paid==true 的段 → 抛“已标记已付的段不可清空（付款事实会丢失）——如需纠正请先撤销已付”
  * - 否则单事务 deleteMany。
  */
 export async function clearPlan(projectId: string): Promise<void> {
@@ -253,10 +253,10 @@ export async function clearPlan(projectId: string): Promise<void> {
 
 /**
  * 标记已付（硬门控 §1-5）。
- * - 段不存在 → 「付款段不存在」
+ * - 段不存在 → “付款段不存在”
  * - canMarkPaid(state, paid) 为 false：
- *   - 已付 → 「该段已标记已付」
- *   - 未解锁 → 「未解锁不可标记已付：{state.reason}」
+ *   - 已付 → “该段已标记已付”
+ *   - 未解锁 → “未解锁不可标记已付：{state.reason}”
  * - 通过则 paid=true, paidAt=new Date(), paidBy=getFinanceUser()?.id ?? null
  * - **绝不写 FinanceRecord**（决策②：两本账分离）
  */
@@ -318,7 +318,7 @@ export async function markPaid(id: string): Promise<void> {
 
 /**
  * 撤销已付（恒允许）。
- * - 段不存在 → 「付款段不存在」
+ * - 段不存在 → “付款段不存在”
  * - 置 paid=false, paidAt=null, paidBy=null
  */
 export async function unmarkPaid(id: string): Promise<void> {

@@ -253,12 +253,12 @@ const past = new Date("2025-01-01T00:00:00.000Z");
   // 路径 1：none 无日期 → 解锁（无验收依赖）
   const s1 = paymentUnlockState(mkNode({ trigger: "none", unlocksAt: null }), [], today);
   check("unlock: none 无日期 → 解锁", s1.unlocked === true, s1.reason);
-  check("unlock: none 无日期 reason 含「无验收依赖」", s1.reason.includes("无验收依赖"), s1.reason);
+  check("unlock: none 无日期 reason 含“无验收依赖”", s1.reason.includes("无验收依赖"), s1.reason);
 
   // 路径 1b：none 有日期，未到 → 锁（日期优先）
   const s2 = paymentUnlockState(mkNode({ trigger: "none", unlocksAt: future }), [], today);
   check("unlock: none 日期未到 → 锁", s2.unlocked === false, s2.reason);
-  check("unlock: none 日期未到 reason 含「保修期未至」", s2.reason.includes("保修期未至"), s2.reason);
+  check("unlock: none 日期未到 reason 含“保修期未至”", s2.reason.includes("保修期未至"), s2.reason);
 
   // 路径 1c：unlocksAt == today 边界 → 解锁（== today 视为已到）
   const s3 = paymentUnlockState(mkNode({ trigger: "none", unlocksAt: today }), [], today);
@@ -267,7 +267,7 @@ const past = new Date("2025-01-01T00:00:00.000Z");
   // 路径 1d：none 有日期，已过 → 解锁
   const s4 = paymentUnlockState(mkNode({ trigger: "none", unlocksAt: past }), [], today);
   check("unlock: none 日期已过 → 解锁", s4.unlocked === true, s4.reason);
-  check("unlock: none 日期已过 reason 含「保修期已至」", s4.reason.includes("保修期已至"), s4.reason);
+  check("unlock: none 日期已过 reason 含“保修期已至”", s4.reason.includes("保修期已至"), s4.reason);
 
   // 路径 2：stages 满足 → 解锁
   const s5 = paymentUnlockState(
@@ -284,8 +284,8 @@ const past = new Date("2025-01-01T00:00:00.000Z");
     today
   );
   check("unlock: stages 未通过 → 锁", s6.unlocked === false, s6.reason);
-  check("unlock: stages 未通过 reason 含「未通过」", s6.reason.includes("未通过"), s6.reason);
-  check("unlock: stages 未通过 missing 含「水电工程」", s6.missing.includes("水电工程"), JSON.stringify(s6.missing));
+  check("unlock: stages 未通过 reason 含“未通过”", s6.reason.includes("未通过"), s6.reason);
+  check("unlock: stages 未通过 missing 含“水电工程”", s6.missing.includes("水电工程"), JSON.stringify(s6.missing));
 
   // 路径 2c：stages 无对应节点
   const s7 = paymentUnlockState(
@@ -294,7 +294,7 @@ const past = new Date("2025-01-01T00:00:00.000Z");
     today
   );
   check("unlock: stages 无对应节点 → 锁", s7.unlocked === false, s7.reason);
-  check("unlock: stages 无对应节点 reason 含「无对应节点」", s7.reason.includes("无对应节点"), s7.reason);
+  check("unlock: stages 无对应节点 reason 含“无对应节点”", s7.reason.includes("无对应节点"), s7.reason);
 
   // 路径 2d：stages 节点清单空
   const s8 = paymentUnlockState(
@@ -303,7 +303,7 @@ const past = new Date("2025-01-01T00:00:00.000Z");
     today
   );
   check("unlock: stages 节点清单空 → 锁", s8.unlocked === false, s8.reason);
-  check("unlock: stages 节点清单空 reason 含「无对应节点」", s8.reason.includes("无对应节点"), s8.reason);
+  check("unlock: stages 节点清单空 reason 含“无对应节点”", s8.reason.includes("无对应节点"), s8.reason);
 
   // 路径 2e：主体四项部分未过
   const s9 = paymentUnlockState(
@@ -317,7 +317,7 @@ const past = new Date("2025-01-01T00:00:00.000Z");
     today
   );
   check("unlock: 主体四项部分未过 → 锁", s9.unlocked === false, s9.reason);
-  check("unlock: 主体四项 missing 含「地面工程」", s9.missing.includes("地面工程"), JSON.stringify(s9.missing));
+  check("unlock: 主体四项 missing 含“地面工程”", s9.missing.includes("地面工程"), JSON.stringify(s9.missing));
   check("unlock: 主体四项 missing 仅 1 项", s9.missing.length === 1, JSON.stringify(s9.missing));
 
   // 路径 3：all 满足 → 解锁
@@ -335,7 +335,7 @@ const past = new Date("2025-01-01T00:00:00.000Z");
     today
   );
   check("unlock: all 有未过节点 → 锁", s11.unlocked === false, s11.reason);
-  check("unlock: all reason 含「尚缺 1 项」", s11.reason.includes("尚缺 1 项"), s11.reason);
+  check("unlock: all reason 含“尚缺 1 项”", s11.reason.includes("尚缺 1 项"), s11.reason);
 
   // 路径 3c：all 节点清单空
   const s12 = paymentUnlockState(
@@ -344,7 +344,7 @@ const past = new Date("2025-01-01T00:00:00.000Z");
     today
   );
   check("unlock: all 节点清单空 → 锁", s12.unlocked === false, s12.reason);
-  check("unlock: all 节点清单空 reason 含「暂无验收节点」", s12.reason.includes("暂无验收节点"), s12.reason);
+  check("unlock: all 节点清单空 reason 含“暂无验收节点”", s12.reason.includes("暂无验收节点"), s12.reason);
 
   // 日期优先：段同时有日期（未来）+ stages 不满足 → 日期原因优先
   const s13 = paymentUnlockState(
@@ -353,7 +353,7 @@ const past = new Date("2025-01-01T00:00:00.000Z");
     today
   );
   check("unlock: 日期+stages 同时不满足 → 日期优先（锁）", s13.unlocked === false, s13.reason);
-  check("unlock: 日期优先 reason 含「保修期未至」", s13.reason.includes("保修期未至"), s13.reason);
+  check("unlock: 日期优先 reason 含“保修期未至”", s13.reason.includes("保修期未至"), s13.reason);
 }
 
 // ── payment: canMarkPaid 真值表 ────────────────────────────────

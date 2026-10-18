@@ -136,7 +136,7 @@ const KEY_ERR =
     J(coerceFieldValue({ type: "text", label: "名" }, "  瓷砖  ")));
   check("coerce: text 201 字 → 拒且文案含 200",
     J(coerceFieldValue({ type: "text", label: "名" }, "字".repeat(201))) ===
-      J({ ok: false, error: "「名」不能超过 200 个字符" }),
+      J({ ok: false, error: "“名”不能超过 200 个字符" }),
     J(coerceFieldValue({ type: "text", label: "名" }, "字".repeat(201))));
   check("coerce: text 200 字边界 → 通过",
     coerceFieldValue({ type: "text", label: "名" }, "字".repeat(200)).ok === true, "200 字合法");
@@ -145,7 +145,7 @@ const KEY_ERR =
     J(coerceFieldValue({ type: "textarea", label: "备注" }, "a\n\nb").columns.valueText));
   check("coerce: textarea 2001 字 → 拒且文案含 2000",
     J(coerceFieldValue({ type: "textarea", label: "备注" }, "字".repeat(2001))) ===
-      J({ ok: false, error: "「备注」不能超过 2000 个字符" }),
+      J({ ok: false, error: "“备注”不能超过 2000 个字符" }),
     J(coerceFieldValue({ type: "textarea", label: "备注" }, "字".repeat(2001))));
   check("coerce: number '5' → 5；'5.0' → 5",
     coerceFieldValue({ type: "number", label: "n" }, "5").columns.valueNumber === 5 &&
@@ -155,10 +155,10 @@ const KEY_ERR =
     coerceFieldValue({ type: "number", label: "n" }, "-3").columns.valueNumber === -3 &&
       coerceFieldValue({ type: "number", label: "n" }, "0").columns.valueNumber === 0,
     "负数与 0 均通过");
-  check("coerce: number 'abc'/'1.2.3'/'1e' → 同一句「应为数字」",
+  check("coerce: number 'abc'/'1.2.3'/'1e' → 同一句“应为数字”",
     ["abc", "1.2.3", "1e"].every((v) =>
       J(coerceFieldValue({ type: "number", label: "保修年限" }, v)) ===
-        J({ ok: false, error: "「保修年限」应为数字" })),
+        J({ ok: false, error: "“保修年限”应为数字" })),
     J(coerceFieldValue({ type: "number", label: "保修年限" }, "abc")));
   check("coerce: number Infinity/NaN 字面 → 拒（非有限）",
     ["Infinity", "NaN", "-Infinity"].every((v) =>
@@ -176,7 +176,7 @@ const KEY_ERR =
   check("coerce: date 2026-13-40 与 2026-02-30 → 拒（日历真实性）",
     ["2026-13-40", "2026-02-30", "2026-00-10"].every((v) =>
       J(coerceFieldValue({ type: "date", label: "复尺" }, v)) ===
-        J({ ok: false, error: "「复尺」应为有效日期（YYYY-MM-DD）" })),
+        J({ ok: false, error: "“复尺”应为有效日期（YYYY-MM-DD）" })),
     J(coerceFieldValue({ type: "date", label: "复尺" }, "2026-02-30")));
   check("coerce: date 缺补零 2026-1-5 与斜杠形态 → 拒（只收 YYYY-MM-DD）",
     ["2026-1-5", "2026/01/05", "20260105"].every((v) =>
@@ -186,13 +186,13 @@ const KEY_ERR =
     coerceFieldValue({ type: "select", label: "家电", options: ["不含家电", "仅厨电"] }, "仅厨电")
       .columns.valueText === "仅厨电",
     "命中选项");
-  check("coerce: select 越界 → 「值不在可选范围内」",
+  check("coerce: select 越界 → “值不在可选范围内”",
     J(coerceFieldValue({ type: "select", label: "家电", options: ["仅厨电"] }, "其他")) ===
-      J({ ok: false, error: "「家电」的值不在可选范围内" }),
+      J({ ok: false, error: "“家电”的值不在可选范围内" }),
     J(coerceFieldValue({ type: "select", label: "家电", options: ["仅厨电"] }, "其他")));
   check("coerce: select 无选项时任何值都越界",
     coerceFieldValue({ type: "select", label: "家电" }, "x").ok === false, "options 缺省 → 拒");
-  check("coerce: 未知 type → 「未知字段类型：money」",
+  check("coerce: 未知 type → “未知字段类型：money”",
     J(coerceFieldValue({ type: "money", label: "金额" }, "5")) ===
       J({ ok: false, error: "未知字段类型：money" }),
     J(coerceFieldValue({ type: "money", label: "金额" }, "5")));
@@ -220,9 +220,9 @@ const KEY_ERR =
 
 /* ── requiredEmptyError ───────────────────────────────────────── */
 {
-  check("requiredEmpty: required 且三列全 null → 「为必填」",
+  check("requiredEmpty: required 且三列全 null → “为必填”",
     requiredEmptyError({ label: "保修年限", required: true },
-      { valueText: null, valueNumber: null, valueDate: null }) === "「保修年限」为必填",
+      { valueText: null, valueNumber: null, valueDate: null }) === "“保修年限”为必填",
     requiredEmptyError({ label: "保修年限", required: true }, { valueText: null, valueNumber: null, valueDate: null }));
   check("requiredEmpty: valueNumber 0 算已填（0 不许当空）",
     requiredEmptyError({ label: "保修年限", required: true },
@@ -252,7 +252,7 @@ const KEY_ERR =
     "null/缺列/整行 null 均空串");
   check("valueToFormInput: 未知 type → 空串", valueToFormInput({ type: "money" }, { valueText: "x" }) === "",
     "脏类型不炸");
-  check("formatFieldValue: 未填 → U+2014「—」（非 ASCII 连字符）",
+  check("formatFieldValue: 未填 → U+2014“—”（非 ASCII 连字符）",
     formatFieldValue({ type: "text" }, null) === "—" && !formatFieldValue({ type: "text" }, null).includes("-"),
     formatFieldValue({ type: "text" }, null));
   check("formatFieldValue: date → 与项目中心 fmtDate 同款",
@@ -262,7 +262,7 @@ const KEY_ERR =
   check("formatFieldValue: textarea 换行折成空格（列表不撑高）",
     formatFieldValue({ type: "textarea" }, { valueText: "a\n\nb" }) === "a b",
     formatFieldValue({ type: "textarea" }, { valueText: "a\n\nb" }));
-  check("formatFieldValue: 未知 type → 「—」", formatFieldValue({ type: "money" }, { valueText: "x" }) === "—",
+  check("formatFieldValue: 未知 type → “—”", formatFieldValue({ type: "money" }, { valueText: "x" }) === "—",
     formatFieldValue({ type: "money" }, { valueText: "x" }));
   check("往返一致：number 5.50 → 表单 5.5",
     valueToFormInput({ type: "number" }, coerceFieldValue({ type: "number", label: "n" }, "5.50").columns) === "5.5",
@@ -344,20 +344,20 @@ const KEY_ERR =
       parseFilterParam("") === null && parseFilterParam(null) === null,
     "四种脏输入均 null");
   check("describeFilter: text 包含",
-    describeFilter({ label: "备注", type: "text" }, { fieldId: "x", type: "text", raw: "瓷砖" }) === "「备注」包含「瓷砖」",
+    describeFilter({ label: "备注", type: "text" }, { fieldId: "x", type: "text", raw: "瓷砖" }) === "“备注”包含“瓷砖”",
     describeFilter({ label: "备注", type: "text" }, { fieldId: "x", type: "text", raw: "瓷砖" }));
   check("describeFilter: select ＝",
-    describeFilter({ label: "家电", type: "select" }, { fieldId: "x", type: "select", raw: "仅厨电" }) === "「家电」＝「仅厨电」",
+    describeFilter({ label: "家电", type: "select" }, { fieldId: "x", type: "select", raw: "仅厨电" }) === "“家电”＝“仅厨电”",
     describeFilter({ label: "家电", type: "select" }, { fieldId: "x", type: "select", raw: "仅厨电" }));
   check("describeFilter: 区间 a ~ b",
     describeFilter({ label: "保修年限", type: "number" }, { fieldId: "x", type: "number", raw: "2", raw2: "5" }) ===
-      "「保修年限」2 ~ 5",
+      "“保修年限”2 ~ 5",
     describeFilter({ label: "保修年限", type: "number" }, { fieldId: "x", type: "number", raw: "2", raw2: "5" }));
   check("describeFilter: 只用 U+2265/U+2264，不写 >=/<=",
     (() => {
       const ge = describeFilter({ label: "保修年限", type: "number" }, { fieldId: "x", type: "number", raw: "2" });
       const le = describeFilter({ label: "保修年限", type: "number" }, { fieldId: "x", type: "number", raw: "", raw2: "5" });
-      return ge === "「保修年限」≥ 2" && le === "「保修年限」≤ 5" && !ge.includes(">=") && !le.includes("<=");
+      return ge === "“保修年限”≥ 2" && le === "“保修年限”≤ 5" && !ge.includes(">=") && !le.includes("<=");
     })(),
     describeFilter({ label: "保修年限", type: "number" }, { fieldId: "x", type: "number", raw: "2" }));
   check("describeFilter: 两端都空 / 未知 type → null",

@@ -6,7 +6,7 @@ import { CustomFieldError, getEntityValues, saveEntityValues } from "@/core/doma
 import { logAppError } from "@/core/domain/telemetry";
 
 /**
- * 项目「自定义字段」值录入的 Server Action（M9-c）。
+ * 项目“自定义字段”值录入的 Server Action（M9-c）。
  * 路由层薄：只把 FormData 拆成 {fieldId, raw} 交给 core 服务，校验与报错口径全在那边。
  *
  * 表单约定：每个字段的 input 名为 `cfv_<fieldId>`，值一律以字符串提交（数字与日期也是，

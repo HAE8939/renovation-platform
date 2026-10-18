@@ -36,7 +36,7 @@ function isOverdue(due: Date | null, status: string): boolean {
  * 表格（问题/项目/严重度/状态/责任人/截止/报告时间）+ 行点击开抽屉。
  *
  * 筛选走服务端 GET form（无客户端状态），选中值回填 select。空态分两态：
- * 无任何问题 → 引导；筛选无结果 → 「无符合条件的问题」。
+ * 无任何问题 → 引导；筛选无结果 → “无符合条件的问题”。
  */
 export default async function QualityIssuesPage({
   searchParams,
@@ -140,12 +140,12 @@ export default async function QualityIssuesPage({
       </form>
 
       {/* 深链指到一个已归档项目：台账按口径不含它的问题，必须说清楚为什么是空的，
-          否则用户只会以为记录被删了（M10-c「事按可见性」）。 */}
+          否则用户只会以为记录被删了（M10-c“事按可见性”）。 */}
       {data.archivedProjectName ? (
         <div className="rounded-card border border-line bg-surface px-4 py-3">
           <p className="text-[13px] leading-relaxed text-secondary">
-            「{data.archivedProjectName}」已归档，问题台账默认不显示已归档项目的问题
-            （驾驶舱的「未整改问题」同样不计）。记录并未删除：在项目中心恢复归档，
+            “{data.archivedProjectName}”已归档，问题台账默认不显示已归档项目的问题
+            （驾驶舱的“未整改问题”同样不计）。记录并未删除：在项目中心恢复归档，
             其问题即回到台账与待办视野。
           </p>
         </div>
@@ -174,7 +174,7 @@ export default async function QualityIssuesPage({
               暂无问题——验收退回自动建问题，也可手工新建
             </p>
             <p className="mt-2 text-[13px] leading-relaxed text-secondary">
-              审核退回验收节点时会自动建立关联问题；如需记录巡检发现的其他问题，点击右上角「+ 新建问题」。
+              审核退回验收节点时会自动建立关联问题；如需记录巡检发现的其他问题，点击右上角“+ 新建问题”。
             </p>
           </div>
         )}

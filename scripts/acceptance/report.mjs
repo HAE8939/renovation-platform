@@ -24,9 +24,9 @@ const TITLES = {
 
 let md = `# 交互写回路径验收报告 · 2026-10-13
 
-> 目的：闭合 STATUS §4-7（「交互写回路径尚未经人手验证」）。
+> 目的：闭合 STATUS §4-7（“交互写回路径尚未经人手验证”）。
 > 做法：**无头 Chrome 真点击**（裸 CDP，非只截图）→ 服务端收 → Prisma 落库 → 回读页面，三方对账。
-> 安全：全程打 \`_scratch/acceptance.db\`（dev.db 副本）；每个套件开跑前重灌副本；每套件收尾一条元断言「实库 md5 未变」。
+> 安全：全程打 \`_scratch/acceptance.db\`（dev.db 副本）；每个套件开跑前重灌副本；每套件收尾一条元断言“实库 md5 未变”。
 > 工具：\`_scratch/accept/\`（cdp.mjs / harness.mjs / runner.mjs / s*.mjs），不进生产代码。
 
 `;
@@ -50,7 +50,7 @@ md += `## 总计\n\nPASS **${tp}** · FAIL **${tf}** · NOTE **${tn}**（NOTE = 
 md += `## 未通过清单（逐条待裁定）\n\n`;
 for (const f of fails) md += `- **[${f.suite}] ${f.desc}**${f.detail ? ` — ${f.detail}` : ""}\n`;
 
-/* 逐条处置与「需 HAE 判断」两段是人工判定，放在 _scratch/logs/triage.md 里，
+/* 逐条处置与“需 HAE 判断”两段是人工判定，放在 _scratch/logs/triage.md 里，
    重新生成报告时自动接回——否则每次跑 report.mjs 都会把判定冲掉（已踩过一次）。 */
 const triagePath = resolve(ROOT, "_scratch", "logs", "triage.md");
 if (existsSync(triagePath)) {

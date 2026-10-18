@@ -9,10 +9,10 @@ import type {
 } from "@/modules/budget/server/catalog";
 
 /**
- * 「从科目库选入」面板。
+ * “从科目库选入”面板。
  * 数据来自 listCatalogForPicker()，只带快照需要的字段。选中即把模板当前值
  * 整行复制成报价明细 —— 复制完成即与科目库脱钩，改模板不回溯历史报价。
- * 面板本身不写库，只在本地多一行草稿，等点「保存」才落库。
+ * 面板本身不写库，只在本地多一行草稿，等点“保存”才落库。
  */
 export function CatalogPicker({
   catalog,
@@ -63,7 +63,7 @@ export function CatalogPicker({
       <div className="max-h-80 overflow-y-auto">
         {visible.length === 0 ? (
           <p className="px-4 py-6 text-[13px] text-secondary">
-            没有与「{query.trim()}」匹配的科目项。
+            没有与“{query.trim()}”匹配的科目项。
           </p>
         ) : (
           visible.map((category) => (

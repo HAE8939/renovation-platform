@@ -57,7 +57,7 @@ export interface CatalogSnapshot {
   sop: string;
 }
 
-/** 报价编辑器「从科目库选入」下拉框的数据。 */
+/** 报价编辑器“从科目库选入”下拉框的数据。 */
 export interface CatalogPickerCategory {
   id: string;
   name: string;
@@ -113,7 +113,7 @@ export async function listCatalogForPicker(): Promise<CatalogPickerCategory[]> {
 export async function createCategory(nameRaw: string): Promise<CatalogCategoryRow> {
   const name = requireText(nameRaw, "科目名称");
   const dup = await prisma.catalogCategory.findFirst({ where: { name } });
-  if (dup) throw new ValidationError(`科目「${name}」已存在`);
+  if (dup) throw new ValidationError(`科目“${name}”已存在`);
 
   const maxOrder = await nextOrder(
     (await prisma.catalogCategory.findMany({ select: { order: true } })).map((r) => r.order)
@@ -125,7 +125,7 @@ export async function createCategory(nameRaw: string): Promise<CatalogCategoryRo
 export async function updateCategory(id: string, nameRaw: string): Promise<void> {
   const name = requireText(nameRaw, "科目名称");
   const dup = await prisma.catalogCategory.findFirst({ where: { name, NOT: { id } } });
-  if (dup) throw new ValidationError(`科目「${name}」已存在`);
+  if (dup) throw new ValidationError(`科目“${name}”已存在`);
   await prisma.catalogCategory.update({ where: { id }, data: { name } });
 }
 
@@ -215,7 +215,7 @@ function positive(value: number, label: string): number {
   return value;
 }
 
-/** 表单字段统一清洗：文本去首尾空格，unit 空值回落「项」。 */
+/** 表单字段统一清洗：文本去首尾空格，unit 空值回落“项”。 */
 function normalizeItemInput(input: CatalogItemInput): Required<Pick<CatalogItemInput, "unit">> & CatalogItemInput {
   return {
     ...input,

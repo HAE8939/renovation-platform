@@ -73,7 +73,7 @@ export default async function FinanceLedgerPage({
 
   /**
    * 归档口径说明（M10-c）：只在真有归档项目参与本页时出现，无归档时一个字都不加。
-   * 说的是「哪些格子含它、哪些不含、为什么」——不写这句，员工只会看到
+   * 说的是“哪些格子含它、哪些不含、为什么”——不写这句，员工只会看到
    * 待收款莫名比已收款少一截，然后开始怀疑整本账。
    */
   const archivedNote = filteredArchived
@@ -186,7 +186,7 @@ export default async function FinanceLedgerPage({
           />
           <StatBox label="总支出" value={formatCny(summary.expenseTotal)} />
         </div>
-        {/* 归档口径说明（M10-c「钱按事实 · 事按可见性」）：
+        {/* 归档口径说明（M10-c“钱按事实 · 事按可见性”）：
             上方已收/支出/合同额/毛利含已归档项目的历史事实，
             待收款与计划未付不含。两格口径不同必须说出来，不能让数字自己圆谎。 */}
         {archivedNote ? (
@@ -214,7 +214,7 @@ export default async function FinanceLedgerPage({
               暂无{view === "income" ? "收入" : "支出"}记录——台账手工录入
             </p>
             <p className="mt-2 text-[13px] leading-relaxed text-secondary">
-              点击右上角「+ 新建记录」录入第一笔。
+              点击右上角“+ 新建记录”录入第一笔。
             </p>
           </div>
         )}

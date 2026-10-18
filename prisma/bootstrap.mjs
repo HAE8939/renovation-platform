@@ -2,7 +2,7 @@
  * prisma/bootstrap.mjs —— 空库最小引导（M13-c）
  *
  * 存在的理由：新容器挂空卷时，core/domain/projects.ts 会在无 Organization 时直接抛
- * 「请先运行 prisma db seed」，而 seed 会连演示客户/财务/线索一起灌进真实库。
+ * “请先运行 prisma db seed”，而 seed 会连演示客户/财务/线索一起灌进真实库。
  * 内测部署需要的是"能被使用的最小骨架"，不是"能被演示的数据集"。
  *
  * 本脚本只做两件事，且幂等（可重复执行、可放进 CMD）：
@@ -26,7 +26,7 @@ const BOSS_NAME = process.env.BOOTSTRAP_ADMIN_NAME || "管理员";
 /**
  * boss 而非 owner：USER_ROLE 常量表（core/domain/types.ts:58）里的老板值是 "boss"，
  * 没有 "owner"。历史上 seed 写的是 "owner"，只靠 resolveActor 的
- * 「缺 boss 则取最早的任意用户」兜底才没出错——那是巧合不是设计。
+ * “缺 boss 则取最早的任意用户”兜底才没出错——那是巧合不是设计。
  */
 const BOSS_ROLE = "boss";
 
@@ -50,7 +50,7 @@ async function main() {
   } else {
     const byEmail = await prisma.user.findUnique({ where: { email: BOSS_EMAIL } });
     if (byEmail) {
-      // 老库里的历史账号（seed 建的「管理员」）：补上合法角色，不动其它字段
+      // 老库里的历史账号（seed 建的“管理员”）：补上合法角色，不动其它字段
       await prisma.user.update({
         where: { id: byEmail.id },
         data: { role: BOSS_ROLE },

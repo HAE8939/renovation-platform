@@ -181,7 +181,7 @@ function RecheckForm({
       {mode === "pass" && (
         <div className="space-y-4">
           <p className="text-[13px] leading-relaxed text-primary">
-            确认复验通过并关闭此问题？关闭后问题进入「已关闭」终态。
+            确认复验通过并关闭此问题？关闭后问题进入“已关闭”终态。
           </p>
           <Field label="复验意见" hint="选填">
             <Textarea
@@ -256,7 +256,7 @@ function RecheckSubmitButton({
  * 头部（Drawer title = 问题标题）→ 严重度/状态徽章 → 描述 → 基础信息
  * （项目 / 来源节点 / 报告人 / 报告时间 / 责任人 / 截止）→ 整改记录 → 复验记录
  * → 动作区（按状态门控）：open→[标记已整改]；rectified→[复验通过·关闭]+[复验退回]；
- * closed→「已关闭」静默文案。错误红字回显，成功关抽屉。
+ * closed→“已关闭”静默文案。错误红字回显，成功关抽屉。
  *
  * issue 为 null 时（openId 未命中，不应发生）不渲染内容。
  */

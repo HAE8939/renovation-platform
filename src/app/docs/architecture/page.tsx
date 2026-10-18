@@ -36,7 +36,7 @@ export default function DocsArchitecture() {
         />
         <div className="mt-6">
           <Note>
-            一处实测限制：本栈（Prisma 5.22 + SQLite）不支持 <Code>Json</Code> 类型。因此自定义字段的多选项采用「每行一个选项」的纯文本约定，
+            一处实测限制：本栈（Prisma 5.22 + SQLite）不支持 <Code>Json</Code> 类型。因此自定义字段的多选项采用“每行一个选项”的纯文本约定，
             需要结构化的地方在服务层单点解析，而不是到处塞 JSON 字符串。
           </Note>
         </div>
@@ -53,9 +53,9 @@ export default function DocsArchitecture() {
         <div className="mt-6">
           <Note tone="accent">
             <strong className="font-medium text-primary">一条铁律撑起整个闭环：</strong>
-            所有功能区的业务表都必须经 <Code>projectId</Code> 挂在 <Code>Project</Code> 上，任何模块不得自建「项目」实体；
+            所有功能区的业务表都必须经 <Code>projectId</Code> 挂在 <Code>Project</Code> 上，任何模块不得自建“项目”实体；
             客户维度经 <Code>Project.clientId</Code> 间接关联。对内关联用 <Code>Project.id</Code>，对外展示与对账用可读的 <Code>Project.code</Code>（RP-YYYY-NNN）。
-            因此「一个项目的全部经营数据」在设计上就能被一次查询收齐。
+            因此“一个项目的全部经营数据”在设计上就能被一次查询收齐。
           </Note>
         </div>
         <div className="mt-4">
@@ -84,8 +84,8 @@ export default function DocsArchitecture() {
         />
         <div className="mt-6">
           <Muted>
-            这套手段确实抓到过真实缺陷：科目库一度没有「新增科目项」入口、归档后恢复项目错落「草稿」态、设置页四套主题卡显示同色、两处文案与新口径矛盾——它们的共同点是编译期与构建期全都发现不了。
-            平台还把「逻辑问题只能在真实使用中暴露」当前提来建设：全站绝大多数 catch 统一写入错误现场日志（JSONL），关键写操作统一经流水记录。员工说「这个数上周还不是这样」时，现场是可以被重建的。
+            这套手段确实抓到过真实缺陷：科目库一度没有“新增科目项”入口、归档后恢复项目错落“草稿”态、设置页四套主题卡显示同色、两处文案与新口径矛盾——它们的共同点是编译期与构建期全都发现不了。
+            平台还把“逻辑问题只能在真实使用中暴露”当前提来建设：全站绝大多数 catch 统一写入错误现场日志（JSONL），关键写操作统一经流水记录。员工说“这个数上周还不是这样”时，现场是可以被重建的。
           </Muted>
         </div>
       </DocsSection>

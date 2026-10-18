@@ -42,7 +42,7 @@ function LeadCard({
 }) {
   const next = nextStage(lead.stage);
   const stale = isStale(lead);
-  // §4-14：quoted→signed 不走通用推进（须经抽屉里的「签约建项」），故 quoted 卡不可拖、不显推进按钮。
+  // §4-14：quoted→signed 不走通用推进（须经抽屉里的“签约建项”），故 quoted 卡不可拖、不显推进按钮。
   const canAdvance = canGenericAdvance(lead.stage);
   const draggable = canAdvance;
 
@@ -98,7 +98,7 @@ function LeadCard({
       {canAdvance && next && <AdvanceStageForm leadId={lead.id} stage={next} variant="card" />}
       {lead.stage === "quoted" && (
         <p className="mt-3 text-[12px] leading-relaxed text-muted">
-          已报价 · 点卡片打开抽屉，走「签约建项」落定签约
+          已报价 · 点卡片打开抽屉，走“签约建项”落定签约
         </p>
       )}
     </Card>
@@ -138,7 +138,7 @@ export function LeadBoard({ leads }: { leads: LeadListItem[] }) {
     setDropStage(null);
   }, []);
 
-  // 仅允许拖到「下一列」（相邻且 idx+1）；回退列不处理（避免错误后退）。
+  // 仅允许拖到“下一列”（相邻且 idx+1）；回退列不处理（避免错误后退）。
   function handleDrop(target: LeadStage) {
     const id = dragId;
     const from = dragFrom;
@@ -161,7 +161,7 @@ export function LeadBoard({ leads }: { leads: LeadListItem[] }) {
   return (
     <>
       {advanceError && <p className="mb-3 text-[13px] text-danger">推进失败：{advanceError}</p>}
-      {/* M10-a UI-7：原为「横向滚动 + 每列固定 280px」，五列并排必然出底部滑块、
+      {/* M10-a UI-7：原为“横向滚动 + 每列固定 280px”，五列并排必然出底部滑块、
           看不全全部内容（HAE 意见 7）。改为响应式网格：窄屏两列换行、宽屏五列并排且列宽自适应。 */}
       <div className="mt-3 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <div className="contents">

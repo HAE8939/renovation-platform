@@ -10,7 +10,7 @@ await withPlatform("s1-catalog", 9361, async ({ br, db, rep, go, shot }) => {
   await rep.scenario("A1-1 新增科目", async () => {
     await go("/budget/catalog");
     await br.clickText("新增科目");
-    rep.ok("UI", "「新增科目」表单已展开", String(await br.evaluate("!!document.querySelector('input[name=name]')")));
+    rep.ok("UI", "“新增科目”表单已展开", String(await br.evaluate("!!document.querySelector('input[name=name]')")));
     await br.fill("科目名称", CAT);
     await br.clickText("创建科目", { type: "button" });
     await br.settle(1200);
@@ -28,7 +28,7 @@ await withPlatform("s1-catalog", 9361, async ({ br, db, rep, go, shot }) => {
     if (!cat) return rep.fail("PRE", "前置缺失：测试科目不存在");
     await br.clickInRow(CAT, "新增科目项");
     const dlg0 = await br.dialogText();
-    rep.assert(/新增科目项/.test(dlg0 || ""), "UI", "抽屉以「新增科目项」态打开", (dlg0 || "").slice(0, 40));
+    rep.assert(/新增科目项/.test(dlg0 || ""), "UI", "抽屉以“新增科目项”态打开", (dlg0 || "").slice(0, 40));
     rep.assert((dlg0 || "").includes(CAT), "UI", "抽屉标明所属科目", CAT);
     await br.fillS("编号", "TEST-01");
     await br.fillS("名称", "测试项");
@@ -83,7 +83,7 @@ await withPlatform("s1-catalog", 9361, async ({ br, db, rep, go, shot }) => {
     await br.settle(1000);
     const t1 = await orders();
     rep.assert(t1[t1.length - 2] === target && t1[t1.length - 1] !== target, "DB",
-      `「${target}」上移一位后 order 序列真的变了`, t1.join(" > "));
+      `“${target}”上移一位后 order 序列真的变了`, t1.join(" > "));
     await go("/budget/catalog");
     rep.assert(await br.hasText(target), "RST", "刷新后仍在列表里");
     const ui = await br.evaluate(`[...document.querySelectorAll('h3')].map(e=>window.__A.norm(e.innerText))`);

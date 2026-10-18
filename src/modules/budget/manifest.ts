@@ -13,7 +13,7 @@ export const budgetManifest: ModuleManifest = {
   requiresAuth: false,
   nav: [
     { label: "科目库", href: "/budget/catalog" },
-    // 「科目分布」刻意不放这里：nav 是全局静态清单、无法携带 projectId，
+    // “科目分布”刻意不放这里：nav 是全局静态清单、无法携带 projectId，
     // 写成 /budget/[projectId]/stats 会按字面量渲染成死链（实测 404）。
     // 项目级入口一律从详情页内部用带 id 的链接进入。
   ],

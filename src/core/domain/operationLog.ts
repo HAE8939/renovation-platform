@@ -1,7 +1,7 @@
 /**
  * operationLog.ts —— 操作流水唯一写入口（M10-a 备料二 · core 平台原语）
  *
- * 一句话：回答「这个数是谁、什么时候、从什么改成了什么」。
+ * 一句话：回答“这个数是谁、什么时候、从什么改成了什么”。
  *
  * 三条硬纪律（对应 schema 里 OperationLog 的注释，改动前先读那段）：
  * ① **best-effort**：记流水失败绝不把业务写入带下水——内部 try/catch 全包，异常转 telemetry。
@@ -26,7 +26,7 @@ export const FALLBACK_ACTOR = "user-local";
 
 /**
  * 内测期真人识别（M13-c 最小访问保护）：反代 basic auth 通过后注入
- * X-Platform-User，这里按 User.name 匹配到真实账号，让流水第一次能回答「是谁改的」。
+ * X-Platform-User，这里按 User.name 匹配到真实账号，让流水第一次能回答“是谁改的”。
  *
  * 信任链见 core/domain/accessGate.ts 顶部注释——应用只绑回环，该头由 Caddy 覆盖式注入。
  * 拿不到头、或 next/headers 在非请求上下文抛错（集成门禁走 tsx、构建期静态生成）
@@ -159,13 +159,13 @@ export async function listOperations(filter: ListOperationFilter = {}) {
 
 /* ── 摘要拼装小工具：让埋点处不写字符串拼接细节，口径统一 ───────── */
 
-/** 金额转「¥1,234.56」文本（流水里存文本，不做数值比较）。 */
+/** 金额转“¥1,234.56”文本（流水里存文本，不做数值比较）。 */
 export function moneyText(n: number | null | undefined): string {
   if (n === null || n === undefined || !Number.isFinite(Number(n))) return "—";
   return "¥" + Number(n).toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-/** 「字段：旧 → 新」一行；只拼真变了的项，全没变返回「（无字段变化）」。 */
+/** “字段：旧 → 新”一行；只拼真变了的项，全没变返回“（无字段变化）”。 */
 export function diffText(pairs: Array<[label: string, before: unknown, after: unknown]>): string {
   const changed = pairs.filter(([, b, a]) => String(b ?? "") !== String(a ?? ""));
   if (!changed.length) return "（无字段变化）";

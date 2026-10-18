@@ -1,7 +1,7 @@
 /**
  * s5-dash-print.mjs —— D2 驾驶舱对账（界面显示 ↔ 独立复算）+ A4 真打印分页
  * 驾驶舱是纯展示，但它把全司口径汇在一处，是发现算错的最快地方。
- * 打印这一条历史上只有 print-pdf.mjs 导过 PDF；本轮同时验「点打印按钮走的确实是打印样式」。
+ * 打印这一条历史上只有 print-pdf.mjs 导过 PDF；本轮同时验“点打印按钮走的确实是打印样式”。
  */
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -23,7 +23,7 @@ await withPlatform("s5-dash-print", 9365, async ({ br, db, rep, go, srv }) => {
   const ym = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
   const thisMonth = ym(now);
   const leadByProject = await db.lead.findMany({ where: { stage: "signed" }, select: { projectId: true, updatedAt: true } });
-  // 口径实测：本月签单额按「签约线索所建项目的 createdAt」计入（不是 lead.updatedAt）
+  // 口径实测：本月签单额按“签约线索所建项目的 createdAt”计入（不是 lead.updatedAt）
   const signedLeads = await db.lead.findMany({
     where: { stage: "signed" },
     select: { projectId: true, project: { select: { contractAmount: true, createdAt: true } } },
@@ -57,7 +57,7 @@ await withPlatform("s5-dash-print", 9365, async ({ br, db, rep, go, srv }) => {
     rep.assert(uiRate !== null && Math.abs(parseFloat(uiRate) - rate * 100) < 0.15, "UI↔算", "全司回款率一致（±0.15pp）", `页面 ${uiRate} · 算 ${ (rate * 100).toFixed(1)}`);
     const inProgress = projects.filter((p) => ["design", "in_progress", "acceptance"].includes(p.status)).length;
     rep.eq(grab("在建项目数"), String(inProgress), "UI↔DB", "在建项目数", `三态计数 ${inProgress}`);
-    rep.assert((await br.hasText("¥0.00")) === false || true, "UI", "现金折线空月按 0 显示而非「—」");
+    rep.assert((await br.hasText("¥0.00")) === false || true, "UI", "现金折线空月按 0 显示而非“—”");
   });
 
   await rep.scenario("D2-2 毛利率排行：不许出现假 100% 榜首", async () => {
@@ -76,8 +76,8 @@ await withPlatform("s5-dash-print", 9365, async ({ br, db, rep, go, srv }) => {
     const want1 = ((cents(p1.contractAmount) + chg1 - exp1) / (cents(p1.contractAmount) + chg1)) * 100;
     rep.assert((rows || "").includes(want1.toFixed(1)), "UI↔算", `001 毛利率 ${want1.toFixed(1)}% 在榜上`, (rows || "").slice(0, 80));
     const zeroSpend = projects.filter((p) => p.contractAmount > 0 && !records.some((r) => r.projectId === p.id && r.type === "expense"));
-    // 决策 15 的落地形态是「灰态置末 + 率显 —」，不是从列表里消失。
-    // 只看排行列表的每一行本身（M10-b 起块内多了「15%~25% 归黄档」这类口径脚注，
+    // 决策 15 的落地形态是“灰态置末 + 率显 —”，不是从列表里消失。
+    // 只看排行列表的每一行本身（M10-b 起块内多了“15%~25% 归黄档”这类口径脚注，
     // 拿整块文本找百分比会被脚注误报，实见一次）。
     const lineRows = await br.evaluate(`(() => {
       const A = window.__A;
@@ -90,7 +90,7 @@ await withPlatform("s5-dash-print", 9365, async ({ br, db, rep, go, srv }) => {
       const line = (lineRows || []).find((x) => x.includes(p.name));
       return !!line && /\d+(?:\.\d+)?\s*%/.test(line);
     });
-    rep.eq(bad.length, 0, "GUARD", "零支出项目不显示百分比（灰态置末、率显「—」）", `${zeroSpend.length} 个项目：${bad.map((p) => p.code).join(",") || "全部合规"}`);
+    rep.eq(bad.length, 0, "GUARD", "零支出项目不显示百分比（灰态置末、率显“—”）", `${zeroSpend.length} 个项目：${bad.map((p) => p.code).join(",") || "全部合规"}`);
   });
 
   await rep.scenario("D2-3 风险项数逐条可点开", async () => {
@@ -108,7 +108,7 @@ await withPlatform("s5-dash-print", 9365, async ({ br, db, rep, go, srv }) => {
     const p1 = projects.find((p) => p.code === CODE);
     await go(`/budget/${p1.id}/print`);
     const hasPrintBtn = await br.evaluate(`window.__A.hasText("打印")`);
-    rep.assert(hasPrintBtn, "UI", "打印页自带「打印」按钮");
+    rep.assert(hasPrintBtn, "UI", "打印页自带“打印”按钮");
     const pdf = await br.send("Page.printToPDF", {
       paperWidth: 8.27, paperHeight: 11.69, marginTop: 0.4, marginBottom: 0.4, marginLeft: 0.5, marginRight: 0.5,
       printBackground: true, preferCSSPageSize: true,

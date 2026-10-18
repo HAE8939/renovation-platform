@@ -286,9 +286,9 @@ function DeleteConfirmButton() {
  *
  * 展示区（只读信息行：类型徽章 recordTypeTone、科目徽章 CATEGORY_TONE、项目、
  * 金额右对齐 num、日期、摘要、录入人）→ 编辑区（与 Modal 同款字段、defaultValue
- * 填当前值、同样「类型↔科目联动」，提交 updateRecordAction）→ 删除区（两步确认：
- * 先「删除此记录」danger 描边不铺红底；点开后显「确认删除？此操作不可撤销」+
- * 红色「确认删除」提交 deleteRecordAction）。
+ * 填当前值、同样“类型↔科目联动”，提交 updateRecordAction）→ 删除区（两步确认：
+ * 先“删除此记录”danger 描边不铺红底；点开后显“确认删除？此操作不可撤销”+
+ * 红色“确认删除”提交 deleteRecordAction）。
  * 编辑/删除成功都 onClose() + router.refresh()（汇总即时重算＝派生收益）。
  */
 export function RecordDrawer({

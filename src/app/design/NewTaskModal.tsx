@@ -97,7 +97,7 @@ export function NewTaskModal({
               </Field>
             </div>
 
-            <Field label="负责人" hint="选填：留空即落「待分配」，可在任务详情里再指派">
+            <Field label="负责人" hint="选填：留空即落“待分配”，可在任务详情里再指派">
               <Select name="assigneeId" defaultValue="">
                 <option value="">待分配</option>
                 {users.map((u) => (

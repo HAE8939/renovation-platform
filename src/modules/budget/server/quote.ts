@@ -6,7 +6,7 @@ import { ValidationError } from "./projects";
 /**
  * 报价明细数据访问层。
  *
- * 这里只管「读」与「落库」，不出现任何金额算法 ——
+ * 这里只管“读”与“落库”，不出现任何金额算法 ——
  * 分组、行小计、直接费 / 税金 / 总价 / 单方造价一律由 modules/budget/lib/quote.ts 计算。
  *
  * 明细是整表替换：先删后插（单事务），order 按提交顺序重新编号。
@@ -111,16 +111,16 @@ function positive(value: number, label: string): number {
 
 /* ── 报价状态机与税率编辑（M15 断点③：接通写路径）────────────────────
  * 断点根因：status 字段（draft/confirmed/locked）自 M2-A 起就在 schema 里，lockedAt
- * 也留了位，但**全站没有任何一处能写入**——用户看得到「草稿/已确认/已锁定」徽章，
+ * 也留了位，但**全站没有任何一处能写入**——用户看得到“草稿/已确认/已锁定”徽章，
  * 却没有把报价从 draft 推到 confirmed 的入口；税率 taxRate 同样是只读展示、不能改。
  * 这段补上写侧与门控，报价确认后锁定编辑（明细与税率只读），locked 用于签约锁单场景。
  *
  * 三条不变量：
  *  ① **写侧走 status 门控**：saveQuoteItems / updateTaxRate 都要求 status='draft'，
- *     confirmed / locked 一律拒（中文错「报价已确认/已锁定…」直达 UI）；
+ *     confirmed / locked 一律拒（中文错“报价已确认/已锁定…”直达 UI）；
  *  ② **状态转移合法性集中一处**：assertQuoteStatusTransition 定义，服务与门禁共用；
  *     合法集：draft→confirmed、confirmed→draft、confirmed→locked。locked 是终态
- *     （签约锁单不可解，与 §4.6 变更单 client_confirmed 的「唯一受控出口」不同族——
+ *     （签约锁单不可解，与 §4.6 变更单 client_confirmed 的“唯一受控出口”不同族——
  *     报价锁是合同动作的一部分，解锁要走合同变更，不给静默口子）；
  *  ③ **税率边界**：0–1 之间（0.03=3%），越界拒。税率改动**只**影响下次 computeTotals，
  *     不回溯已 confirmed 的历史报价（同明细快照语义，AGENTS §5）。
@@ -197,7 +197,7 @@ export async function updateQuoteTaxRate(
     });
     if (!quote) throw new QuoteStatusError("报价不存在（请先在报价单页保存至少一行明细）");
     if (!isQuoteEditable(quote.status)) {
-      throw new QuoteStatusError(`当前报价状态为「${quote.status}」，不可改税率（先退回草稿）`);
+      throw new QuoteStatusError(`当前报价状态为“${quote.status}”，不可改税率（先退回草稿）`);
     }
     await tx.budgetQuote.update({ where: { id: quote.id }, data: { taxRate } });
     return { before: quote.taxRate, after: taxRate };

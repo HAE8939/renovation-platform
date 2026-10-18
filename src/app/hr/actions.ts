@@ -39,7 +39,7 @@ export async function addProjectMemberAction(formData: FormData) {
       entity: "projectMember",
       entityId: row.id,
       projectId: row.projectId,
-      summary: `为项目「${row.project.name}」（${row.project.code}）新增责任关系：${row.user.name} 任${PROJECT_MEMBER_ROLE_LABEL[row.role as keyof typeof PROJECT_MEMBER_ROLE_LABEL] ?? row.role}`,
+      summary: `为项目“${row.project.name}”（${row.project.code}）新增责任关系：${row.user.name} 任${PROJECT_MEMBER_ROLE_LABEL[row.role as keyof typeof PROJECT_MEMBER_ROLE_LABEL] ?? row.role}`,
       after: row.role,
     });
     revalidatePath("/hr");
@@ -59,7 +59,7 @@ export async function removeProjectMemberAction(formData: FormData) {
     entity: "projectMember",
     entityId: id,
     projectId: removed.projectId,
-    summary: `移除项目「${removed.projectName}」（${removed.projectCode}）的责任关系：${removed.userName} 任${PROJECT_MEMBER_ROLE_LABEL[removed.role as keyof typeof PROJECT_MEMBER_ROLE_LABEL] ?? removed.role}`,
+    summary: `移除项目“${removed.projectName}”（${removed.projectCode}）的责任关系：${removed.userName} 任${PROJECT_MEMBER_ROLE_LABEL[removed.role as keyof typeof PROJECT_MEMBER_ROLE_LABEL] ?? removed.role}`,
     before: removed.role,
   });
   revalidatePath("/hr");
@@ -83,7 +83,7 @@ export async function createWorkLogAction(formData: FormData) {
       entity: "workLog",
       entityId: row.id,
       projectId: row.projectId,
-      summary: `新增工作记录「${row.title}」· ${WORKLOG_CATEGORY_LABEL[row.category] ?? row.category} · ${row.workDate.toLocaleDateString("zh-CN")}${row.minutes ? ` · ${row.minutes} 分钟` : ""}`,
+      summary: `新增工作记录“${row.title}”· ${WORKLOG_CATEGORY_LABEL[row.category] ?? row.category} · ${row.workDate.toLocaleDateString("zh-CN")}${row.minutes ? ` · ${row.minutes} 分钟` : ""}`,
       after: row.category,
     });
     revalidatePath("/hr");
@@ -101,7 +101,7 @@ export async function archiveWorkLogAction(formData: FormData) {
     entity: "workLog",
     entityId: row.id,
     projectId: row.projectId,
-    summary: `归档工作记录「${row.title}」——仅从列表隐藏，仍计入工时统计（工时属事实族，见 §4.3）`,
+    summary: `归档工作记录“${row.title}”——仅从列表隐藏，仍计入工时统计（工时属事实族，见 §4.3）`,
     before: "active",
     after: "archived",
   });

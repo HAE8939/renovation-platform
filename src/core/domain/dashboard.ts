@@ -9,7 +9,7 @@
  *   失败，故不 import 任何东西，round2/round4 在文件内内联实现，公式与
  *   src/core/domain/pricing.ts 保持一致。
  * - 回款率色档唯一阈值 80% 来自 v5.1 §6.1。
- * - 签单额口径（只计「签约建项」项、按 createdAt 落本地日历月）来自
+ * - 签单额口径（只计“签约建项”项、按 createdAt 落本地日历月）来自
  *   TASK_M9 §1-10。
  */
 
@@ -56,7 +56,7 @@ export function prevMonthKey(key: string): string {
   return `${y}-${String(mo - 1).padStart(2, "0")}`;
 }
 
-/** 签单额归集的最小输入形状。signed = 该项目是否由「签约建项」而来（调用方用 Project.lead 非空判定）。 */
+/** 签单额归集的最小输入形状。signed = 该项目是否由“签约建项”而来（调用方用 Project.lead 非空判定）。 */
 export interface SignedInput {
   contractAmount: number;
   createdAt: Date;
@@ -70,7 +70,7 @@ export interface SignedInput {
  * 非有限值按 0 计（不计入）。
  * 返回 { month, prevMonth, momPct }：month/prevMonth 用 round2；
  * momPct = prevMonth > 0 ? round4((month - prevMonth) / prevMonth) : null
- * （上月为 0 → null，UI 显「上月无签单，不可比」）。
+ * （上月为 0 → null，UI 显“上月无签单，不可比”）。
  */
 export function signedAmountAt(
   items: SignedInput[],
@@ -95,7 +95,7 @@ export function signedAmountAt(
 
 /**
  * 回款率 = round4(received / receivable)。
- * receivable 非有限或 <= 0 → null（UI 显「—」，不得造 0%）；
+ * receivable 非有限或 <= 0 → null（UI 显“—”，不得造 0%）；
  * received 非有限按 0 参与计算；比值不设上限钳制，超收如实反映（>1）。
  */
 export function collectionRate(received: number, receivable: number): number | null {
@@ -158,7 +158,7 @@ export const FUNNEL_STAGE_ORDER = [
  * 商务漏斗阶段存量计数（TASK_M9 §7-1）。
  *
  * 只画当前 `Lead.stage` 的存量分布，**不画相邻阶段转化率**——本平台没有阶段
- * 流水表，`stage` 只有现值，「到达过某阶段」的累计数算不出来；用存量冒充转化率
+ * 流水表，`stage` 只有现值，“到达过某阶段”的累计数算不出来；用存量冒充转化率
  * ＝造假日指标（违反 §0 禁 mock 完成准则）。唯一真指标是签约率（见 leadConversion）。
  *
  * 按传入 `order` 顺序输出；`pct = count / total`（total = rows.length，含 order 外
@@ -195,7 +195,7 @@ export function funnelCounts(
 /**
  * 签约率 = signed 线索数 / 全部线索数（TASK_M9 §7-1 唯一真指标）。
  *
- * 分母 0 → `null`（UI 显「—」）；分子按 `stage === "signed"` 计数；四位舍入。
+ * 分母 0 → `null`（UI 显“—”）；分子按 `stage === "signed"` 计数；四位舍入。
  * 与 `funnelCounts` 中 signed 阶段的 `pct` 同值，但语义独立（一个画存量条、
  * 一个作真指标），口径单点收敛在此函数，页面不得各写算式。
  */

@@ -8,7 +8,7 @@ import { signLeadAction, type SignLeadState } from "@/modules/crm/actions";
 
 const initial: SignLeadState = {};
 
-/** 单行「签约」入口：按钮打开最小 Modal，提交调 signLeadAction。 */
+/** 单行“签约”入口：按钮打开最小 Modal，提交调 signLeadAction。 */
 export function SignLeadButton({ leadId }: { leadId: string }) {
   const [open, setOpen] = useState(false);
   const router = useRouter();

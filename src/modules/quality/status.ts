@@ -50,9 +50,9 @@ export function nodeStatusTone(status: string): NodeStatusTone {
 }
 
 /**
- * 节点显示标签（含派生文案「整改中」/「待重新提交」，§1-2）：
- * - returned + 有 open 问题 → 「整改中」（不落库，派生显示）
- * - returned + 无 open 问题 → 「待重新提交」
+ * 节点显示标签（含派生文案“整改中”/“待重新提交”，§1-2）：
+ * - returned + 有 open 问题 → “整改中”（不落库，派生显示）
+ * - returned + 无 open 问题 → “待重新提交”
  * - 其余 → 回 NODE_STATUS_LABEL
  * hasOpenIssues 由调用方先算（问题 status!=="closed" 计数 > 0）。
  */

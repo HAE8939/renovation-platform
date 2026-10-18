@@ -235,7 +235,7 @@ export default async function DesignBoardPage({
         </p>
         {scope === "mine" && (
           <p className="mt-2 text-[13px] text-secondary">
-            当前视角「指派给我」
+            当前视角“指派给我”
             {placeholder ? (
               <>
                 ：占位当前用户 <span className="font-medium text-primary">{placeholder.name}</span>
@@ -264,8 +264,8 @@ export default async function DesignBoardPage({
             </p>
             <p className="mt-2 text-[13px] leading-relaxed text-secondary">
               {scope === "mine"
-                ? "该用户名下没有指派的设计任务；切换「设计任务池」可查看全部任务。"
-                : "点击右上角「+ 新建任务」创建设计任务；录入后将在此按状态分列展示。"}
+                ? "该用户名下没有指派的设计任务；切换“设计任务池”可查看全部任务。"
+                : "点击右上角“+ 新建任务”创建设计任务；录入后将在此按状态分列展示。"}
             </p>
             {scope === "mine" && (
               <Link
@@ -277,7 +277,7 @@ export default async function DesignBoardPage({
             )}
           </div>
         ) : (
-          /* 看板：M10-a UI-8 由「横向滚动 + 固定 280px 列」改为响应式网格（HAE 意见 8） */
+          /* 看板：M10-a UI-8 由“横向滚动 + 固定 280px 列”改为响应式网格（HAE 意见 8） */
           <div className="mt-3 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <div className="contents">
               {DESIGN_TASK_STATUS_ORDER.map((status) => {

@@ -11,10 +11,10 @@ import {
 } from "./actions";
 
 /**
- * 项目「自定义字段」值录入（M9-c，client）。
+ * 项目“自定义字段”值录入（M9-c，client）。
  * - 控件按定义类型分派：单行文本→Input / 多行文本→textarea / 数字→Input number /
  *   日期→Input date / 单选→Select（选项来自定义，前端不猜类型、不写校验规则）。
- * - 必填项 label 后加「*」；**校验真源在服务端**（core 的 coerce + requiredEmpty），
+ * - 必填项 label 后加“*”；**校验真源在服务端**（core 的 coerce + requiredEmpty），
  *   这里只做输入形态约束（number/date 由控件本身门住）。
  * - 无在用定义 → 诚实空态 + 指向平台设置的引导（不显示空表框）。
  * - 保存后回显成功一行（不弹提示、不加动效）。

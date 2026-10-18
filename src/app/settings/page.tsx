@@ -7,7 +7,7 @@ import { SettingsPanels } from "./SettingsPanels";
  * 平台设置（M9-d）：主题切换 + 品牌 Logo。server component 取数，交互在 SettingsPanels（client）。
  *
  * 它是**平台工具页、不是业务模块**：不进 registry、不出现在侧栏导航与首页卡片，
- * 唯一入口是顶栏「设置」链（决策 7「顶栏入口」）。这样「可插拔业务模块」与「平台自身配置」
+ * 唯一入口是顶栏“设置”链（决策 7“顶栏入口”）。这样“可插拔业务模块”与“平台自身配置”
  * 两条线不混——侧栏永远只列功能区。
  */
 

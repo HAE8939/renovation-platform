@@ -140,7 +140,7 @@ export default async function QualityListPage({
                         <Link
                           href={`/quality/nodes/${n.id}`}
                           className="font-medium text-primary hover:text-accent-ink"
-                          title={`查看「${n.name}」验收节点`}
+                          title={`查看“${n.name}”验收节点`}
                         >
                           {n.name}
                         </Link>

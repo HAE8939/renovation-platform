@@ -58,7 +58,7 @@ export async function createLeadAction(
     await recordOperation({
       action: "lead.create",
       entity: "lead",
-      summary: `新建线索「${text("name")}」${text("estate") ? ` · ${text("estate")}` : ""}`,
+      summary: `新建线索“${text("name")}”${text("estate") ? ` · ${text("estate")}` : ""}`,
       after: `阶段 线索 · 意向 ${text("budgetRange") || "未填"}`,
     });
     return { ok: true };
@@ -91,7 +91,7 @@ export async function advanceStageAction(
       entity: "lead",
       entityId: leadId,
       projectId: leadOld?.projectId ?? null,
-      summary: `线索「${leadOld?.name ?? leadId}」阶段推进 ${leadOld?.stage ?? "?"} → ${stage}`,
+      summary: `线索“${leadOld?.name ?? leadId}”阶段推进 ${leadOld?.stage ?? "?"} → ${stage}`,
       before: leadOld?.stage ?? null,
       after: stage,
     });
@@ -144,7 +144,7 @@ export async function signLeadAction(
       entity: "lead",
       entityId: leadId,
       projectId: result.projectId,
-      summary: `签约建项「${leadForSign?.name ?? leadId}」→ ${signedProject ? `${signedProject.code} ${signedProject.name}` : result.projectId}，合同额 ${moneyText(Number(formData.get("contractAmount")))}${leadForSign ? `；签约前阶段「${stageText(leadForSign.stage)}」· 电话 ${leadForSign.phone ?? "未填"}` : ""}`,
+      summary: `签约建项“${leadForSign?.name ?? leadId}”→ ${signedProject ? `${signedProject.code} ${signedProject.name}` : result.projectId}，合同额 ${moneyText(Number(formData.get("contractAmount")))}${leadForSign ? `；签约前阶段“${stageText(leadForSign.stage)}”· 电话 ${leadForSign.phone ?? "未填"}` : ""}`,
       // before 存**机器值**（线索真实阶段码，原先这里硬编码 "quoted"、与真实阶段无关），
       // after 存结果标记；中文说明全在 summary（§4.3）。
       before: leadForSign?.stage ?? null,
@@ -221,7 +221,7 @@ export async function archiveLeadAction(
       entity: "lead",
       entityId: leadId,
       projectId: lead?.projectId ?? null,
-      summary: `${archived ? "作废" : "恢复"}线索「${lead?.name ?? leadId}」（${lead?.code ?? ""}）——${archived ? `作废前阶段「${stageText(lead?.stage)}」，作废后不进漏斗与待办视野` : `恢复到阶段「${stageText(lead?.stage)}」`}`,
+      summary: `${archived ? "作废" : "恢复"}线索“${lead?.name ?? leadId}”（${lead?.code ?? ""}）——${archived ? `作废前阶段“${stageText(lead?.stage)}”，作废后不进漏斗与待办视野` : `恢复到阶段“${stageText(lead?.stage)}”`}`,
       // before 存**阶段机器值**：恢复线索要靠它回写 stage，存中文会让回写校验失败而静默回落。
       before: archived ? (lead?.stage ?? null) : "archived",
       after: archived ? "archived" : (lead?.stage ?? null),

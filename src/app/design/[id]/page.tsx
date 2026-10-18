@@ -220,7 +220,7 @@ export default async function DesignTaskDetailPage({
           <p className="mt-2 text-[13px] text-secondary">
             当前负责人：
             <span className="text-primary">{task.assigneeName ?? "待分配"}</span>
-            。指派后「待分配」任务即进入「进行中」。
+            。指派后“待分配”任务即进入“进行中”。
           </p>
           <AssignTaskForm
             taskId={task.id}
@@ -238,8 +238,8 @@ export default async function DesignTaskDetailPage({
         </section>
       ) : (
         <p className="text-[13px] text-secondary">
-          当前任务状态为「{statusLabel}
-          」，暂不可提交{task.status === "submitted" ? "，请等待审核" : ""}。
+          当前任务状态为“{statusLabel}
+          ”，暂不可提交{task.status === "submitted" ? "，请等待审核" : ""}。
         </p>
       )}
 

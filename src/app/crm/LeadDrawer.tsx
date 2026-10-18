@@ -24,7 +24,7 @@ export { isStale, canSign, STAGE_BADGE };
 
 type LeadDetailData = Awaited<ReturnType<typeof getLeadDetailAction>>;
 
-/** 阶段到达「已报价」及之后（且尚未签约建项）可发起签约。 */
+/** 阶段到达“已报价”及之后（且尚未签约建项）可发起签约。 */
 const QUOTED_INDEX = LEAD_STAGE_ORDER.indexOf("quoted");
 function canSign(stage: LeadStage): boolean {
   return LEAD_STAGE_ORDER.indexOf(stage) >= QUOTED_INDEX;
@@ -44,7 +44,7 @@ function formatDate(d: Date | null): string {
   return date.toLocaleDateString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit" });
 }
 
-/** 是否「超 3 天未跟进」：未签约且（从未跟进 或 距最后跟进 > 3 天）。 */
+/** 是否“超 3 天未跟进”：未签约且（从未跟进 或 距最后跟进 > 3 天）。 */
 function isStale(lead: LeadListItem): boolean {
   if (lead.projectId) return false;
   if (!lead.lastFollowAt) return true;
@@ -62,7 +62,7 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-/** 抽屉内「添加跟进」表单：提交后通知父级刷新时间线。 */
+/** 抽屉内“添加跟进”表单：提交后通知父级刷新时间线。 */
 function AddFollowUpForm({
   leadId,
   onAdded,
@@ -237,7 +237,7 @@ export function LeadDrawer({
 /**
  * 可点开详情抽屉的线索表格（客户端）。
  * 整表放在客户端：行点击打开右侧抽屉；推进/签约等交互单元格阻止冒泡，
- * 不触发抽屉。保留 M3-d2 的「签约」按钮/列。Drawer 与 table 同级，避免非法嵌套。
+ * 不触发抽屉。保留 M3-d2 的“签约”按钮/列。Drawer 与 table 同级，避免非法嵌套。
  */
 export function LeadsTable({ leads }: { leads: LeadListItem[] }) {
   const [openId, setOpenId] = useState<string | null>(null);
@@ -295,8 +295,8 @@ export function LeadsTable({ leads }: { leads: LeadListItem[] }) {
                       {canGenericAdvance(l.stage) && next ? (
                         <AdvanceStageForm leadId={l.id} stage={next} />
                       ) : l.stage === "quoted" ? (
-                        // §4-14：quoted→signed 只走右侧「签约建项」，不给通用推进
-                        <span className="text-[13px] text-muted">走「签约」→</span>
+                        // §4-14：quoted→signed 只走右侧“签约建项”，不给通用推进
+                        <span className="text-[13px] text-muted">走“签约”→</span>
                       ) : (
                         <span className="text-[13px] text-secondary">已到末态</span>
                       )}

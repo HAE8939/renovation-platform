@@ -128,7 +128,7 @@ export async function updateTaskProgress(
     // syncAcceptanceNodes 是 quality 私有表唯一跨模块写入点（见 core/domain/acceptance.ts）。
     await syncAcceptanceNodes(task.projectId, tx);
     // M15 断点④：同一进度联动里回写项目实际完工日（全工序 completed → 各 actualEnd 最大值；
-    // 未完工 → null）。放同一事务，让「工序完工」与「项目实际完工日」原子一致，工期红灯与
+    // 未完工 → null）。放同一事务，让“工序完工”与“项目实际完工日”原子一致，工期红灯与
     // 保修金基准据此读到真值、不再回落计划日。syncProjectActualEnd 幂等（见 core/domain/projectCompletion.ts）。
     await syncProjectActualEnd(task.projectId, tx);
   });

@@ -94,7 +94,7 @@ export async function deleteFieldAction(
       action: "field.delete",
       entity: "fieldDef",
       entityId: id,
-      summary: `删除自定义字段「${defOld?.label ?? id}」（${defOld?.key ?? ""}），连带硬删 ${defOld?.valueCount ?? 0} 条已录值`,
+      summary: `删除自定义字段“${defOld?.label ?? id}”（${defOld?.key ?? ""}），连带硬删 ${defOld?.valueCount ?? 0} 条已录值`,
       // before 存**机器值**（字段 key）；人话进 summary——一格两用会让下游无从校验（§4.3）。
       before: defOld?.key ?? null,
     });
@@ -121,7 +121,7 @@ export async function toggleFieldActiveAction(
       action: "field.toggle",
       entity: "fieldDef",
       entityId: id,
-      summary: `${nextActive ? "启用" : "停用"}自定义字段「${defT?.label ?? id}」`,
+      summary: `${nextActive ? "启用" : "停用"}自定义字段“${defT?.label ?? id}”`,
       after: nextActive ? "active" : "inactive",
     });
     revalidateFieldSurfaces();

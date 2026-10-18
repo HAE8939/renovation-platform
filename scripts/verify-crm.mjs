@@ -1,7 +1,7 @@
 /**
  * verify-crm.mjs —— 签约客户归并纯函数回归校验（只读，纯函数，不碰库）
  *
- * 为什么存在：M3-d1 把「签约按手机号归并 Client」的归并决策抽成纯函数
+ * 为什么存在：M3-d1 把“签约按手机号归并 Client”的归并决策抽成纯函数
  * src/modules/crm/server/leadMatch.ts（不碰 DB、可被脚本 import 测）。
  * 本脚本把 TASK_M3_CRM §4 的归并用例变成可重跑门禁：直接 import 生产 TS
  * （Node 24 原生跑 .ts），再用独立预言机复算对照。
@@ -34,7 +34,7 @@ function check(name, ok, detail = "") {
   const b = normalizePhone(" 13900000001 ");
   const c = normalizePhone("139 0000 0001");
   check("normalizePhone: 三种本地写法归一相等", a === b && b === c && a === "13900000001",
-    `「139-0000-0001」→${a} / 「 13900000001 」→${b} / 「139 0000 0001」→${c}`);
+    `“139-0000-0001”→${a} / “ 13900000001 ”→${b} / “139 0000 0001”→${c}`);
 
   // 空 / null / 非数字 → null
   check("normalizePhone: 空串 → null", normalizePhone("") === null, "返回 null");
@@ -94,7 +94,7 @@ function check(name, ok, detail = "") {
   check("nextStage: 末态 signed → null", nextStage("signed") === null);
   check("nextStage: 未知阶段 → null", nextStage("bogus") === null);
 
-  // §4-14 收紧核心：quoted→signed 不走通用推进（须经「签约建项」）；余三格可通用推进；末态不可。
+  // §4-14 收紧核心：quoted→signed 不走通用推进（须经“签约建项”）；余三格可通用推进；末态不可。
   check("canGenericAdvance: leads/contacted/confirmed 可通用推进",
     canGenericAdvance("leads") === true &&
     canGenericAdvance("contacted") === true &&

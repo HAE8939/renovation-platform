@@ -160,13 +160,13 @@ export async function listChanges(
 /**
  * 新建变更单。
  * 守卫（纯输入校验在开事务前，存在性校验在事务内，仿 createRecord/createIssue）：
- * - kind ∈ CHANGE_KIND（「未知变更类型：X」）
- * - title 去空白必填（「变更描述不能为空」）
- * - amount 有限且按方向守卫（「减项金额应为负数」/「增项金额应为正数」/「变更金额不能为 0」）
- * - dateIso 可解析（「日期格式非法」）
- * - 占位录入人 getBudgetUser()，null → 「未找到录入人，请先运行 seed 初始化用户」
+ * - kind ∈ CHANGE_KIND（“未知变更类型：X”）
+ * - title 去空白必填（“变更描述不能为空”）
+ * - amount 有限且按方向守卫（“减项金额应为负数”/“增项金额应为正数”/“变更金额不能为 0”）
+ * - dateIso 可解析（“日期格式非法”）
+ * - 占位录入人 getBudgetUser()，null → “未找到录入人，请先运行 seed 初始化用户”
  * - note 去空白、可空（存 ""）
- * 事务内：经 projectId 查 BudgetQuote（一项目一报价）；不存在 → 「未找到报价单，请先在报价编辑器保存」。
+ * 事务内：经 projectId 查 BudgetQuote（一项目一报价）；不存在 → “未找到报价单，请先在报价编辑器保存”。
  * 写 createdBy=占位用户 id。
  */
 export async function createChange(
@@ -207,7 +207,7 @@ export async function createChange(
 
 /**
  * 编辑变更单（全字段覆盖式编辑）。
- * 守卫同 createChange；额外：id 不存在 → 「变更单不存在」。
+ * 守卫同 createChange；额外：id 不存在 → “变更单不存在”。
  * 不改 createdBy（保留原录入人=创建者）；updatedAt 由 @updatedAt 自动。
  * projectId 用于二次校验归属（防止跨项目改）：变更单 quoteId 必须属于该 projectId。
  */
@@ -261,18 +261,18 @@ export async function setChangeStatus(changeId: string, status: "pending" | "cli
 }
 
 /**
- * 撤销确认：client_confirmed → pending（§4.6「已知缺口」补口）。
+ * 撤销确认：client_confirmed → pending（§4.6“已知缺口”补口）。
  *
- * 为什么补这条边：§4.6 把变更单金额口径锁死为「只认 client_confirmed」，且刻意不给它出口——
+ * 为什么补这条边：§4.6 把变更单金额口径锁死为“只认 client_confirmed”，且刻意不给它出口——
  * 已确认金额不能被无痕改写或删除（updateChange / deleteChange 都拒绝 client_confirmed 行）。
  * 守卫本身对，但配合 m13b 的批量回填，一旦员工录错并被自动确认，此前**没有任何纠正路径**。
  * 本函数给的就是那条纠错边，而不是把已确认金额变成可无痕改写：
  *  - 只把状态退回 pending，并**即时从金额口径摘出**（两处聚合按 status==='client_confirmed' 过滤，退回 pending 自然掉出）；
- *  - 清空 confirmedAt / confirmedBy / confirmNote——留着它们会让一条 pending 行挂着「已确认时间」这种矛盾现场；
+ *  - 清空 confirmedAt / confirmedBy / confirmNote——留着它们会让一条 pending 行挂着“已确认时间”这种矛盾现场；
  *    原始确认信息不丢，全在撤销前后写入的操作流水里（before/after 可重建，§4.4）；
- *  - 退回 pending 后行可编辑（updateChange 允许 pending）、可再次确认，构成「撤销 → 纠错 → 再确认」闭环。
+ *  - 退回 pending 后行可编辑（updateChange 允许 pending）、可再次确认，构成“撤销 → 纠错 → 再确认”闭环。
  *
- * 幂等与守卫：非 client_confirmed 的行拒绝（避免把 pending/draft「撤销」成 pending 的无意义写入）。
+ * 幂等与守卫：非 client_confirmed 的行拒绝（避免把 pending/draft“撤销”成 pending 的无意义写入）。
  * 流水由动作层写（§4.4：埋点在动作层、不在事务内，防记流水失败连业务一起滚掉）。
  */
 export async function revokeChangeConfirm(changeId: string): Promise<void> {
@@ -341,7 +341,7 @@ export function changeAttachmentFiles(formData: FormData): File[] {
 
 /**
  * 删除变更单（硬删——单用户无回收站，TASK §4-M9-a）。
- * id 不存在 → 「变更单不存在」。删除不需要 getBudgetUser。
+ * id 不存在 → “变更单不存在”。删除不需要 getBudgetUser。
  * 不做归属校验：changeId 唯一且经 actions bind projectId 路径进来，
  * 跨项目删需先 listChanges 看到才点得到，无现实风险。
  */

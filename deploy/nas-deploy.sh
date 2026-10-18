@@ -3,7 +3,7 @@
 #
 # 为什么需要这个脚本而不是直接用 compose.internal.yml：
 # 极空间 Z0220021 上只有 docker 引擎与 CLI（26.1.4），**没有 docker compose**——面板的
-# 「编排容器」是它自己调 Docker HTTP API，不是 compose。而该机型是 aarch64，官方
+# “编排容器”是它自己调 Docker HTTP API，不是 compose。而该机型是 aarch64，官方
 # docker/compose 镜像给的是 amd64 的 v1 二进制（装上也跑不起来，实测已排除）。
 # 所以在这台机器上，本脚本就是部署入口；compose.internal.yml 保留给有 compose 的环境。
 # 两者是**等价关系**，改一个必须同步另一个（网络/卷/端口/环境变量逐项对齐）。

@@ -28,7 +28,7 @@ export interface ProjectManagementItem {
   designer: string | null;
   pm: string | null;
   updatedAt: Date;
-  /** 进度：来自排程工序的 overallProgress；无排程 → null（UI 显「未排程」）。 */
+  /** 进度：来自排程工序的 overallProgress；无排程 → null（UI 显“未排程”）。 */
   progress: number | null;
   /** 报价直接费（Σ 行小计）。 */
   quoteSubtotal: number;
@@ -37,7 +37,7 @@ export interface ProjectManagementItem {
   /** 报价总价（直接费 + 税）。 */
   quoteGrand: number;
   /**
-   * 未闭环事项（M10-c「归档允许但提示」，HAE 2026-10-13 拍板）：
+   * 未闭环事项（M10-c“归档允许但提示”，HAE 2026-10-13 拍板）：
    * 归档一个还有问题没整改、款没收齐的项目是合法动作，但必须**知情**——
    * 确认框里如实列出这些，归档后它们只是从待办视野消失，数据一律保留。
    */
@@ -133,7 +133,7 @@ export async function listProjectsForManagement(
     };
   });
 
-  // 未闭环读数（M10-c「归档允许但提示」）：两条 groupBy 拿全部项目的计数与金额，
+  // 未闭环读数（M10-c“归档允许但提示”）：两条 groupBy 拿全部项目的计数与金额，
   // 不做 N+1——一项目一查，30 个项目时就难看了。
   const ids = items.map((i) => i.id);
   const [issueGroups, payGroups] = await Promise.all([

@@ -9,8 +9,8 @@ import { canAssign, statusAfterAssign } from "../status";
  * 设计任务【新建与指派】服务（M5-e，接上主脊断点）。
  *
  * 存在的理由：design/server/tasks.ts 是 M5-a 的只读服务，看板/日历只渲染演示批次的任务，
- * 全站没有把一条设计任务写进库的入口——这是 PLATFORM_INTRODUCTION §8.2 点名的「主脊上最
- * 明确的断点」。本文件补齐写侧：新建（可同时指派）与对既有任务的指派/改派。
+ * 全站没有把一条设计任务写进库的入口——这是 PLATFORM_INTRODUCTION §8.2 点名的“主脊上最
+ * 明确的断点”。本文件补齐写侧：新建（可同时指派）与对既有任务的指派/改派。
  *
  * 三条纪律（沿 createIssue / createLead 既有写法）：
  *  - 输入校验（标题/类型/优先级/日期/指派门控）在开事务前做，避免无谓 DB 轮次；
@@ -48,7 +48,7 @@ export async function suggestDesignTaskCode(): Promise<string> {
 
 /**
  * 表单选项：非归档项目 + 全量用户，一次取回喂给新建 Modal 与详情页指派表单。
- * 项目按可见性排掉 archived（「事按可见性」，归档项目不应再被指派新设计任务）。
+ * 项目按可见性排掉 archived（“事按可见性”，归档项目不应再被指派新设计任务）。
  */
 export async function listDesignFormOptions(): Promise<{
   projects: DesignProjectOption[];
@@ -79,7 +79,7 @@ export interface CreateDesignTaskInput {
   /** 截止日期 "YYYY-MM-DD"；空 = 未排期（诚实空态，不造假 deadline）。 */
   deadlineIso?: string | null;
   priority?: string;
-  /** 建单时即指派（可空 → 落「待分配」）；非空须为库中真实 userId。 */
+  /** 建单时即指派（可空 → 落“待分配”）；非空须为库中真实 userId。 */
   assigneeId?: string | null;
 }
 
@@ -158,7 +158,7 @@ export async function createDesignTask(
  *  - 任务存在；
  *  - canAssign(status)（已提交/已通过不开放，给中文错）；
  *  - assigneeId 必须非空且为库中真实 userId（指派语义就是给一个负责人）。
- * 仅「待分配」会因指派推进为「进行中」；执行/返修中的改派保持原态（statusAfterAssign）。
+ * 仅“待分配”会因指派推进为“进行中”；执行/返修中的改派保持原态（statusAfterAssign）。
  * 本期不接登录，操作人由动作层写流水（action `design.assign`），服务层不多写别表。
  */
 export async function assignDesignTask(

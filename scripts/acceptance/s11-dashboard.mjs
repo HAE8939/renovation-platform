@@ -37,7 +37,7 @@ await withPlatform("s11-dashboard", 9375, async ({ br, db, rep, go, shot }) => {
     rep.assert(m?.firstRowLights.lines === 1 && m?.firstRowLights.height <= 24, "UI", "三灯排在同一行、没被挤成竖排", `${m?.firstRowLights.height}px · ${m?.firstRowLights.lines} 行`);
   });
 
-  await rep.scenario("DB2 项目名不截断（原来卡视图显「云栖名…」）", async () => {
+  await rep.scenario("DB2 项目名不截断（原来卡视图显“云栖名…”）", async () => {
     const names = await br.evaluate(`[...document.querySelectorAll('table tbody tr')].map(r=>window.__A.norm(r.children[0].innerText))`);
     const long = (await db.project.findMany({ where: { status: { not: "archived" } }, select: { name: true } })).map((p) => p.name);
     const missing = long.filter((n) => !names.some((cell) => cell.includes(n)));
@@ -45,7 +45,7 @@ await withPlatform("s11-dashboard", 9375, async ({ br, db, rep, go, shot }) => {
     rep.assert(names.every((x) => /RP-2026-/.test(x)), "UI", "每行同时带编号，便于对账");
   });
 
-  await rep.scenario("DB3 未录入支出的项目：毛利与毛利率一起置「—」，不给假数", async () => {
+  await rep.scenario("DB3 未录入支出的项目：毛利与毛利率一起置“—”，不给假数", async () => {
     const rows = await br.evaluate(`(() => {
       const t = document.querySelector('table');
       return [...t.querySelectorAll('tbody tr')].map(r => ({
@@ -62,7 +62,7 @@ await withPlatform("s11-dashboard", 9375, async ({ br, db, rep, go, shot }) => {
       const hasExpense = cents(exp._sum.amount) > 0;
       if (!hasExpense) {
         checked += 1;
-        rep.assert(r.profit === "—" && r.rate === "—", "口径", `${r.code} 无支出 → 毛利与率都不可算`, `毛利「${r.profit}」率「${r.rate}」`);
+        rep.assert(r.profit === "—" && r.rate === "—", "口径", `${r.code} 无支出 → 毛利与率都不可算`, `毛利“${r.profit}”率“${r.rate}”`);
       } else {
         const chg = await db.changeOrder.aggregate({ where: { quote: { projectId: p.id } }, _sum: { amount: true } });
         const want = (cents(p.contractAmount) + cents(chg._sum.amount) - cents(exp._sum.amount)) / 100;
@@ -83,7 +83,7 @@ await withPlatform("s11-dashboard", 9375, async ({ br, db, rep, go, shot }) => {
         items: [...sec.querySelectorAll('li')].filter(x=>/打开模块/.test(x.innerText)).map(x=>A.norm(x.innerText).slice(0,40)),
       };
     })()`);
-    rep.assert(!!strip, "UI", "「需要你处理」清单在位");
+    rep.assert(!!strip, "UI", "“需要你处理”清单在位");
     rep.assert(!/人效|未接入/.test(strip?.text || ""), "GUARD", "占位组（人员管控未上线）不混进待办清单", (strip?.text || "").slice(0, 40));
     const want = {
       node: await db.acceptanceNode.count({ where: { status: "submitted", project: { status: { not: "archived" } } } }),

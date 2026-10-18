@@ -54,10 +54,10 @@ await withPlatform("s10-splash", 9370, async ({ br, db, rep, go, shot, srv }) =>
     await go("/");
     await br.settle(2400);
     await br.evaluate(`window.__A.clickS ? true : true`);
-    // 「平台说明」CTA 现挂真链接（见文末 SP3b）；这里不点它，避免导航离开首页打断「三种收起」。
+    // “平台说明”CTA 现挂真链接（见文末 SP3b）；这里不点它，避免导航离开首页打断“三种收起”。
     await br.clickText("进入平台");
     await br.settle(900);
-    rep.eq(await br.evaluate(`!!document.querySelector('.splash')`), false, "UI", "点「进入平台」后首屏移除");
+    rep.eq(await br.evaluate(`!!document.querySelector('.splash')`), false, "UI", "点“进入平台”后首屏移除");
     rep.assert(await br.hasText("选择一个工作入口"), "UI", "收起后是原来的模块索引页（功能未丢）");
     rep.assert(await br.hasText("数据驾驶舱"), "UI", "模块清单完整（首个模块在列）");
     const bodyOverflow = await br.evaluate(`document.body.style.overflow`);
@@ -82,7 +82,7 @@ await withPlatform("s10-splash", 9370, async ({ br, db, rep, go, shot, srv }) =>
     // 内测台闸默认关 → /docs 可达；线上 /docs 含内部口径，须经反向代理口令入口（AGENTS §7.1）。
     await br.clickText("平台说明");
     await br.settle(900);
-    rep.assert((await br.url()).includes("/docs"), "UI", "点「平台说明」跳转到文档站 /docs", await br.url());
+    rep.assert((await br.url()).includes("/docs"), "UI", "点“平台说明”跳转到文档站 /docs", await br.url());
     rep.assert(await br.hasText("装修经营全流程数字化管理平台"), "UI", "/docs 总览页正常渲染，不是 404");
   });
 
@@ -92,11 +92,11 @@ await withPlatform("s10-splash", 9370, async ({ br, db, rep, go, shot, srv }) =>
     const n = await db.$queryRaw`SELECT 1`.then(() => null).catch(() => null);
     const text = await br.evaluate(`window.__A.after("个功能模块", 8)`);
     const eyebrow = await br.evaluate(`(() => {const el=document.querySelector('.splash-eyebrow');return el?window.__A.norm(el.innerText):null})()`);
-    rep.assert(!!eyebrow && !/数字化管理平台/.test(eyebrow), "UI", "eyebrow 不再与标题撞字（标题已含「数字管理平台」）", String(eyebrow));
+    rep.assert(!!eyebrow && !/数字化管理平台/.test(eyebrow), "UI", "eyebrow 不再与标题撞字（标题已含“数字管理平台”）", String(eyebrow));
     const title = await br.evaluate(`(() => {const el=document.querySelector('.splash-title');return el?window.__A.norm(el.innerText):null})()`);
     rep.assert(!!eyebrow && eyebrow.includes("装修经营"), "UI", "文案是平台自己的（不是模板占位）", String(eyebrow));
-    rep.assert(!!title && title.includes("一站式") && title.includes("数字管理平台"), "UI", "主标题按 HAE 定的文案「一站式数字管理平台」", String(title));
-    rep.note("UI", "副标题里的模块数取自 registry", `「${text ?? ""}」前文=${String(await br.evaluate("window.__A.after('9 ',14)"))}`);
+    rep.assert(!!title && title.includes("一站式") && title.includes("数字管理平台"), "UI", "主标题按 HAE 定的文案“一站式数字管理平台”", String(title));
+    rep.note("UI", "副标题里的模块数取自 registry", `“${text ?? ""}”前文=${String(await br.evaluate("window.__A.after('9 ',14)"))}`);
     void n;
   });
 

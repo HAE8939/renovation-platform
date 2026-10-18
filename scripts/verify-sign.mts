@@ -3,7 +3,7 @@
  *
  * 为什么存在：verify-crm.mjs 只断言归并的纯函数决策（normalizePhone/pickClientByPhone），
  * 覆盖不到 signLead→createProject 的**事务传播**与**幂等**——M3-d2 正是靠本脚本抓出
- * 「signLead 自开事务建 Client、createProject 又开独立事务看不见它」的真 bug（SQLite 隔离）。
+ * “signLead 自开事务建 Client、createProject 又开独立事务看不见它”的真 bug（SQLite 隔离）。
  * 集成门禁必须真跑生产 signLead，故用 tsx 解析 @/ 别名直连。
  *
  * 运行配方（三步，指向一个临时库）：

@@ -42,8 +42,8 @@ export function AdvanceStageForm({
     >
       <SubmitBtn className={btnClass}>
         {variant === "card"
-          ? `→ 下一阶段「${LEAD_STAGE_LABEL[stage]}」`
-          : `推进到「${LEAD_STAGE_LABEL[stage]}」`}
+          ? `→ 下一阶段“${LEAD_STAGE_LABEL[stage]}”`
+          : `推进到“${LEAD_STAGE_LABEL[stage]}”`}
       </SubmitBtn>
       {state.error && <p className="mt-1 text-[12px] text-danger">{state.error}</p>}
     </form>

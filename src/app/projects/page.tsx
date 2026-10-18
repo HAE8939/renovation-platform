@@ -37,7 +37,7 @@ function formatDate(d: Date): string {
   return d.toLocaleDateString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit" });
 }
 
-/** 进度：有排程显 {n}%；无排程显灰色「未排程」（撤掉恒「未接入」文案）。 */
+/** 进度：有排程显 {n}%；无排程显灰色“未排程”（撤掉恒“未接入”文案）。 */
 function ProgressCell({ progress }: { progress: number | null }) {
   if (progress == null) {
     return (
@@ -145,7 +145,7 @@ export default async function ProjectsListPage({
     })
     .filter((x): x is string => x !== null);
 
-  // 空状态要区分「筛完了没有」与「库里根本没有」：前者给「清除筛选」，后者给建项指路。
+  // 空状态要区分“筛完了没有”与“库里根本没有”：前者给“清除筛选”，后者给建项指路。
   const filtersActive = Boolean(status) || applied.length > 0;
 
   return (
@@ -194,12 +194,12 @@ export default async function ProjectsListPage({
               </a>
             </Card>
           ) : (
-            // 真空状态（无任何项目）：项目中心是「签约后」的工作台，本身不建项——
+            // 真空状态（无任何项目）：项目中心是“签约后”的工作台，本身不建项——
             // 建项走预算报价，签约生成走 CRM。给出明确指路，而不是就地放一个绕过签约链路的建项按钮。
             <Card className="mt-3 py-8 text-center">
               <p className="text-[15px] font-medium text-primary">还没有项目</p>
               <p className="mx-auto mt-2 max-w-prose text-[13px] leading-relaxed text-secondary">
-                项目由报价或签约产生：在「装修预算报价」里录入新项目，或在「线索 CRM」把成交线索签约后自动生成。
+                项目由报价或签约产生：在“装修预算报价”里录入新项目，或在“线索 CRM”把成交线索签约后自动生成。
               </p>
               <div className="mt-4 flex items-center justify-center gap-4">
                 <Link href="/budget" className="text-[13px] text-accent-ink hover:underline underline-offset-4">

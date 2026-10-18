@@ -195,12 +195,12 @@ function MarginDot({ light }: { light: "green" | "yellow" | "red" | "neutral" })
 /**
  * 毛利卡（M8-d）：毛利额 + 毛利率 + marginLight 色点 + 收支台账链。
  * 毛利依赖台账支出入账、不依赖报价，故置于 BudgetTab 顶部、q.exists 判断之外，
- * 无报价单也显示。marginRate==null（合同额未录入）→ 毛利率「—」+ 灰态提示，
+ * 无报价单也显示。marginRate==null（合同额未录入）→ 毛利率“—”+ 灰态提示，
  * 不造 0%。色点用语义色（success/warning/danger），neutral→bg-sunken。
  *
  * §4-16 收口（M9-e）：有合同额但**零支出**的项目，按公式毛利率恰得 100%——与驾驶舱决策 15
- * 「剔除无成本数据的 100%」同判定，这里也降级：毛利率显「—」、色点转灰、提示「未录入支出，
- * 毛利率不可算」。毛利额仍如实显示（它是台账真值，只是尚无支出可抵）。仅改显示层，
+ * “剔除无成本数据的 100%”同判定，这里也降级：毛利率显“—”、色点转灰、提示“未录入支出，
+ * 毛利率不可算”。毛利额仍如实显示（它是台账真值，只是尚无支出可抵）。仅改显示层，
  * 不动 grossProfit/marginRate 口径函数（§4-17 负变更口径维持现状）。
  */
 function GrossProfitCard({ hub }: { hub: ProjectHub }) {
@@ -276,7 +276,7 @@ function BudgetTab({ hub }: { hub: ProjectHub }) {
       {!q || !q.exists ? (
         <EmptyTab
           title="该项目暂无报价单"
-          note="在「装修预算报价」为该项目编制报价后，这里会显示直接费 / 税金 / 总价与分科目占比。"
+          note="在“装修预算报价”为该项目编制报价后，这里会显示直接费 / 税金 / 总价与分科目占比。"
         />
       ) : (
         <>
@@ -343,7 +343,7 @@ function PeopleTab({ hub }: { hub: ProjectHub }) {
         <Row label="预算员" value={hub.people.budgetAnalyst} />
       </dl>
       <p className="mt-4 text-xs leading-relaxed text-muted">
-        绩效得分与考核维度将在「人员管控」模块上线后接入此处。
+        绩效得分与考核维度将在“人员管控”模块上线后接入此处。
       </p>
     </div>
   );
@@ -386,7 +386,7 @@ function ScheduleTab({ hub }: { hub: ProjectHub }) {
       <div className="rounded-card border border-line bg-surface px-6 py-12 text-center">
         <p className="text-[15px] font-medium text-secondary">该项目暂无排程</p>
         <p className="mx-auto mt-2 max-w-prose text-[13px] leading-relaxed text-muted">
-          在「时间管控」按面积档一键生成排程后，这里会显示整体进度、工期预警与工序清单。
+          在“时间管控”按面积档一键生成排程后，这里会显示整体进度、工期预警与工序清单。
         </p>
         <Link
           href={`/schedule/${hub.id}`}
@@ -461,7 +461,7 @@ function DesignTab({ hub }: { hub: ProjectHub }) {
       <div className="rounded-card border border-line bg-surface px-6 py-12 text-center">
         <p className="text-[15px] font-medium text-secondary">该项目暂无设计任务</p>
         <p className="mx-auto mt-2 max-w-prose text-[13px] leading-relaxed text-muted">
-          在「设计管理」为该项目分派设计任务后，这里会显示任务总量与各状态分布。
+          在“设计管理”为该项目分派设计任务后，这里会显示任务总量与各状态分布。
         </p>
       </div>
     );

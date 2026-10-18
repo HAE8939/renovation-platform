@@ -3,7 +3,7 @@
  *
  * 为什么存在：verify-design.mjs 只断言纯函数；createDesignTask / assignDesignTask 的
  * 事务、关联实体存在性校验、状态推进与编号生成必须真跑生产服务层才能覆盖
- * （承 STATUS §8「改服务层写入 → 集成门禁零回退」）。M5-e 是全站第一次有设计任务写入口，
+ * （承 STATUS §8“改服务层写入 → 集成门禁零回退”）。M5-e 是全站第一次有设计任务写入口，
  * 断链风险最高，必须有独立集成门禁兜住。
  *
  * 隔离库：_scratch/design-flow.db（run-gates 会 prisma migrate reset 自动建表 + seed）。

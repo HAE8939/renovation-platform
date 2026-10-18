@@ -9,7 +9,7 @@ import { USER_ROLE, type UserRole } from "./types";
  *
  * 其余角色（designer / pm / inspector / budget_mgr / ops / viewer 等）
  * 暂不臆造规则 —— 留 TODO，等 P4 接入真实认证与更细粒度视角再补。
- * 这是「视角过滤 + 按钮显隐」层级，非安全边界（AGENTS §7 RBAC DEFERRED）。
+ * 这是“视角过滤 + 按钮显隐”层级，非安全边界（AGENTS §7 RBAC DEFERRED）。
  */
 
 /** crm 模块用到的动作。后续可加 sign / export 等。 */

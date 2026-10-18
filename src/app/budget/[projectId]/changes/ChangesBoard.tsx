@@ -56,8 +56,8 @@ export interface ChangesBoardProps {
  * 变更单看板（M9-a，client）。
  * - 列表：日期 / 类型 label / 描述 / 金额（带符号、num 右对齐）/ 原因截断 / 操作。
  * - 新建/编辑用 Modal（描述* / 类型 select* / 金额* 数字可负 + hint / 日期* 默认今天 / 原因说明）。
- * - 删除=行内两步确认（首点变「确认删除」danger 描边，再点执行；2 秒复位）。
- * - 空态「暂无变更单」+ 引导。
+ * - 删除=行内两步确认（首点变“确认删除”danger 描边，再点执行；2 秒复位）。
+ * - 空态“暂无变更单”+ 引导。
  *
  * 口径：金额展示只用 formatSignedCny；累计变更/预警判定只用服务端传入的 changeTotal/changeWarn
  * （page.tsx 已调 ledger.changeTotal/changeWatch），客户端不再各写算式。
@@ -199,7 +199,7 @@ function ChangeRow({
         {row.status === "pending" ? <><form action={changeStatusFormAction}><input type="hidden" name="projectId" value={projectId} /><input type="hidden" name="changeId" value={row.id} /><input type="hidden" name="status" value="client_confirmed" /><Button size="sm" type="submit">客户确认</Button></form><form action={changeStatusFormAction}><input type="hidden" name="projectId" value={projectId} /><input type="hidden" name="changeId" value={row.id} /><input type="hidden" name="status" value="rejected" /><Button size="sm" variant="danger" type="submit">驳回</Button></form></> : null}
         {row.status === "client_confirmed" ? (
           <>
-            {/* 已确认行不能直接编辑或删除（金额不得被无痕改写）；纠错走「撤销确认」：
+            {/* 已确认行不能直接编辑或删除（金额不得被无痕改写）；纠错走“撤销确认”：
                 退回待确认 → 即时从经营口径摘出 → 改 → 再确认。留流水可追溯（§4.6）。 */}
             <span className="text-[12px] text-muted whitespace-nowrap">金额已计入</span>
             <form action={revokeChangeFormAction}>
@@ -227,7 +227,7 @@ function ChangeRow({
   );
 }
 
-/** 行内两步删除：首点「删除」→ 变「确认删除」danger 描边；再点执行；2 秒复位。 */
+/** 行内两步删除：首点“删除”→ 变“确认删除”danger 描边；再点执行；2 秒复位。 */
 function DeleteInlineButton({
   projectId,
   changeId,

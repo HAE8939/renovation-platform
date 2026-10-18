@@ -11,12 +11,12 @@ import { getDashboardOverview } from "@/modules/dashboard/server/overview";
 /**
  * 数据驾驶舱页面（M9-b-1 建页 · M10-b 排版改版）。
  * server component，零客户端交互；全部数字来自 getDashboardOverview 的真实聚合，
- * 不可算一律显「—」。本页不含业务算式与阈值字面量——口径与几何换算都收敛在
+ * 不可算一律显“—”。本页不含业务算式与阈值字面量——口径与几何换算都收敛在
  * core/domain 与 modules/dashboard/server。
  *
- * M10-b 改版（HAE：「排版很丑，配不上驾驶舱」；已批样张 docs/preview/dashboard-v2.html）：
+ * M10-b 改版（HAE：“排版很丑，配不上驾驶舱”；已批样张 docs/preview/dashboard-v2.html）：
  * ① 四张等大 KPI 卡 → 本月签单额独占主级带 + 三格次级紧凑（同 /finance 毛利卡已定的阶梯法）；
- * ② 待办中心从右列长条 → 「需要你处理」横向清单，按数量倒序并到第二屏；
+ * ② 待办中心从右列长条 → “需要你处理”横向清单，按数量倒序并到第二屏；
  * ③ 健康矩阵两张大卡 → 全部在册项目的密集表（项目名不截断、30 个项目也不崩）；
  * ④ 现金与毛利并排、漏斗收在一屏内。
  */
@@ -57,7 +57,7 @@ export default async function DashboardPage() {
   const incomePts = cash.points.map((p) => `${p.xPct},${p.incomeY}`).join(" ");
   const expensePts = cash.points.map((p) => `${p.xPct},${p.expenseY}`).join(" ");
 
-  // 「需要你处理」：占位组（人员管控未上线）不进这条清单——它不是待办，是留位声明。
+  // “需要你处理”：占位组（人员管控未上线）不进这条清单——它不是待办，是留位声明。
   const actionGroups = todos.filter((g) => !g.placeholder).sort((a, b) => b.count - a.count);
   const actionTotal = actionGroups.reduce((s, g) => s + g.count, 0);
 
@@ -71,7 +71,7 @@ export default async function DashboardPage() {
           事按可见性（风险 · 待办 · 项目健康度不含已归档）· 生成于 {generatedAt}
         </p>
         {/* 归档参与说明（M10-c）：只在真有归档项目参与时出现，无归档一个字都不加。
-            不写这句，员工看到的是「刚归档一个项目，现金线掉了一截 / 又好像没掉」，
+            不写这句，员工看到的是“刚归档一个项目，现金线掉了一截 / 又好像没掉”，
             然后开始怀疑整本账——沉默地少一个数字，比数字变小更糟。 */}
         {archivedFacts.projectCount > 0 && (
           <p className="mt-2 text-[12px] leading-relaxed text-muted">
@@ -80,7 +80,7 @@ export default async function DashboardPage() {
             <span className="num">{formatCny(archivedFacts.income)}</span>、支出{" "}
             <span className="num">{formatCny(archivedFacts.expense)}</span>{" "}
             仍计入上方签单额、回款率、现金线与右侧毛利排行（发生过的事不因归档消失）；
-            它们不再出现在「需要你处理」与「项目健康度」里。要连历史一起排除，请到项目中心恢复归档。
+            它们不再出现在“需要你处理”与“项目健康度”里。要连历史一起排除，请到项目中心恢复归档。
           </p>
         )}
       </section>
@@ -313,7 +313,7 @@ export default async function DashboardPage() {
                       </Td>
                       <Td align="right" className="num text-[12px] whitespace-nowrap">
                         {/* 未录入支出 ⇒ 毛利额同样不可信（合同额减 0 支出＝全额成毛利），
-                            与毛利率一起置「—」，不半真半假 */}
+                            与毛利率一起置“—”，不半真半假 */}
                         {row.rankable ? formatCny(row.profit) : <span className="text-muted">—</span>}
                       </Td>
                       <Td align="right" className="num text-[12px] whitespace-nowrap">
@@ -345,7 +345,7 @@ export default async function DashboardPage() {
             <p className="mt-3 text-[12px] leading-relaxed text-secondary">
               毛利 = 合同额 + 累计变更 − 支出；
               <b className="font-medium text-primary">只录了合同额、还没录支出的项目不显示 100%</b>
-              （那是没数据不是高利润），故置「—」。
+              （那是没数据不是高利润），故置“—”。
             </p>
           </div>
         )}
@@ -441,7 +441,7 @@ export default async function DashboardPage() {
           </p>
           <p className="mt-2 text-[12px] leading-relaxed text-muted">
             5~7 月是<b className="font-medium text-secondary">真实现金流空白</b>（演示项目最早
-            2026-08 开工），不是数据缺失，故如实显示 ¥0.00 而非「—」。
+            2026-08 开工），不是数据缺失，故如实显示 ¥0.00 而非“—”。
           </p>
         </Card>
 

@@ -1,10 +1,10 @@
 /**
  * prisma/seed-templates.mjs —— 工序模板库引导（业务配置，非演示数据）
  *
- * 存在的理由：ProcessTemplate 是「新建项目排程自动套用标准工期」的必需配置
+ * 存在的理由：ProcessTemplate 是“新建项目排程自动套用标准工期”的必需配置
  * （11 道工序 × 3 面积档 = 33 行），不是可选的演示数据。但历史上它被埋在
  * prisma/seed.ts 的 seedSchedule() 里，和假客户/假台账混在一起；容器 CMD 只跑
- * bootstrap.mjs（组织 + boss），不跑完整 seed，导致内测部署「工序模板库」空壳、
+ * bootstrap.mjs（组织 + boss），不跑完整 seed，导致内测部署“工序模板库”空壳、
  * 新排程无标准天数可套。本脚本把这块业务配置单独剥离，可安全放进 CMD。
  *
  * 与 seed.ts 的关系：天数常量与 seed.ts:250 SCHEDULE_PROCESS 逐字一致（照抄 v5.1
@@ -13,7 +13,7 @@
  *
  * 幂等且自愈：按 schema @@unique([tier, order]) 做 upsert，不整表判空。
  * 重复执行不报错、不清空人工改动之外的行；漏一行会自动补、错一行按 (tier,order)
- * 覆盖为标准天数。注意：这会把手工改过的「标准天数」拉回本表口径——若线上有意的
+ * 覆盖为标准天数。注意：这会把手工改过的“标准天数”拉回本表口径——若线上有意的
  * 个性化标准工期，应改本脚本常量而非在页面上改，否则下次启动被覆盖。
  *
  * 用纯 JS + @prisma/client：与 bootstrap.mjs 同理，production 依赖链下不依赖 tsx。

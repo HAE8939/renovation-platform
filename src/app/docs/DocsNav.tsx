@@ -11,7 +11,7 @@ interface DocsNavProps {
 
 /**
  * 文档站导航。/docs 下替换业务模块导航进驻平台外壳的左侧栏（与首页隐藏侧栏同构），
- * 因此文档区只有一套导航，不再是「业务侧栏 + 内容区目录」两栏并存。
+ * 因此文档区只有一套导航，不再是“业务侧栏 + 内容区目录”两栏并存。
  */
 export function DocsNav({ compact = false }: DocsNavProps) {
   const pathname = usePathname() ?? "/docs";

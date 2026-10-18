@@ -6,7 +6,7 @@ import { HeroSplash } from "./HeroSplash";
 
 export const metadata = { title: "平台首页" };
 // 外壳现在每次渲染读 PlatformSetting（主题/Logo，M9-d）；首页保持静态会把构建当时的插槽色
-// 烘死、切主题后落地页不跟着变（违反「全站生效」）。转动态 → 与其它页一致，随库值现渲。
+// 烘死、切主题后落地页不跟着变（违反“全站生效”）。转动态 → 与其它页一致，随库值现渲。
 export const dynamic = "force-dynamic";
 
 /**

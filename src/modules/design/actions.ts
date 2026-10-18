@@ -47,7 +47,7 @@ export async function createDesignTaskAction(
       entity: "designTask",
       entityId: created.id,
       projectId,
-      summary: `新建设计任务「${title}」（${created.code}${
+      summary: `新建设计任务“${title}”（${created.code}${
         text("assigneeId") ? "，已指派" : "，待分配"
       }）`,
       after: created.code,
@@ -65,7 +65,7 @@ export async function createDesignTaskAction(
 
 /**
  * 指派 / 改派既有任务（M5-e）。taskId / assigneeId 走表单；成功后刷新看板与详情。
- * 流水记 before→after 状态（pending→assigned 是真实推进，改派则前后同态，仍留「换人」事实）。
+ * 流水记 before→after 状态（pending→assigned 是真实推进，改派则前后同态，仍留“换人”事实）。
  */
 export interface DesignAssignFormState {
   error?: string;
@@ -99,7 +99,7 @@ export async function assignDesignTaskAction(
       entity: "designTask",
       entityId: taskId,
       projectId: task?.projectId ?? null,
-      summary: `指派设计任务「${task?.title ?? taskId}」给 ${assignee?.name ?? "负责人"}（${beforeLabel} → ${afterLabel}）`,
+      summary: `指派设计任务“${task?.title ?? taskId}”给 ${assignee?.name ?? "负责人"}（${beforeLabel} → ${afterLabel}）`,
       before: res.before,
       after: res.after,
     });

@@ -78,7 +78,7 @@ function GeneratePreview({ data }: { data: ProjectScheduleData }) {
       <h2 className="text-[17px] font-semibold text-primary">一键生成排程</h2>
       <p className="mt-2 text-[13px] leading-relaxed text-secondary">
         面积 <span className="num text-primary">{data.project.area} ㎡</span>
-        {" → "}判定为「{data.tierLabel}」档
+        {" → "}判定为“{data.tierLabel}”档
       </p>
 
       <div className="mt-4 overflow-x-auto">
@@ -157,7 +157,7 @@ function CannotGenerate({ data }: { data: ProjectScheduleData }) {
         {data.cannotGenerateReason ?? "缺少必要条件"}。
       </p>
       <p className="mt-2 text-[13px] leading-relaxed text-secondary">
-        开工日期与建筑面积在「项目设置」维护。
+        开工日期与建筑面积在“项目设置”维护。
       </p>
       <Link
         href={`/budget/${data.project.id}/settings`}
@@ -306,7 +306,7 @@ function GanttBody({ data }: { data: ProjectScheduleData }) {
 
   const rowIndexById = new Map(data.tasks.map((t, i) => [t.id, i]));
 
-  // 「今天」小标布局：贴图右缘时向左翻转（防越界裁切）；并让相邻刻度标签避让。
+  // “今天”小标布局：贴图右缘时向左翻转（防越界裁切）；并让相邻刻度标签避让。
   const TODAY_LABEL_W = 28;
   const todayLabelFlipped = todayX + 8 + TODAY_LABEL_W > svgWidth;
   const todayLabelLeft = todayLabelFlipped
@@ -476,7 +476,7 @@ function GanttBody({ data }: { data: ProjectScheduleData }) {
           <div className="relative flex-1">
             <div className="overflow-x-auto">
               <svg width={svgWidth} height={svgHeight} className="block">
-                {/* 周刻度 + 竖网格线（每 7 天）；与「今天」小标重叠的刻度文字不画（网格线保留） */}
+                {/* 周刻度 + 竖网格线（每 7 天）；与“今天”小标重叠的刻度文字不画（网格线保留） */}
                 {scaleMarks.map((m, i) => {
                   const labelLeft = m.x + 4;
                   const overlapsToday =
@@ -635,7 +635,7 @@ function GanttBody({ data }: { data: ProjectScheduleData }) {
                           onClick={() => setDrawerIndex(i)}
                         />
                       )}
-                      {/* 拖拽预览标签「±N 天」 */}
+                      {/* 拖拽预览标签“±N 天” */}
                       {isDragging && (
                         <text
                           x={x + w + 8}
@@ -652,7 +652,7 @@ function GanttBody({ data }: { data: ProjectScheduleData }) {
                     </g>
                   );
                 })}
-                {/* 今日竖线（全页唯一强 accent）+ 「今天」小标（贴右缘时向左翻转，防越界裁切） */}
+                {/* 今日竖线（全页唯一强 accent）+ “今天”小标（贴右缘时向左翻转，防越界裁切） */}
                 <line
                   x1={todayX}
                   y1={0}

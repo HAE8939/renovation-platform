@@ -118,7 +118,7 @@ export function CatalogEditor({ catalog }: { catalog: CatalogCategoryRow[] }) {
 
   function askDeleteCategory(c: CatalogCategoryRow) {
     setConfirm({
-      text: `删除科目「${c.name}」及其 ${c.items.length} 个科目项？已生成的报价不受影响。`,
+      text: `删除科目“${c.name}”及其 ${c.items.length} 个科目项？已生成的报价不受影响。`,
       run: () => {
         const fd = new FormData();
         fd.set("id", c.id);
@@ -152,7 +152,7 @@ export function CatalogEditor({ catalog }: { catalog: CatalogCategoryRow[] }) {
 
   function askDeleteItem(c: CatalogCategoryRow, item: CatalogItemRow) {
     setConfirm({
-      text: `删除科目项「${item.name}」（${item.code}）？`,
+      text: `删除科目项“${item.name}”（${item.code}）？`,
       run: () => {
         const fd = new FormData();
         fd.set("id", item.id);
@@ -215,11 +215,11 @@ export function CatalogEditor({ catalog }: { catalog: CatalogCategoryRow[] }) {
 
         {catalog.length === 0 ? (
           <Card className="mt-3 py-8 text-center text-sm text-secondary">
-            还没有科目。先用上面的「新增科目」建一个工程科目，再往里加科目项。
+            还没有科目。先用上面的“新增科目”建一个工程科目，再往里加科目项。
           </Card>
         ) : visible.length === 0 ? (
           <Card className="mt-3 py-8 text-center text-sm text-secondary">
-            没有与「{query.trim()}」匹配的科目或科目项。
+            没有与“{query.trim()}”匹配的科目或科目项。
           </Card>
         ) : (
           <div className="mt-3 space-y-4">
@@ -461,7 +461,7 @@ export function CatalogEditor({ catalog }: { catalog: CatalogCategoryRow[] }) {
                   </div>
 
                   <div className="grid gap-4 sm:grid-cols-3">
-                    <Field label="单位" hint="留空默认「项」">
+                    <Field label="单位" hint="留空默认“项”">
                       <Input
                         name="unit"
                         defaultValue={item?.unit ?? ""}

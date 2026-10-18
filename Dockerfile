@@ -30,7 +30,7 @@ ENV DATABASE_URL=file:/tmp/build.db
 ENV BUILD_STANDALONE=1
 RUN pnpm prisma generate
 # 构建期必须先建表：静态导出会渲染 root layout，而它经 branding/theme 调
-# platformSetting.upsert()——空库直接抛 P2021「table platform_settings does not exist」，
+# platformSetting.upsert()——空库直接抛 P2021“table platform_settings does not exist”，
 # 表现为 /_not-found 预渲染失败、整个 build 红掉。本机照不出这一条，是因为它的
 # DATABASE_URL 指向有表的 dev.db。这里只建 schema、不灌任何数据。
 RUN pnpm prisma migrate deploy

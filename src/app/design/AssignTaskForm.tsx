@@ -11,7 +11,7 @@ import {
 import type { DesignUserOption } from "@/modules/design/server/create";
 
 /**
- * 任务详情页的「指派 / 改派」内联表单（M5-e）。
+ * 任务详情页的“指派 / 改派”内联表单（M5-e）。
  * 仅在 canAssign 状态（待分配 / 进行中 / 待返修）由服务端渲染；已提交/已通过不出现。
  * 选负责人 → 指派，成功刷新页面（看板与详情同步）；错误红字回显。
  * 默认选中当前负责人（改派直观可见现在是谁）。

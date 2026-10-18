@@ -7,8 +7,8 @@ export const metadata = { title: "质量档案" };
 
 /**
  * 质量档案索引页（M7-d，TASK_M7 §4-M7-d）。
- * 每项目一行：项目 / 编号 / 节点（通过 x · 未通过 y，分母 0 显「—」）/
- * 未关闭问题（0 显「—」）/ 「打开档案 →」。
+ * 每项目一行：项目 / 编号 / 节点（通过 x · 未通过 y，分母 0 显“—”）/
+ * 未关闭问题（0 显“—”）/ “打开档案 →”。
  * 空态诚实文案（无项目时不造假）。读前 syncAcceptanceNodes 兜底自愈。
  */
 export default async function QualityArchivePage() {

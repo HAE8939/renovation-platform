@@ -244,7 +244,7 @@ const DEMO_QUOTE: { code: string; quantity: number }[] = [
 
 // ── 11 工序 × 3 档模板（照抄 TASK_M6 §3 / v5.1 §6.5.2）──────────────
 // 三档实算：lt90=54 / b90_130=76 / gt130=107。
-// 说明：任务卡 §3 逐工序天数实算 b90_130=76，§6 多处写作「80 / 2026-11-19」，
+// 说明：任务卡 §3 逐工序天数实算 b90_130=76，§6 多处写作“80 / 2026-11-19”，
 // 二者相差 4 天。本 seed 照抄逐工序天数（照抄 v5.1），实算 76；如 v5.1 原表确为 80，
 // 请集成者核 v5.1 §6.5.2 后修正逐工序天数，seed 与 verify 同步即可。
 const SCHEDULE_PROCESS: {
@@ -491,7 +491,7 @@ async function seedDesignTasks() {
     throw new Error("design seed 自检失败：默认组织不存在，请先运行基础 seed");
   }
 
-  // 2-3 个设计侧用户：designer / design_asst；「审核人」语义复用 designer 角色
+  // 2-3 个设计侧用户：designer / design_asst；“审核人”语义复用 designer 角色
   //（USER_ROLE 无独立 reviewer 值，v5.1 11 角色里审核即由设计师承担）。
   const designer = await prisma.user.upsert({
     where: { email: "linlan@renovation.local" },
@@ -592,7 +592,7 @@ async function seedDesignTasks() {
       title: "现场复核量房",
       type: "measurement",
       status: "pending",
-      assigneeId: null, // 刻意待分配：看板「待分配」列要有真数据
+      assigneeId: null, // 刻意待分配：看板“待分配”列要有真数据
       reviewerId: null,
       requirement: "开工前复核实际尺寸与图纸偏差，出水点位逐一定位。",
       deadline: new Date(Date.now() + 14 * day),
@@ -1272,12 +1272,12 @@ async function seedQuality() {
     const DAY = 24 * 60 * 60 * 1000;
     const addDays = (base: Date, n: number) => new Date(base.getTime() + n * DAY);
 
-    // 003「老街 21 号院」—— 拆除/水电 passed、泥工 returned + Issue
+    // 003“老街 21 号院”—— 拆除/水电 passed、泥工 returned + Issue
     const p3 = await prisma.project.findUnique({
       where: { code: "RP-2026-003" },
       select: { id: true },
     });
-    // 002「金域蓝湾 2 栋 802」—— 拆除 passed、水电 submitted
+    // 002“金域蓝湾 2 栋 802”—— 拆除 passed、水电 submitted
     const p2 = await prisma.project.findUnique({
       where: { code: "RP-2026-002" },
       select: { id: true },
@@ -1296,7 +1296,7 @@ async function seedQuality() {
       });
       if (!node) {
         throw new Error(
-          `quality seed 自检失败：项目 ${projectId} 的「${name}」验收节点未生成（syncAcceptanceNodes 应已物化）`
+          `quality seed 自检失败：项目 ${projectId} 的“${name}”验收节点未生成（syncAcceptanceNodes 应已物化）`
         );
       }
       const task = await prisma.scheduleTask.findFirst({
@@ -1305,7 +1305,7 @@ async function seedQuality() {
       });
       if (!task || !task.actualEnd) {
         throw new Error(
-          `quality seed 自检失败：「${name}」任务未完工或无 actualEnd，无法取提交时间`
+          `quality seed 自检失败：“${name}”任务未完工或无 actualEnd，无法取提交时间`
         );
       }
       return { nodeId: node.id, actualEnd: task.actualEnd };
@@ -1362,7 +1362,7 @@ async function seedQuality() {
           returnReason,
         },
       });
-      // 先全 pass，再把「空鼓率检查」置 fail
+      // 先全 pass，再把“空鼓率检查”置 fail
       await prisma.nodeCheck.updateMany({
         where: { nodeId },
         data: { result: "pass" },
@@ -1657,8 +1657,8 @@ async function seedFinance() {
       await tx.financeRecord.create({ data: { projectId: p2.id, type: "income", category: "contract", amount: p2o1.amountDue, date: p2PaidAt, description: "开工款", recordedBy: uid } });
 
       // ④ 支出台账 7 笔（001 材料+人工、002 材料+人工、003 材料+人工+其他）
-      // 日期按各自开工日起算的工序进度落在施工期内（承 STATUS §5「演示数据时间自洽要主动
-      // 回填」教训：全塞 seed 时刻会让已竣工项目出现「完工后才买主材」的反序）。
+      // 日期按各自开工日起算的工序进度落在施工期内（承 STATUS §5“演示数据时间自洽要主动
+      // 回填”教训：全塞 seed 时刻会让已竣工项目出现“完工后才买主材”的反序）。
       // dayOffset 若越过今天则钳到今天之前（001 开工日固定，偏移大时会跑到未来）。
       const expenses: {
         code: string;
@@ -1752,9 +1752,9 @@ async function seedFinance() {
 
 // ── M9-a 变更单 seed ───────────────────────────────────────────
 // 两条变更单（幂等：count===0 才建），照 seedQuality/seedFinance 范式：
-// ① 001（RP-2026-001）upgrade / +3200 / 「主卧衣柜升级为定制柜体」——
+// ① 001（RP-2026-001）upgrade / +3200 / “主卧衣柜升级为定制柜体”——
 //    3200 > 62000×5%=3100 → 001 预警演示位（changeWatch.warn=true）；
-// ② 002（RP-2026-002）process / +2800 / 「厨房橱柜工艺变更」——
+// ② 002（RP-2026-002）process / +2800 / “厨房橱柜工艺变更”——
 //    2800 < 160000×5%=8000 → 不预警（与 001 互补，验证 false 分支）。
 // 日期落在各项目施工期内（承 STATUS §5 演示数据时间自洽教训）。
 // createdBy 取 getBudgetUser()（预算员占位；P4 接登录后替换）。
@@ -1787,9 +1787,9 @@ async function seedChanges() {
   // 但变更单服务层 createChange 会拒 null（要录入人）；seed 直写绕过服务层故可 null。
 
   // 取报价单 id —— 变更单挂报价单级（PLAN §7-2），一项目一报价（M1a 约束）。
-  // 001 由基础 seed 建单；002/003/004 是排程演示「直接 create」的项目、没有报价单，
-  // 故此处对目标项目做 ensure：缺则补一张草稿报价单（与 createProject「建项目即建
-  // 草稿报价单」的产品行为一致；只补 001/002 两个目标，不扩范围）。
+  // 001 由基础 seed 建单；002/003/004 是排程演示“直接 create”的项目、没有报价单，
+  // 故此处对目标项目做 ensure：缺则补一张草稿报价单（与 createProject“建项目即建
+  // 草稿报价单”的产品行为一致；只补 001/002 两个目标，不扩范围）。
   const ensureQuote = async (projectId: string): Promise<{ id: string }> => {
     const existing = await prisma.budgetQuote.findUnique({
       where: { projectId },
@@ -1920,9 +1920,9 @@ async function seedChanges() {
 // 照 seedChanges 范式：按 code 存在性跳过，不靠总数判断。
 // 未签四阶段各补至≥2（现有 001 contacted / 002 quoted）：
 //   leads ×2（003/004）+ contacted ×1（005）+ confirmed ×2（006/009）+ quoted ×1（010）= 6 条
-//   ※ 卡面写「003~008」与「已签 007/008」撞号：007/008 由已签占用（卡点名且绑 RP-2026-005/006
+//   ※ 卡面写“003~008”与“已签 007/008”撞号：007/008 由已签占用（卡点名且绑 RP-2026-005/006
 //     与合同额），故未签的 confirmed 第二条与 quoted 那条改用 009/010（自报偏离见交付报）。
-// 已签 2 条（配套建项目，让漏斗顶格 + 让「本月签单额」环比第一次有真值可比）：
+// 已签 2 条（配套建项目，让漏斗顶格 + 让“本月签单额”环比第一次有真值可比）：
 //   007（本月签）→ RP-2026-005 contractAmount 218000
 //   008（上月签）→ RP-2026-006 contractAmount 176000
 // 两条都走 core/domain/projects.createProject（自动建草稿 BudgetQuote、Client 按名归并+手机号回写），
@@ -2087,7 +2087,7 @@ async function seedLeads() {
   }
 
   // ── 阶段补足（脏库护栏，集成者加）───────────────────────────────
-  // 固定 code 清单**保证不了**「五阶段各 ≥2」：dev.db 里有手测数据，seed 的
+  // 固定 code 清单**保证不了**“五阶段各 ≥2”：dev.db 里有手测数据，seed 的
   // LEAD-2026-001 已被手测推进成 signed（实测如此），contacted 就只剩 1 条。
   // 正解＝按 DB 真值逐阶段补到 2 条，而不是假定库是干净的（M9-a ensureQuote 同族教训）。
   const codeMax = (() => {
@@ -2142,7 +2142,7 @@ async function seedLeads() {
           followUps: {
             create: [
               {
-                content: `阶段补足：使「${stage}」阶段线索不少于 2 条，漏斗各档都有真实存量。`,
+                content: `阶段补足：使“${stage}”阶段线索不少于 2 条，漏斗各档都有真实存量。`,
                 date: unsignedFollow,
               },
             ],
@@ -2156,7 +2156,7 @@ async function seedLeads() {
   // ── 2 条已签线索（配套建项目）──
   // 007 本月签 → RP-2026-005 / 218000；008 上月签 → RP-2026-006 / 176000。
   // 走 createProject：自动建草稿报价单、Client 按名归并+手机号回写。
-  // 不建付款计划/收支/变更；不建 ScheduleTask（让驾驶舱矩阵显「未排程」诚实灰态）。
+  // 不建付款计划/收支/变更；不建 ScheduleTask（让驾驶舱矩阵显“未排程”诚实灰态）。
   const SIGNED: {
     code: string;
     name: string;
@@ -2195,7 +2195,7 @@ async function seedLeads() {
       projectAddress: "溪上和园 6 栋 1201 室",
       contractAmount: 218000,
       // 本月签：项目 createdAt 落本月（createProject 默认 now 即本月，故不回填；
-      //   此字段仅作为「期望值」用于自检对照，005 不做实际 update）
+      //   此字段仅作为“期望值”用于自检对照，005 不做实际 update）
       projectCreatedAt: thisMonth1,
       leadCreatedAt: lead007Created,
       signedAt: thisMonth1,
@@ -2244,7 +2244,7 @@ async function seedLeads() {
     });
     if (existsLead) continue; // 幂等：已 seed 跳过
 
-    // 脏库护栏（集成者加）：该签约月若已存在「带线索的项目」（手测签过），环比演示位
+    // 脏库护栏（集成者加）：该签约月若已存在“带线索的项目”（手测签过），环比演示位
     // 就已成立，不再补建——否则既重复占位，又必撞 `Lead.projectId @unique`。
     const mStart = new Date(s.projectCreatedAt.getFullYear(), s.projectCreatedAt.getMonth(), 1);
     const mEnd = new Date(s.projectCreatedAt.getFullYear(), s.projectCreatedAt.getMonth() + 1, 1);
@@ -2256,9 +2256,9 @@ async function seedLeads() {
     });
     if (alreadySigned > 0) continue;
 
-    // 项目：只复用「同 code 且尚未被任何线索占用」的项目；否则用空闲 code 新建。
+    // 项目：只复用“同 code 且尚未被任何线索占用”的项目；否则用空闲 code 新建。
     //（Lead.projectId 是 @unique——实测 dev.db 里 RP-2026-005/006 已被手测签约项目占号，
-    //  原「按 code 复用」写法直接 P2002 崩 seed。）
+    //  原“按 code 复用”写法直接 P2002 崩 seed。）
     let project = await prisma.project.findFirst({
       where: { code: s.projectCode, lead: { is: null } },
       select: { id: true, createdAt: true },
@@ -2320,7 +2320,7 @@ async function seedLeads() {
     });
   }
 
-  // ── 自检断言（报数取 DB 真值；断言按「签约月」而非按「固定 code」——
+  // ── 自检断言（报数取 DB 真值；断言按“签约月”而非按“固定 code”——
   //    脏库里手测可能已占掉 RP-2026-005/006 与某个月的签约位，按 code 断言会误报）──
   const [totalLeads, stageRows, signedLeads] = await Promise.all([
     prisma.lead.count(),
@@ -2369,7 +2369,7 @@ async function seedLeads() {
       `leads seed 自检失败：${signedMissingProject} 条 signed 线索缺 projectId（漏回写）`
     );
   }
-  // 驾驶舱「本月签单额」环比演示位：本月与上月各至少一条签约建项（缺哪月补哪月）
+  // 驾驶舱“本月签单额”环比演示位：本月与上月各至少一条签约建项（缺哪月补哪月）
   if (cur.length < 1) {
     throw new Error(
       `leads seed 自检失败：本月(${thisMonth}) 应有 ≥1 条签约建项项目，实际 0（环比演示位落空）`
@@ -2377,20 +2377,20 @@ async function seedLeads() {
   }
   if (prev.length < 1) {
     throw new Error(
-      `leads seed 自检失败：上月(${lastMonth}) 应有 ≥1 条签约建项项目，实际 0（环比将显「不可比」）`
+      `leads seed 自检失败：上月(${lastMonth}) 应有 ≥1 条签约建项项目，实际 0（环比将显“不可比”）`
     );
   }
 }
 
 /**
- * M9-b-2b：变更款收款台账 seed（驾驶舱「近 6 个月现金收付折线」补"变更款收款"格）。
+ * M9-b-2b：变更款收款台账 seed（驾驶舱“近 6 个月现金收付折线”补"变更款收款"格）。
  *
  * 为什么单独成函数：不塞进 seedFinance() —— 那边自检对 11 笔负责，混建会让幂等
  * 复跑必误报；本函数独立建 income/change，各管各的幂等与断言。
  * 为什么排在 seedChanges() 之后：金额取自 M9-a 建好的变更单（changeTotal 聚合），
  * 变更单不在就无款可收。
- * 为什么不重排既有 11 笔收支：支出挪到 5~7 月会造出「开工前（最早开工 2026-08-02）
- * 采购主材」的时间反序假数据；折线 5~7 月为 0 是真实空白。income 不进毛利口径，
+ * 为什么不重排既有 11 笔收支：支出挪到 5~7 月会造出“开工前（最早开工 2026-08-02）
+ * 采购主材”的时间反序假数据；折线 5~7 月为 0 是真实空白。income 不进毛利口径，
  * 对 grossProfit/marginRate 零影响。
  * 幂等按不变量（项目已有 income/change 即跳过），不按条数——HAE 可能在界面自录过
  * 变更款，按条数判会重复建或误报。
@@ -2476,7 +2476,7 @@ async function seedChangeIncome() {
   ]);
   const sum = sumAgg._sum.amount ?? 0;
 
-  // 合法跳过判定镜像：只有「变更净额 > 0」的项目才必须存在收款行——无变更单/
+  // 合法跳过判定镜像：只有“变更净额 > 0”的项目才必须存在收款行——无变更单/
   // 净额 ≤ 0/项目缺失被跳过是合法的，断言不得要求它有收款行。
   const expected: { code: string; mustHave: boolean; net: number }[] = [];
   for (const { code } of targets) {
@@ -2537,7 +2537,7 @@ async function seedChangeIncome() {
     }
   }
 
-  // 断言 3：「本单元没动既有行」的护栏——seed 基线至少 7 笔 expense、4 笔 income/contract；
+  // 断言 3：“本单元没动既有行”的护栏——seed 基线至少 7 笔 expense、4 笔 income/contract；
   // 内测允许继续补录事实行，额外行不应让幂等 seed 失败。
   // 只保条数：金额/日期基线由 verify-finance.mjs / verify-finance-flow.mts 的毛利
   // 断言（grossProfit 24900 / marginRate 0.3819）把守，这里不重复。
@@ -2552,7 +2552,7 @@ async function seedChangeIncome() {
 // 定义幂等**按 key 逐条判存在**（不靠总数——HAE 可能在界面上自己加过字段）；
 // 值幂等**按 (字段, 实体) 唯一键 upsert**（同 seedChangeIncome 的"只写不变量"纪律）。
 // 复尺日期落在各自开工日**之前** 3~10 天：复尺发生在开工前，不得倒挂、也不得是未来日
-// （承 §5「演示数据时间自洽要主动回填」）。
+// （承 §5“演示数据时间自洽要主动回填”）。
 // RP-2026-004 **故意全空**＝必填拦截（保修年限 required=true）与"未填写"诚实空态演示位。
 const CUSTOM_FIELD_DEFS: {
   key: string;

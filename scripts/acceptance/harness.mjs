@@ -119,7 +119,7 @@ export class Report {
   /** 期望服务端拒绝并给出中文文案（含关键词） */
   rejects(text, keyword, id, desc) {
     const hit = keyword ? text.includes(keyword) : false;
-    return this.assert(hit, id, desc, hit ? `已见「${keyword}」` : `未见「${keyword}」；页面片段：${(text || "").replace(/\s+/g, " ").slice(0, 160)}`);
+    return this.assert(hit, id, desc, hit ? `已见“${keyword}”` : `未见“${keyword}”；页面片段：${(text || "").replace(/\s+/g, " ").slice(0, 160)}`);
   }
   summary() {
     const p = this.rows.filter((r) => r.status === "PASS").length;
@@ -166,7 +166,7 @@ export function cash(n) {
   return Number(n).toFixed(2);
 }
 
-/** 从页面文本里抓金额（用于「界面显示 == DB 算出」交叉比对） */
+/** 从页面文本里抓金额（用于“界面显示 == DB 算出”交叉比对） */
 export function findMoney(text, needle) {
   const re = /¥\s?[-\d,]+(?:\.\d{2})?/g;
   const i = text.indexOf(needle);

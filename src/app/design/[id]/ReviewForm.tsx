@@ -23,8 +23,8 @@ function ReviewSubmitButton({
 }
 
 /**
- * 审核操作区（M5-c）：仅在最新「待审核」提交旁渲染。
- * 「通过」直接确认（confirm 文案，无 alert）；「退回」展开必填原因输入
+ * 审核操作区（M5-c）：仅在最新“待审核”提交旁渲染。
+ * “通过”直接确认（confirm 文案，无 alert）；“退回”展开必填原因输入
  * （textarea required，前端拦 + 后端再拦双保险）。
  * 审核人 = 占位当前用户（P4 接登录后自动切换为登录人）；无占位用户则禁用提交。
  */
@@ -74,7 +74,7 @@ export function ReviewForm({
       {mode === "approve" && (
         <div className="space-y-4">
           <p className="text-[13px] text-primary">
-            确认通过此版本？通过后任务状态将转为「已通过」。
+            确认通过此版本？通过后任务状态将转为“已通过”。
           </p>
           <div className="flex flex-wrap items-center gap-4">
             <ReviewSubmitButton

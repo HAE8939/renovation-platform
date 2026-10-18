@@ -57,7 +57,7 @@ async function main() {
   const reviewer = await getPlaceholderUser("review");
   chk("前置：占位审核用户存在（pm/inspector）", !!reviewer, reviewer?.name ?? "无");
 
-  // ── 1) 同步建/删/幂等（002「金域蓝湾」天花工程任务）──────────────
+  // ── 1) 同步建/删/幂等（002“金域蓝湾”天花工程任务）──────────────
   const p2 = await prisma.project.findUnique({ where: { code: "RP-2026-002" } });
   if (!p2) throw new Error("RP-2026-002 不存在（先跑 prisma db seed）");
 
@@ -106,7 +106,7 @@ async function main() {
   chk("进度再置 100 → 节点重新生成", !!regenerated, regenerated?.id ?? "无");
   chk("重新生成节点状态 = pending", regenerated?.status === "pending", regenerated?.status ?? "无");
 
-  // ── 2) 非 pending 永不自动删（003「老街」泥工工程 returned）────────
+  // ── 2) 非 pending 永不自动删（003“老街”泥工工程 returned）────────
   const p3 = await prisma.project.findUnique({ where: { code: "RP-2026-003" } });
   if (!p3) throw new Error("RP-2026-003 不存在（先跑 prisma db seed）");
 
@@ -148,7 +148,7 @@ async function main() {
   chk("对 submitted 节点提交 → 拒绝", errSubmitted.includes("不可提交"), errSubmitted);
   chk("拒绝类 = QualityNodeError", submittedClassOk);
 
-  // 3b：对 pending 缺检查项提交 → 拒绝「还有 N 项未检」（002 天花工程 = pending，3 检查项）
+  // 3b：对 pending 缺检查项提交 → 拒绝“还有 N 项未检”（002 天花工程 = pending，3 检查项）
   const tianhuaPending = await prisma.acceptanceNode.findUnique({ where: { taskId: tianhua!.id } });
   chk("前置：002 天花工程节点 = pending", tianhuaPending?.status === "pending", tianhuaPending?.status ?? "无");
 
@@ -158,10 +158,10 @@ async function main() {
   } catch (e) {
     errMissing = e instanceof Error ? e.message : String(e);
   }
-  chk("缺检查项提交 → 拒绝「还有 N 项未检」", errMissing.includes("未检"), errMissing);
+  chk("缺检查项提交 → 拒绝“还有 N 项未检”", errMissing.includes("未检"), errMissing);
   chk("缺检查项报错含数字 3", errMissing.includes("3"), errMissing);
 
-  // 多余 id 报「检查项不匹配」（先真 id 全覆盖，再附 1 个多余 id；否则会先命中「未检」分支）
+  // 多余 id 报“检查项不匹配”（先真 id 全覆盖，再附 1 个多余 id；否则会先命中“未检”分支）
   let errExtra: string = "";
   try {
     const realIds = await prisma.nodeCheck.findMany({
@@ -179,7 +179,7 @@ async function main() {
   } catch (e) {
     errExtra = e instanceof Error ? e.message : String(e);
   }
-  chk("多余检查项 id → 拒绝「检查项不匹配」", errExtra.includes("不匹配"), errExtra);
+  chk("多余检查项 id → 拒绝“检查项不匹配”", errExtra.includes("不匹配"), errExtra);
 
   // 3c：全填提交 → status=submitted + submittedBy/submittedAt + 检查项结果写入
   const tianhuaChecksForSubmit = await prisma.nodeCheck.findMany({
@@ -281,7 +281,7 @@ async function main() {
   } catch (e) {
     errReviewNonSub = e instanceof Error ? e.message : String(e);
   }
-  chk("对非 submitted 审核 → 拒绝「仅待审核」", errReviewNonSub.includes("仅待审核"), errReviewNonSub);
+  chk("对非 submitted 审核 → 拒绝“仅待审核”", errReviewNonSub.includes("仅待审核"), errReviewNonSub);
 
   // 5b：reviewNode(pass) → passed + reviewedBy/At（003 泥工 = submitted）
   await reviewNode(niniForResub!.id, { approve: true });
@@ -298,7 +298,7 @@ async function main() {
   } catch (e) {
     errEmptyReason = e instanceof Error ? e.message : String(e);
   }
-  chk("reviewNode(return, 空原因) → 拒绝「退回原因不能为空」", errEmptyReason.includes("不能为空"), errEmptyReason);
+  chk("reviewNode(return, 空原因) → 拒绝“退回原因不能为空”", errEmptyReason.includes("不能为空"), errEmptyReason);
 
   // 5d：reviewNode(return, reason+severity) → returned + Issue 断言
   const issueBeforeReturn = await prisma.issue.count();
@@ -334,7 +334,7 @@ async function main() {
   } catch (e) {
     errReReview = e instanceof Error ? e.message : String(e);
   }
-  chk("对 passed 再审 → 拒绝「仅待审核」", errReReview.includes("仅待审核"), errReReview);
+  chk("对 passed 再审 → 拒绝“仅待审核”", errReReview.includes("仅待审核"), errReReview);
 
   // ── 6) 问题流全链（003 防水工程节点，pending → 复验退回再锁 → 全链 open→rectified→closed）──
   // 6a：定位 003 防水工程节点（seed 物化为 pending）
@@ -390,7 +390,7 @@ async function main() {
   } catch (e) {
     errFangshuiResub1 = e instanceof Error ? e.message : String(e);
   }
-  chk("6d 未整改重提 → 拒「存在未整改问题」", errFangshuiResub1.includes("未整改"), errFangshuiResub1);
+  chk("6d 未整改重提 → 拒“存在未整改问题”", errFangshuiResub1.includes("未整改"), errFangshuiResub1);
 
   // 6e：rectifyIssue(A) → rectified
   await rectifyIssue(issueAId, "已整改上翻高度至 30cm");
@@ -418,7 +418,7 @@ async function main() {
   } catch (e) {
     errFangshuiResub2 = e instanceof Error ? e.message : String(e);
   }
-  chk("6g 复验退回再锁 → 重提被拒「存在未整改问题」", errFangshuiResub2.includes("未整改"), errFangshuiResub2);
+  chk("6g 复验退回再锁 → 重提被拒“存在未整改问题”", errFangshuiResub2.includes("未整改"), errFangshuiResub2);
 
   // 6h：rectifyIssue(A) 二次整改 → rectified（rectifyNote 更新为最新）
   await rectifyIssue(issueAId, "二次整改完成");
@@ -442,7 +442,7 @@ async function main() {
   chk("6j 复验通过 → closedAt 落库", !!issueAClosed?.closedAt, issueAClosed?.closedAt?.toISOString() ?? "空");
   chk("6j 复验通过 → recheckNote = 复验合格", issueAClosed?.recheckNote === "复验合格", issueAClosed?.recheckNote ?? "空");
 
-  // 6k：对 closed 的 A 再 rectifyIssue → 拒「当前状态不可整改」
+  // 6k：对 closed 的 A 再 rectifyIssue → 拒“当前状态不可整改”
   let errRectifyClosed: string = "";
   let errRectifyClosedClass = false;
   try {
@@ -451,7 +451,7 @@ async function main() {
     errRectifyClosed = e instanceof Error ? e.message : String(e);
     errRectifyClosedClass = e instanceof QualityIssueError;
   }
-  chk("6k 对 closed rectifyIssue → 拒「当前状态不可整改」", errRectifyClosed.includes("不可整改"), errRectifyClosed);
+  chk("6k 对 closed rectifyIssue → 拒“当前状态不可整改”", errRectifyClosed.includes("不可整改"), errRectifyClosed);
   chk("6k 拒绝类 = QualityIssueError", errRectifyClosedClass);
 
   // ── 7) 手工新建 createIssue 校验 ──────────────────────────────
@@ -469,7 +469,7 @@ async function main() {
   } catch (e) {
     errNoProject = e instanceof Error ? e.message : String(e);
   }
-  chk("7a createIssue 项目不存在 → 拒「项目不存在」", errNoProject.includes("项目不存在"), errNoProject);
+  chk("7a createIssue 项目不存在 → 拒“项目不存在”", errNoProject.includes("项目不存在"), errNoProject);
 
   // 7b：标题空 → 拒
   let errEmptyTitle: string = "";
@@ -485,7 +485,7 @@ async function main() {
   } catch (e) {
     errEmptyTitle = e instanceof Error ? e.message : String(e);
   }
-  chk("7b createIssue 标题空 → 拒「问题标题不能为空」", errEmptyTitle.includes("不能为空"), errEmptyTitle);
+  chk("7b createIssue 标题空 → 拒“问题标题不能为空”", errEmptyTitle.includes("不能为空"), errEmptyTitle);
 
   // 7c：严重度非法 → 拒
   let errBadSeverity: string = "";
@@ -501,7 +501,7 @@ async function main() {
   } catch (e) {
     errBadSeverity = e instanceof Error ? e.message : String(e);
   }
-  chk("7c createIssue 严重度非法 → 拒「严重度取值非法」", errBadSeverity.includes("严重度"), errBadSeverity);
+  chk("7c createIssue 严重度非法 → 拒“严重度取值非法”", errBadSeverity.includes("严重度"), errBadSeverity);
 
   // 7d：成功新建 → 字段逐一断言（status=open / reportedBy=占位提交人 / nodeId=null / dueDate 可空）
   const submitUser = await getPlaceholderUser("submit");

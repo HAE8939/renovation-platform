@@ -86,7 +86,7 @@ async function main() {
   );
 
   // 护栏（M8.5）：付款模板 triggerStages 必须都能在工序模板库找到对应工序——
-  // 防「按名字匹配」链路在改名后静默失配。工序名是三处同字面契约：
+  // 防“按名字匹配”链路在改名后静默失配。工序名是三处同字面契约：
   // ProcessTemplate.name → ScheduleTask.name → AcceptanceNode.name。
   const tplNames = new Set(
     (await prisma.processTemplate.findMany({ select: { name: true } })).map((t) => t.name)
@@ -357,7 +357,7 @@ async function main() {
     chk("拒绝：不存在项目 → 抛错", false, "未抛错");
   } catch (e) {
     chk(
-      "拒绝：不存在项目 → FinanceRecordError「项目不存在」",
+      "拒绝：不存在项目 → FinanceRecordError“项目不存在”",
       e instanceof FinanceRecordError && e.message === "项目不存在",
       e instanceof Error ? e.message : "非 Error"
     );
@@ -375,7 +375,7 @@ async function main() {
     chk("拒绝：负数金额 → 抛错", false, "未抛错");
   } catch (e) {
     chk(
-      "拒绝：负数金额 → 「金额需为大于 0 的数字」",
+      "拒绝：负数金额 → “金额需为大于 0 的数字”",
       e instanceof FinanceRecordError && e.message === "金额需为大于 0 的数字",
       e instanceof Error ? e.message : "非 Error"
     );
@@ -393,7 +393,7 @@ async function main() {
     chk("拒绝：零金额 → 抛错", false, "未抛错");
   } catch (e) {
     chk(
-      "拒绝：零金额 → 「金额需为大于 0 的数字」",
+      "拒绝：零金额 → “金额需为大于 0 的数字”",
       e instanceof FinanceRecordError && e.message === "金额需为大于 0 的数字",
       e instanceof Error ? e.message : "非 Error"
     );
@@ -411,7 +411,7 @@ async function main() {
     chk("拒绝：NaN 金额 → 抛错", false, "未抛错");
   } catch (e) {
     chk(
-      "拒绝：NaN 金额 → 「金额需为大于 0 的数字」",
+      "拒绝：NaN 金额 → “金额需为大于 0 的数字”",
       e instanceof FinanceRecordError && e.message === "金额需为大于 0 的数字",
       e instanceof Error ? e.message : "非 Error"
     );
@@ -429,7 +429,7 @@ async function main() {
     chk("拒绝：非法 type → 抛错", false, "未抛错");
   } catch (e) {
     chk(
-      "拒绝：非法 type → 「收支类型非法」",
+      "拒绝：非法 type → “收支类型非法”",
       e instanceof FinanceRecordError && e.message === "收支类型非法",
       e instanceof Error ? e.message : "非 Error"
     );
@@ -447,7 +447,7 @@ async function main() {
     chk("拒绝：income+material → 抛错", false, "未抛错");
   } catch (e) {
     chk(
-      "拒绝：income+material → 「科目与收支类型不匹配」",
+      "拒绝：income+material → “科目与收支类型不匹配”",
       e instanceof FinanceRecordError && e.message === "科目与收支类型不匹配",
       e instanceof Error ? e.message : "非 Error"
     );
@@ -465,7 +465,7 @@ async function main() {
     chk("拒绝：expense+contract → 抛错", false, "未抛错");
   } catch (e) {
     chk(
-      "拒绝：expense+contract → 「科目与收支类型不匹配」",
+      "拒绝：expense+contract → “科目与收支类型不匹配”",
       e instanceof FinanceRecordError && e.message === "科目与收支类型不匹配",
       e instanceof Error ? e.message : "非 Error"
     );
@@ -483,7 +483,7 @@ async function main() {
     chk("拒绝：非法日期 → 抛错", false, "未抛错");
   } catch (e) {
     chk(
-      "拒绝：非法日期 → 「日期格式非法」",
+      "拒绝：非法日期 → “日期格式非法”",
       e instanceof FinanceRecordError && e.message === "日期格式非法",
       e instanceof Error ? e.message : "非 Error"
     );
@@ -501,7 +501,7 @@ async function main() {
     chk("拒绝：updateRecord 不存在 → 抛错", false, "未抛错");
   } catch (e) {
     chk(
-      "拒绝：updateRecord 不存在 → 「记录不存在」",
+      "拒绝：updateRecord 不存在 → “记录不存在”",
       e instanceof FinanceRecordError && e.message === "记录不存在",
       e instanceof Error ? e.message : "非 Error"
     );
@@ -513,7 +513,7 @@ async function main() {
     chk("拒绝：deleteRecord 不存在 → 抛错", false, "未抛错");
   } catch (e) {
     chk(
-      "拒绝：deleteRecord 不存在 → 「记录不存在」",
+      "拒绝：deleteRecord 不存在 → “记录不存在”",
       e instanceof FinanceRecordError && e.message === "记录不存在",
       e instanceof Error ? e.message : "非 Error"
     );
@@ -614,7 +614,7 @@ async function main() {
     chk("守卫：draft 直接确认 → 抛错", false, "未抛错");
   } catch (e) {
     chk(
-      "守卫：draft 直接确认 → 「只有待确认的变更才能确认」",
+      "守卫：draft 直接确认 → “只有待确认的变更才能确认”",
       e instanceof ChangeOrderError &&
         e.message === "只有待确认的变更才能确认",
       e instanceof Error ? e.message : "非 Error"
@@ -674,7 +674,7 @@ async function main() {
     chk("守卫：已确认后编辑 → 抛错", false, "未抛错");
   } catch (e) {
     chk(
-      "守卫：已确认后编辑 → 「客户已确认的变更不能直接编辑」",
+      "守卫：已确认后编辑 → “客户已确认的变更不能直接编辑”",
       e instanceof ChangeOrderError &&
         e.message === "客户已确认的变更不能直接编辑",
       e instanceof Error ? e.message : "非 Error"
@@ -710,7 +710,7 @@ async function main() {
     chk("守卫：已确认后删除 → 抛错", false, "未抛错");
   } catch (e) {
     chk(
-      "守卫：已确认后删除 → 「客户已确认的变更不能删除」",
+      "守卫：已确认后删除 → “客户已确认的变更不能删除”",
       e instanceof ChangeOrderError &&
         e.message === "客户已确认的变更不能删除",
       e instanceof Error ? e.message : "非 Error"
@@ -760,13 +760,13 @@ async function main() {
     dateIso: "2026-10-15",
   });
   await setChangeStatus(revId, "pending");
-  // 守卫：未确认（pending）的行不能撤销——避免把「提交前」的行撤销成 pending 的无意义写入
+  // 守卫：未确认（pending）的行不能撤销——避免把“提交前”的行撤销成 pending 的无意义写入
   try {
     await revokeChangeConfirm(revId);
     chk("守卫：pending 撤销 → 抛错", false, "未抛错");
   } catch (e) {
     chk(
-      "守卫：pending 撤销 → 「只有客户已确认的变更才能撤销确认」",
+      "守卫：pending 撤销 → “只有客户已确认的变更才能撤销确认”",
       e instanceof ChangeOrderError &&
         e.message === "只有客户已确认的变更才能撤销确认",
       e instanceof Error ? e.message : "非 Error"
@@ -848,7 +848,7 @@ async function main() {
     chk("拒绝：变更 title 空 → 抛错", false, "未抛错");
   } catch (e) {
     chk(
-      "拒绝：变更 title 空 → 「变更描述不能为空」",
+      "拒绝：变更 title 空 → “变更描述不能为空”",
       e instanceof ChangeOrderError && e.message === "变更描述不能为空",
       e instanceof Error ? e.message : "非 Error"
     );
@@ -865,7 +865,7 @@ async function main() {
     chk("拒绝：变更 kind 未知 → 抛错", false, "未抛错");
   } catch (e) {
     chk(
-      "拒绝：变更 kind 未知 → 「未知变更类型：refund」",
+      "拒绝：变更 kind 未知 → “未知变更类型：refund”",
       e instanceof ChangeOrderError && e.message === "未知变更类型：refund",
       e instanceof Error ? e.message : "非 Error"
     );
@@ -882,7 +882,7 @@ async function main() {
     chk("拒绝：变更 amount 0 → 抛错", false, "未抛错");
   } catch (e) {
     chk(
-      "拒绝：变更 amount 0 → 「变更金额不能为 0」",
+      "拒绝：变更 amount 0 → “变更金额不能为 0”",
       e instanceof ChangeOrderError && e.message === "变更金额不能为 0",
       e instanceof Error ? e.message : "非 Error"
     );
@@ -899,7 +899,7 @@ async function main() {
     chk("拒绝：deduct 正数 → 抛错", false, "未抛错");
   } catch (e) {
     chk(
-      "拒绝：deduct 正数 → 「减项金额应为负数」",
+      "拒绝：deduct 正数 → “减项金额应为负数”",
       e instanceof ChangeOrderError && e.message === "减项金额应为负数",
       e instanceof Error ? e.message : "非 Error"
     );
@@ -916,7 +916,7 @@ async function main() {
     chk("拒绝：add 负数 → 抛错", false, "未抛错");
   } catch (e) {
     chk(
-      "拒绝：add 负数 → 「增项金额应为正数」",
+      "拒绝：add 负数 → “增项金额应为正数”",
       e instanceof ChangeOrderError && e.message === "增项金额应为正数",
       e instanceof Error ? e.message : "非 Error"
     );
@@ -933,7 +933,7 @@ async function main() {
     chk("拒绝：变更日期非法 → 抛错", false, "未抛错");
   } catch (e) {
     chk(
-      "拒绝：变更日期非法 → 「日期格式非法」",
+      "拒绝：变更日期非法 → “日期格式非法”",
       e instanceof ChangeOrderError && e.message === "日期格式非法",
       e instanceof Error ? e.message : "非 Error"
     );
@@ -950,7 +950,7 @@ async function main() {
     chk("拒绝：updateChange 不存在 → 抛错", false, "未抛错");
   } catch (e) {
     chk(
-      "拒绝：updateChange 不存在 → 「变更单不存在」",
+      "拒绝：updateChange 不存在 → “变更单不存在”",
       e instanceof ChangeOrderError && e.message === "变更单不存在",
       e instanceof Error ? e.message : "非 Error"
     );
@@ -962,7 +962,7 @@ async function main() {
     chk("拒绝：deleteChange 不存在 → 抛错", false, "未抛错");
   } catch (e) {
     chk(
-      "拒绝：deleteChange 不存在 → 「变更单不存在」",
+      "拒绝：deleteChange 不存在 → “变更单不存在”",
       e instanceof ChangeOrderError && e.message === "变更单不存在",
       e instanceof Error ? e.message : "非 Error"
     );
@@ -1003,7 +1003,7 @@ async function main() {
     chk("付款：004 contractAmount=0 generatePlan → 抛错", false, "未抛错");
   } catch (e) {
     chk(
-      "付款：004 contractAmount=0 → 「先在项目设置录入合同额」",
+      "付款：004 contractAmount=0 → “先在项目设置录入合同额”",
       e instanceof PaymentPlanError && e.message === "先在项目设置录入合同额",
       e instanceof Error ? e.message : "非 Error"
     );
@@ -1060,7 +1060,7 @@ async function main() {
     chk("付款：004 重复 generatePlan → 抛错", false, "未抛错");
   } catch (e) {
     chk(
-      "付款：004 重复 generatePlan → 「已存在付款计划，请先清空再生成」",
+      "付款：004 重复 generatePlan → “已存在付款计划，请先清空再生成”",
       e instanceof PaymentPlanError &&
         e.message === "已存在付款计划，请先清空再生成",
       e instanceof Error ? e.message : "非 Error"
@@ -1074,7 +1074,7 @@ async function main() {
     chk("付款：003 clearPlan（有 paid 段）→ 抛错", false, "未抛错");
   } catch (e) {
     chk(
-      "付款：003 clearPlan → 「已标记已付的段不可清空…」",
+      "付款：003 clearPlan → “已标记已付的段不可清空…”",
       e instanceof PaymentPlanError &&
         e.message.includes("已标记已付的段不可清空"),
       e instanceof Error ? e.message : "非 Error"
@@ -1141,7 +1141,7 @@ async function main() {
     chk("付款：002 order3 markPaid（未解锁）→ 抛错", false, "未抛错");
   } catch (e) {
     chk(
-      "付款：002 order3 markPaid → 「未解锁不可标记已付：…」",
+      "付款：002 order3 markPaid → “未解锁不可标记已付：…”",
       e instanceof PaymentPlanError &&
         e.message.startsWith("未解锁不可标记已付："),
       e instanceof Error ? e.message : "非 Error"
@@ -1156,13 +1156,13 @@ async function main() {
   });
   if (!p2o2) throw new Error("前置失败：002 未找到 order2");
 
-  // 确保 002「水电工程」AcceptanceNode.status 非 passed（若 seed 已 passed 则先置 submitted）
+  // 确保 002“水电工程”AcceptanceNode.status 非 passed（若 seed 已 passed 则先置 submitted）
   const sdNode = await prisma.acceptanceNode.findFirst({
     where: { projectId: p2.id, name: "水电工程" },
     select: { id: true, status: true },
   });
   if (!sdNode)
-    throw new Error("前置失败：002 未找到「水电工程」验收节点，请先跑 M7 seed");
+    throw new Error("前置失败：002 未找到“水电工程”验收节点，请先跑 M7 seed");
   if (sdNode.status === "passed") {
     await prisma.acceptanceNode.update({
       where: { id: sdNode.id },
@@ -1170,7 +1170,7 @@ async function main() {
     });
   }
 
-  // getPlanView → order2 state.unlocked=false, missing 含「水电工程」
+  // getPlanView → order2 state.unlocked=false, missing 含“水电工程”
   const viewBefore = await getPlanView(p2.id);
   const segBefore = viewBefore.segments.find((s) => s.order === 2);
   chk(
@@ -1178,7 +1178,7 @@ async function main() {
     segBefore?.state.unlocked === false
   );
   chk(
-    "付款：002 order2 解锁前 → missing 含「水电工程」",
+    "付款：002 order2 解锁前 → missing 含“水电工程”",
     segBefore?.state.missing.includes("水电工程") === true,
     segBefore?.state.missing.join(",") ?? ""
   );

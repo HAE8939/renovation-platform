@@ -33,7 +33,7 @@ export class CustomFieldError extends Error {
   }
 }
 
-/** 定义行视图模型（UI 直接消费；options 已从「每行一个」的存储文本清洗成数组）。 */
+/** 定义行视图模型（UI 直接消费；options 已从“每行一个”的存储文本清洗成数组）。 */
 export interface FieldDef {
   id: string;
   key: string;
@@ -48,7 +48,7 @@ export interface FieldDef {
   valueCount?: number;
 }
 
-/** 一条「定义 + 该实体的值」：值录入表单与详情展示共用，展示串由纯函数算。 */
+/** 一条“定义 + 该实体的值”：值录入表单与详情展示共用，展示串由纯函数算。 */
 export interface EntityFieldValue {
   def: FieldDef;
   columns: ValueColumns;
@@ -118,7 +118,7 @@ function normalizeDefInput(input: DefInput): {
   let options = "";
   if (type === "select") {
     const parsed = parseOptions(input.optionsRaw ?? "");
-    if (parsed.length === 0) throw new CustomFieldError(`「${label}」的选项不能为空`);
+    if (parsed.length === 0) throw new CustomFieldError(`“${label}”的选项不能为空`);
     options = parsed.join("\n");
   }
   return {
@@ -185,7 +185,7 @@ export async function createDef(input: DefInput): Promise<FieldDef> {
     where: { key: data.key },
     select: { id: true },
   });
-  if (dup) throw new CustomFieldError(`字段标识「${data.key}」已存在`);
+  if (dup) throw new CustomFieldError(`字段标识“${data.key}”已存在`);
 
   const max = await prisma.customFieldDef.aggregate({ _max: { order: true } });
   const order = (max._max.order ?? -1) + 1;
@@ -208,7 +208,7 @@ export async function createDef(input: DefInput): Promise<FieldDef> {
   } catch (e) {
     // 并发下 findUnique 与 create 之间的窗口：P2002 兜底成同一句中文
     if (typeof e === "object" && e !== null && "code" in e && (e as { code?: string }).code === "P2002") {
-      throw new CustomFieldError(`字段标识「${data.key}」已存在`);
+      throw new CustomFieldError(`字段标识“${data.key}”已存在`);
     }
     throw e;
   }
@@ -256,7 +256,7 @@ export async function updateDef(
   // optionsRaw 未提交时（例如只改名称）保留原选项，避免把 select 的选项清空
   const options = input.optionsRaw === undefined ? existing.options ?? "" : data.options;
   if (existing.type === "select" && parseOptions(options).length === 0) {
-    throw new CustomFieldError(`「${data.label}」的选项不能为空`);
+    throw new CustomFieldError(`“${data.label}”的选项不能为空`);
   }
 
   const updated = await prisma.customFieldDef.update({
@@ -296,7 +296,7 @@ export async function deleteDef(id: string): Promise<void> {
   throw new CustomFieldError("字段定义不存在");
 }
 
-/** 整表调序：先校验 id 集合恰等现有集（照 M6-d 模板库「先全量预校验再写」），再批量写 order。 */
+/** 整表调序：先校验 id 集合恰等现有集（照 M6-d 模板库“先全量预校验再写”），再批量写 order。 */
 export async function reorderDefs(orderedIds: string[]): Promise<void> {
   const ids = orderedIds.map((s) => String(s));
   const existing = await prisma.customFieldDef.findMany({ select: { id: true } });

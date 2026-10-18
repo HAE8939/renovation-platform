@@ -62,7 +62,7 @@ export async function submitNodeAction(
       entity: "acceptanceNode",
       entityId: nodeId,
       projectId: nodeSub?.projectId ?? null,
-      summary: `提交验收「${nodeSub?.name ?? nodeId}」，检查项 ${checks.length} 条`,
+      summary: `提交验收“${nodeSub?.name ?? nodeId}”，检查项 ${checks.length} 条`,
       after: text("submitNote") || "（无提交说明）",
     });
 
@@ -97,7 +97,7 @@ export async function uploadEvidenceAction(
       entity: "evidence",
       entityId: saved.id,
       projectId: (await prisma.acceptanceNode.findUnique({ where: { id: nodeId }, select: { projectId: true } }))?.projectId ?? null,
-      summary: `上传验收证据「${saved.originalName}」`,
+      summary: `上传验收证据“${saved.originalName}”`,
       after: `${saved.mimeType}，${saved.size} 字节`,
     });
     revalidatePath(`/quality/nodes/${nodeId}`);
@@ -124,7 +124,7 @@ export async function deleteEvidenceAction(
       entity: "evidence",
       entityId: evidenceId,
       projectId: node?.projectId ?? null,
-      summary: `删除验收证据「${removed.originalName}」`,
+      summary: `删除验收证据“${removed.originalName}”`,
     });
     revalidatePath(`/quality/nodes/${removed.nodeId}`);
     return { ok: true };
@@ -176,8 +176,8 @@ export async function reviewNodeAction(
       entityId: nodeId,
       projectId: nodeRev?.projectId ?? null,
       summary: approve
-        ? `验收通过「${nodeRev?.name ?? nodeId}」`
-        : `验收退回「${nodeRev?.name ?? nodeId}」：${text("reason") || "未填原因"}（严重度 ${text("severity") || "normal"}${issueRev ? `，已建问题「${issueRev.title}」` : ""}）`,
+        ? `验收通过“${nodeRev?.name ?? nodeId}”`
+        : `验收退回“${nodeRev?.name ?? nodeId}”：${text("reason") || "未填原因"}（严重度 ${text("severity") || "normal"}${issueRev ? `，已建问题“${issueRev.title}”` : ""}）`,
       before: "submitted",
       after: nodeRev?.status ?? (approve ? "passed" : "returned"),
     });
@@ -214,7 +214,7 @@ export async function rectifyIssueAction(
       entity: "issue",
       entityId: issueId,
       projectId: iss?.projectId ?? null,
-      summary: `标记问题「${iss?.title ?? issueId}」已整改：${note || "未填说明"}`,
+      summary: `标记问题“${iss?.title ?? issueId}”已整改：${note || "未填说明"}`,
       after: iss?.status ?? null,
     });
 
@@ -261,8 +261,8 @@ export async function recheckIssueAction(
       entityId: issueId,
       projectId: issRe?.projectId ?? null,
       summary: pass
-        ? `复验通过并关闭问题「${issRe?.title ?? issueId}」${note ? `：${note}` : ""}`
-        : `复验退回问题「${issRe?.title ?? issueId}」：${note || "未填意见"}`,
+        ? `复验通过并关闭问题“${issRe?.title ?? issueId}”${note ? `：${note}` : ""}`
+        : `复验退回问题“${issRe?.title ?? issueId}”：${note || "未填意见"}`,
       after: issRe?.status ?? (pass ? "closed" : "open"),
     });
     return { ok: true };
@@ -302,7 +302,7 @@ export async function createIssueAction(
       action: "issue.create",
       entity: "issue",
       projectId,
-      summary: `手工新建问题「${title}」（严重度 ${severity}）`,
+      summary: `手工新建问题“${title}”（严重度 ${severity}）`,
       after: desc || "（无详细描述）",
     });
     return { ok: true };

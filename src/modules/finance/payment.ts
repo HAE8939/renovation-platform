@@ -129,7 +129,7 @@ function fmtDate(d: Date): string {
  * 付款段解锁派生（决策①：读取时算，不落库）。
  *
  * 优先级：
- * 1. unlocksAt 未到 → 未解锁（「保修期未至，{yyyy-MM-dd} 起可收」）← 日期优先
+ * 1. unlocksAt 未到 → 未解锁（“保修期未至，{yyyy-MM-dd} 起可收”）← 日期优先
  * 2. trigger=="stages" 有工序未 passed 或无对应节点 → 未解锁
  * 3. trigger=="all" 存在非 passed 节点 → 未解锁
  * 4. 解锁
@@ -205,11 +205,11 @@ export function paymentUnlockState(
 
 /**
  * 人读触发条件（计划页展示用，非 emoji）。
- * - none 无日期 → 「签约即可收」
- * - none 有日期 → 「保修期满后收取」
- * - stages 单工序 → 「{工序}验收通过」
- * - stages 多工序 → 「主体四项工序验收通过」（§3 指定文案）
- * - all → 「全部验收通过」
+ * - none 无日期 → “签约即可收”
+ * - none 有日期 → “保修期满后收取”
+ * - stages 单工序 → “{工序}验收通过”
+ * - stages 多工序 → “主体四项工序验收通过”（§3 指定文案）
+ * - all → “全部验收通过”
  */
 export function paymentTriggerLabel(node: PaymentNodeProjection): string {
   switch (node.trigger) {

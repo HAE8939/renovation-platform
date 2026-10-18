@@ -25,7 +25,7 @@ export function LeadArchiveButton({ leadId, leadName, archived, signed }: Props)
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!archived && !window.confirm(`确认作废线索「${leadName}」？\n作废后不再出现在看板、漏斗与签约率里，可随时恢复。`)) return;
+    if (!archived && !window.confirm(`确认作废线索“${leadName}”？\n作废后不再出现在看板、漏斗与签约率里，可随时恢复。`)) return;
     setError(null);
     const fd = new FormData(e.currentTarget);
     start(async () => {

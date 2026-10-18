@@ -22,7 +22,7 @@ export function PlatformShell({
 }) {
   const pathname = usePathname() ?? "/";
   const isHome = pathname === "/";
-  // 文档站：左侧栏由业务模块导航换成「说明目录」，文档区只留一套导航（与首页隐藏侧栏同构）。
+  // 文档站：左侧栏由业务模块导航换成“说明目录”，文档区只留一套导航（与首页隐藏侧栏同构）。
   const isDocs = isDocsPath(pathname);
 
   return (

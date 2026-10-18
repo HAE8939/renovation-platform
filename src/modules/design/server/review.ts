@@ -64,7 +64,7 @@ export async function reviewSubmission(
 
     if (!canReview(task.status)) {
       const label = DESIGN_TASK_STATUS_LABEL[task.status as DesignTaskStatus] ?? task.status;
-      throw new DesignReviewError(`当前任务状态为「${label}」，不可审核`);
+      throw new DesignReviewError(`当前任务状态为“${label}”，不可审核`);
     }
 
     const submission = await tx.taskSubmission.findUnique({

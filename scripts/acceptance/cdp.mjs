@@ -1,9 +1,9 @@
 /**
  * cdp.mjs —— 极简 Chrome DevTools Protocol 驱动（无第三方依赖）
  *
- * 为什么存在：STATUS §4-7 的缺口是「交互写回路径从没被点过」。历史验收全靠
+ * 为什么存在：STATUS §4-7 的缺口是“交互写回路径从没被点过”。历史验收全靠
  * `--screenshot` CLI（只截不改）与直连服务的门禁（不经过 UI），两条都碰不到
- * 「界面上点了 → 服务端收了 → 库里真变了 → 页面回读一致」这一整段。
+ * “界面上点了 → 服务端收了 → 库里真变了 → 页面回读一致”这一整段。
  * 本机没有 playwright / puppeteer，Node 24 自带 WebSocket 与 fetch，
  * 于是用裸 CDP 写一个够用的驱动：能点、能填、能上传、能截图、能读回 DOM。
  *
@@ -107,7 +107,7 @@ const HELPERS = String.raw`
       return lb.includes(want) || wrap.includes(want);
     });
     const el = byValue || byLabel;
-    if (!el) throw new Error("单选「" + name + "」无值：" + value + "（可选：" + list.map((e) => e.value).join("/") + "）");
+    if (!el) throw new Error("单选“" + name + "”无值：" + value + "（可选：" + list.map((e) => e.value).join("/") + "）");
     el.click();
     return { name, value: el.value, checked: el.checked };
   };
@@ -127,7 +127,7 @@ const HELPERS = String.raw`
     A.setNative(el, value);
     return { tag: el.tagName, name: el.name || null, value: el.value };
   };
-  /** 行内控件：按「行标识」（行文本或任一控件的值）定位行，再按 placeholder/label 找控件 */
+  /** 行内控件：按“行标识”（行文本或任一控件的值）定位行，再按 placeholder/label 找控件 */
   A.rowOf = (key) => {
     const k = A.norm(key).toLowerCase();
     const rows = [...document.querySelectorAll("tr")].filter(A.visible);
@@ -143,7 +143,7 @@ const HELPERS = String.raw`
     const l = A.norm(label).toLowerCase();
     const ctrls = [...row.querySelectorAll("input,select,textarea")];
     const el = ctrls.find((e) => A.labelOf(e) === l) || ctrls.find((e) => A.labelOf(e).includes(l));
-    if (!el) throw new Error("行「" + key + "」内无控件「" + label + "」（该行控件：" + ctrls.map((e) => A.labelOf(e).split("|")[0]).join(", ") + "）");
+    if (!el) throw new Error("行“" + key + "”内无控件“" + label + "”（该行控件：" + ctrls.map((e) => A.labelOf(e).split("|")[0]).join(", ") + "）");
     return el;
   };
   A.fillRow = (key, label, value) => {
@@ -191,7 +191,7 @@ const HELPERS = String.raw`
         }
       }
     }
-    throw new Error("找不到行「" + key + "」内的按钮「" + text + "」（全页同名按钮 " + want.length + " 个）");
+    throw new Error("找不到行“" + key + "”内的按钮“" + text + "”（全页同名按钮 " + want.length + " 个）");
   };
   /* 抽屉 / 弹窗内的控件：有 dialog 时只在其中找，避免与背景同名控件混淆 */
   A.dialog = () => {
@@ -207,7 +207,7 @@ const HELPERS = String.raw`
   };
   A.fillS = (label, value) => {
     const el = A.scoped(label);
-    if (!el) throw new Error("弹窗/页面内找不到控件「" + label + "」(dialog=" + !!A.dialog() + ")");
+    if (!el) throw new Error("弹窗/页面内找不到控件“" + label + "”(dialog=" + !!A.dialog() + ")");
     A.setNative(el, value);
     return { value: el.value, inDialog: !!A.dialog() };
   };
@@ -216,11 +216,11 @@ const HELPERS = String.raw`
     const scope = A.dialog() || document;
     const btns = [...scope.querySelectorAll("button,[role=button],a")].filter((e) => A.visible(e));
     const el = btns.find((e) => A.textOf(e).toLowerCase() === t) || btns.find((e) => A.textOf(e).toLowerCase().includes(t));
-    if (!el) throw new Error("弹窗/页面内找不到按钮「" + text + "」（有：" + btns.map((e) => A.textOf(e)).slice(0, 12).join(", ") + "）");
+    if (!el) throw new Error("弹窗/页面内找不到按钮“" + text + "”（有：" + btns.map((e) => A.textOf(e)).slice(0, 12).join(", ") + "）");
     el.click();
     return { clicked: A.textOf(el), inDialog: !!A.dialog() };
   };
-  /** 点「文本里含该关键字」的最specific可点元素（取最短文本，避免命中大容器） */
+  /** 点“文本里含该关键字”的最specific可点元素（取最短文本，避免命中大容器） */
   A.pickRow = (key) => {
     const k = A.norm(key).toLowerCase();
     const hits = [...document.querySelectorAll("button,[role=button],a,li,td,th,summary")]
@@ -230,7 +230,7 @@ const HELPERS = String.raw`
       const any = [...document.querySelectorAll("*")].filter(
         (e) => A.visible(e) && e.children.length < 6 && A.norm(e.innerText).toLowerCase().includes(k)
       );
-      if (!any.length) throw new Error("找不到含「" + key + "」的可点元素");
+      if (!any.length) throw new Error("找不到含“" + key + "”的可点元素");
       any.sort((a, b) => A.norm(a.innerText).length - A.norm(b.innerText).length);
       const leaf = any[0];
       const target = leaf.closest("a,button,[role=button],[onclick],[class*=cursor-pointer],[class*=hover\\:bg],tr,summary") || leaf;
@@ -250,7 +250,7 @@ const HELPERS = String.raw`
     const want = A.norm(optionText).toLowerCase();
     const op = [...el.querySelectorAll("option")].find((o) => A.norm(o.innerText).toLowerCase() === want)
       || [...el.querySelectorAll("option")].find((o) => A.norm(o.innerText).toLowerCase().includes(want));
-    if (!op) throw new Error("下拉「" + label + "」无选项：" + optionText + "（现有：" + [...el.querySelectorAll("option")].map((o) => A.norm(o.innerText)).join(" / ") + "）");
+    if (!op) throw new Error("下拉“" + label + "”无选项：" + optionText + "（现有：" + [...el.querySelectorAll("option")].map((o) => A.norm(o.innerText)).join(" / ") + "）");
     A.setNative(el, op.value);
     return { selected: A.norm(op.innerText), value: op.value };
   };
@@ -288,7 +288,7 @@ const HELPERS = String.raw`
       A.setNative(list[0], value);
       return { name, key: A.norm(key), value: list[0].value, tag: list[0].tagName, via: "only-one" };
     }
-    throw new Error("name=" + name + " 的控件都不在含「" + key + "」的作用域里（共 " + list.length + " 个）");
+    throw new Error("name=" + name + " 的控件都不在含“" + key + "”的作用域里（共 " + list.length + " 个）");
   };
   A.valueNear = (name, key) => {
     const el = A.resolveNear(name, key, true);
@@ -314,7 +314,7 @@ const HELPERS = String.raw`
     if (byValue.length === 1) return byValue[0];
     if (list.length === 1) return list[0];
     if (soft) return null;
-    throw new Error("name=" + name + " 的控件都不在含「" + key + "」的作用域里（共 " + list.length + " 个）");
+    throw new Error("name=" + name + " 的控件都不在含“" + key + "”的作用域里（共 " + list.length + " 个）");
   };
   /** 提交控件所属的 form（内联改名这类没有按钮锚点的场景） */
   A.submitNear = (name, key) => {
@@ -336,7 +336,7 @@ const HELPERS = String.raw`
     const want = A.norm(optionText).toLowerCase();
     const op = [...el.querySelectorAll("option")].find((o) => A.norm(o.innerText).toLowerCase() === want)
       || [...el.querySelectorAll("option")].find((o) => A.norm(o.innerText).toLowerCase().includes(want));
-    if (!op) throw new Error("下拉「" + label + "」无选项：" + optionText + "（现有：" + [...el.querySelectorAll("option")].map(o=>A.norm(o.innerText)).join(" / ") + "）");
+    if (!op) throw new Error("下拉“" + label + "”无选项：" + optionText + "（现有：" + [...el.querySelectorAll("option")].map(o=>A.norm(o.innerText)).join(" / ") + "）");
     A.setNative(el, op.value);
     return { selected: A.norm(op.innerText), value: op.value };
   };
@@ -357,13 +357,13 @@ const HELPERS = String.raw`
     const i = s.indexOf(from);
     return i < 0 ? null : s.slice(Math.max(0, i - 120), i + (len || 320));
   };
-  /** 从锚点文字「往后」取一段（取标签后面的数值时用，避免 -120 前窗把上一个值带进来） */
+  /** 从锚点文字“往后”取一段（取标签后面的数值时用，避免 -120 前窗把上一个值带进来） */
   A.after = (from, len) => {
     const s = document.body.innerText;
     const i = s.indexOf(from);
     return i < 0 ? null : s.slice(i, i + (len || 120));
   };
-  /** 标签后第一个数字（计数类 KPI，如「在建项目数 2」，不带 ¥） */
+  /** 标签后第一个数字（计数类 KPI，如“在建项目数 2”，不带 ¥） */
   A.afterNumber = (from) => {
     const t = A.after(from, 90);
     if (!t) return null;
@@ -380,7 +380,7 @@ const HELPERS = String.raw`
     const m = A.norm(marker).toLowerCase();
     const forms = [...document.querySelectorAll("form")].filter(A.visible);
     const f = forms.find((x) => A.norm(x.innerText).toLowerCase().includes(m));
-    if (!f) throw new Error("找不到含「" + marker + "」的表单（共 " + forms.length + " 个）");
+    if (!f) throw new Error("找不到含“" + marker + "”的表单（共 " + forms.length + " 个）");
     const btn = [...f.querySelectorAll("button[type=submit],button:not([type]),input[type=submit]")].find(A.visible);
     if (btn) { btn.click(); return { via: "button", text: A.textOf(btn) }; }
     f.requestSubmit ? f.requestSubmit() : f.submit();

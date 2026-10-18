@@ -10,7 +10,7 @@ interface PageProps {
   params: { projectId: string };
 }
 
-/** 项目基础信息编辑页（M1b-B3）。详情页内的「项目设置」链接带真实 projectId 进入。 */
+/** 项目基础信息编辑页（M1b-B3）。详情页内的“项目设置”链接带真实 projectId 进入。 */
 export default async function ProjectSettingsPage({ params }: PageProps) {
   const detail = await getProjectDetail(params.projectId);
   if (!detail) notFound();

@@ -1,7 +1,7 @@
 /**
  * 财务口径纯函数（core/domain）—— 单一真源。
  *
- * 沿 M4-a `pricing.ts` 上收先例（PLAN §7.3「毛利只出现在单一口径文件」）：
+ * 沿 M4-a `pricing.ts` 上收先例（PLAN §7.3“毛利只出现在单一口径文件”）：
  * projects 与 finance 两个消费方都要用，跨模块禁引；放 core 让两者共用而不产生
  * 跨模块 import（AGENTS §2）。本文件自包含、不 import 任何模块、不查 prisma、
  * 可被 plain node / verify 脚本直接加载。
@@ -86,11 +86,11 @@ export function grossProfit(input: GrossProfitInput): number {
 
 /**
  * 毛利率 = 毛利 ÷ (合同额 + 变更额)。
- * 分母 ≤ 0（合同额未录入=不可算）→ 返回 **null**，UI 显「—」，不造 0%。
+ * 分母 ≤ 0（合同额未录入=不可算）→ 返回 **null**，UI 显“—”，不造 0%。
  * 否则舍入到四位小数（0~1 之间，UI 自行 ×100 格式化）。
  * 注：TASK_M8 §3 原文写作 round2(rate*10000)/10000，但 round2 是两位舍入，
- * 会使 0.2265625 → 0.226563（六位）与「四位小数」声明冲突；此处取标准四位舍入
- * Math.round(rate*10000)/10000，与 §6「四位小数舍入」断言一致。
+ * 会使 0.2265625 → 0.226563（六位）与“四位小数”声明冲突；此处取标准四位舍入
+ * Math.round(rate*10000)/10000，与 §6“四位小数舍入”断言一致。
  */
 export function marginRate(input: GrossProfitInput): number | null {
   const contract = safeAmount(input.contractAmount);
@@ -103,7 +103,7 @@ export function marginRate(input: GrossProfitInput): number | null {
 }
 
 /**
- * 毛利率色档（v5.1 §6.7.5「>25% 绿 / 15–25% 黄 / <15% 红」的歧义本卡定死）：
+ * 毛利率色档（v5.1 §6.7.5“>25% 绿 / 15–25% 黄 / <15% 红”的歧义本卡定死）：
  * - null / undefined → "neutral"（不可算，不报红）
  * - > 0.25 → "green"
  * - 0.25 → "yellow"（临界归黄）

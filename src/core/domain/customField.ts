@@ -132,7 +132,7 @@ function parseLocalDate(s: string): Date | null {
 /**
  * 表单原始串 → 按类型转成三列。
  *
- * 空串（含纯空白）一律视为「未填」→ 三列全 null 且 ok:true，**不报类型错**；
+ * 空串（含纯空白）一律视为“未填”→ 三列全 null 且 ok:true，**不报类型错**；
  * 是否再拦必填由 requiredEmptyError 决定（先转类型、再判必填，报错顺序才稳定）。
  * number 的负数与 0 都合法（保修年限填 0 是业务事实）；方向语义由 type 列承载，
  * 不靠符号。未知 type（脏定义）宁可报错也不静默吞掉。
@@ -148,7 +148,7 @@ export function coerceFieldValue(
     case FIELD_TYPE.text: {
       const v = s.trim();
       if (v.length > TEXT_MAX) {
-        return { ok: false, error: `「${def.label}」不能超过 ${TEXT_MAX} 个字符` };
+        return { ok: false, error: `“${def.label}”不能超过 ${TEXT_MAX} 个字符` };
       }
       return { ok: true, columns: { ...emptyColumns(), valueText: v } };
     }
@@ -156,21 +156,21 @@ export function coerceFieldValue(
       // 只去首尾空白：内部换行是用户刻意写的，必须原样保留
       const v = s.trim();
       if (v.length > TEXTAREA_MAX) {
-        return { ok: false, error: `「${def.label}」不能超过 ${TEXTAREA_MAX} 个字符` };
+        return { ok: false, error: `“${def.label}”不能超过 ${TEXTAREA_MAX} 个字符` };
       }
       return { ok: true, columns: { ...emptyColumns(), valueText: v } };
     }
     case FIELD_TYPE.number: {
       const n = Number(s.trim());
       if (!Number.isFinite(n)) {
-        return { ok: false, error: `「${def.label}」应为数字` };
+        return { ok: false, error: `“${def.label}”应为数字` };
       }
       return { ok: true, columns: { ...emptyColumns(), valueNumber: n } };
     }
     case FIELD_TYPE.date: {
       const d = parseLocalDate(s);
       if (!d) {
-        return { ok: false, error: `「${def.label}」应为有效日期（YYYY-MM-DD）` };
+        return { ok: false, error: `“${def.label}”应为有效日期（YYYY-MM-DD）` };
       }
       return { ok: true, columns: { ...emptyColumns(), valueDate: d } };
     }
@@ -178,7 +178,7 @@ export function coerceFieldValue(
       const v = s.trim();
       const options = def.options ?? [];
       if (!options.includes(v)) {
-        return { ok: false, error: `「${def.label}」的值不在可选范围内` };
+        return { ok: false, error: `“${def.label}”的值不在可选范围内` };
       }
       return { ok: true, columns: { ...emptyColumns(), valueText: v } };
     }
@@ -200,7 +200,7 @@ export function requiredEmptyError(
     columns.valueText !== null ||
     columns.valueNumber !== null ||
     columns.valueDate !== null;
-  return filled ? null : `「${def.label}」为必填`;
+  return filled ? null : `“${def.label}”为必填`;
 }
 
 // ── M9-c 表单回填与展示 ───────────────────────────────────────────
@@ -248,7 +248,7 @@ export function valueToFormInput(
 }
 
 /**
- * 展示串（列表与详情共用）。未填 → 「—」（U+2014 EM DASH，不是 ASCII 连字符）。
+ * 展示串（列表与详情共用）。未填 → “—”（U+2014 EM DASH，不是 ASCII 连字符）。
  * textarea 把内部换行折成空格（列表里不撑高）；date 与项目中心 fmtDate 同款样式。
  */
 export function formatFieldValue(
@@ -373,14 +373,14 @@ export function describeFilter(
   switch (def.type) {
     case FIELD_TYPE.text:
     case FIELD_TYPE.textarea:
-      return a === "" ? null : `「${def.label}」包含「${a}」`;
+      return a === "" ? null : `“${def.label}”包含“${a}”`;
     case FIELD_TYPE.select:
-      return a === "" ? null : `「${def.label}」＝「${a}」`;
+      return a === "" ? null : `“${def.label}”＝“${a}”`;
     case FIELD_TYPE.number:
     case FIELD_TYPE.date:
-      if (a !== "" && b !== "") return `「${def.label}」${a} ~ ${b}`;
-      if (a !== "") return `「${def.label}」≥ ${a}`;
-      if (b !== "") return `「${def.label}」≤ ${b}`;
+      if (a !== "" && b !== "") return `“${def.label}”${a} ~ ${b}`;
+      if (a !== "") return `“${def.label}”≥ ${a}`;
+      if (b !== "") return `“${def.label}”≤ ${b}`;
       return null;
     default:
       return null;

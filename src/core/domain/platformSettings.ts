@@ -5,7 +5,7 @@ import { DEFAULT_THEME, isThemeKey, normalizeThemeKey, type ThemeKey } from "./t
  * 平台设置读写（M9-d）—— prisma 服务，只碰 PlatformSetting 单例。
  *
  * 落 `core/domain`：主题是外壳（layout）级的全局事实，Logo 是品牌区的展示事实，
- * 二者都不属于任何业务模块（AGENTS §2「主数据/平台能力归 core」）。业务模块不 import 这里，
+ * 二者都不属于任何业务模块（AGENTS §2“主数据/平台能力归 core”）。业务模块不 import 这里，
  * 只有外壳与 /settings 平台页用。
  *
  * 单用户免登录 → 全平台一行（固定 id "platform"）。get 时缺行即建（首次访问自动补齐），
@@ -33,7 +33,7 @@ export async function getPlatformSettings(): Promise<PlatformSettings> {
 
 /**
  * 改主题：只认四套插槽键（isThemeKey）。非法键抛中文错——设置页正常提交不会走到，
- * 这是「不在设置页开取色器、绝不落自由色值」这条红线的服务端闸门。
+ * 这是“不在设置页开取色器、绝不落自由色值”这条红线的服务端闸门。
  */
 export async function setThemeKey(key: unknown): Promise<ThemeKey> {
   if (!isThemeKey(key)) {

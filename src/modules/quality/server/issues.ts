@@ -71,7 +71,7 @@ export interface IssueRow {
  *
  * `archivedProjectName` 非空 = 用户正用 `?projectId=` 深链访问一个**已归档**项目。
  * 列表按口径不显示归档项目的问题，若不把这句递给页面，用户看到的是
- * 「明明有记录却一片空白」，只会以为数据丢了（本仓一贯的诚实降级要求）。
+ * “明明有记录却一片空白”，只会以为数据丢了（本仓一贯的诚实降级要求）。
  */
 export interface IssueListResult {
   issues: IssueRow[];
@@ -93,7 +93,7 @@ export interface IssueListFilters {
  *
  * 排序：状态 rank（open=0 → rectified=1 → closed=2）升序，同 rank 按 createdAt 降序
  * （最待办的问题在前，同态内最新优先）。**问题本体与项目下拉都取非 archived**
- * （M10-c：归档＝从待办视野摘出，与驾驶舱「未整改问题」计数同口径）；
+ * （M10-c：归档＝从待办视野摘出，与驾驶舱“未整改问题”计数同口径）；
  * 用户列表全量供责任人下拉。
  */
 export async function listIssues(
@@ -103,14 +103,14 @@ export async function listIssues(
     projectId?: string;
     status?: string;
     severity?: string;
-    /** 归档项目的问题不进全司台账视野（M10-c「事按可见性」，见下注释）。 */
+    /** 归档项目的问题不进全司台账视野（M10-c“事按可见性”，见下注释）。 */
     project?: { status: { not: string } };
   } = {};
   if (filters.projectId) where.projectId = filters.projectId;
   if (filters.status) where.status = filters.status;
   if (filters.severity) where.severity = filters.severity;
   // 列表本体排除已归档项目的问题。此前只排了下拉、本体没排，于是
-  // 「问题台账里数得到、驾驶舱待办里数不到」——同一时刻两个未整改数对不上。
+  // “问题台账里数得到、驾驶舱待办里数不到”——同一时刻两个未整改数对不上。
   // 归档项目的历史问题并未删除：恢复归档即回到台账，单项目页也照读得到。
   where.project = { status: { not: "archived" } };
 
@@ -176,7 +176,7 @@ export async function listIssues(
       select: { id: true, name: true },
       orderBy: { name: "asc" },
     }),
-    // 深链正指一个已归档项目 → 带回项目名，让页面说明「为什么是空的」
+    // 深链正指一个已归档项目 → 带回项目名，让页面说明“为什么是空的”
     filters.projectId
       ? prisma.project.findFirst({
           where: { id: filters.projectId, status: "archived" },
@@ -197,8 +197,8 @@ export async function listIssues(
 
 /**
  * 标记问题整改完成（open → rectified）。
- * 守卫：问题存在 / canRectify(status)（否则「当前状态不可整改」）/ note 去空白非空
- * （「整改说明不能为空」）；写 rectifyNote + rectifiedAt=now、status→rectified；
+ * 守卫：问题存在 / canRectify(status)（否则“当前状态不可整改”）/ note 去空白非空
+ * （“整改说明不能为空”）；写 rectifyNote + rectifiedAt=now、status→rectified；
  * assertIssueTransition("open","rectified") 兜底。单事务。
  *
  * note 非空校验在开事务前（仿 review.ts 的 reason 校验位置，避免无谓 DB 轮次）。
@@ -250,8 +250,8 @@ export type RecheckInput = RecheckPassInput | RecheckFailInput;
 
 /**
  * 复验问题（rectified → closed | open）。
- * 守卫：问题存在 / status==="rectified"（否则「仅待复验问题可复验」）；
- * pass=false 时 note 去空白非空（「复验意见不能为空」）；
+ * 守卫：问题存在 / status==="rectified"（否则“仅待复验问题可复验”）；
+ * pass=false 时 note 去空白非空（“复验意见不能为空”）；
  * pass=true → status=closed、closedAt=now、recheckNote=note?.trim() || null；
  * pass=false → status=open、recheckNote=note.trim()；
  * rectifyNote/rectifiedAt 历史一律不清（保留整改记录）；
@@ -320,12 +320,12 @@ export interface CreateIssueInput {
 }
 
 /**
- * 手工新建问题（M7-c，§1-4 台账含最小「手工新建」）。
- * 守卫：projectId 存在（「项目不存在」）/ title 去空白非空（「问题标题不能为空」）/
- * severity ∈ {minor,normal,major}（「严重度取值非法」）/ assigneeId 为 null/空 或
- * 库中真实 userId（「责任人不存在」）/ dueDateIso 可空、非法拒绝（「截止日期格式非法」）；
+ * 手工新建问题（M7-c，§1-4 台账含最小“手工新建”）。
+ * 守卫：projectId 存在（“项目不存在”）/ title 去空白非空（“问题标题不能为空”）/
+ * severity ∈ {minor,normal,major}（“严重度取值非法”）/ assigneeId 为 null/空 或
+ * 库中真实 userId（“责任人不存在”）/ dueDateIso 可空、非法拒绝（“截止日期格式非法”）；
  * status="open"、reportedBy=占位用户（getPlaceholderUser("submit")，null 报
- * 「未找到演示用户」）、nodeId=null（手工建无来源节点）。单事务。
+ * “未找到演示用户”）、nodeId=null（手工建无来源节点）。单事务。
  *
  * 输入校验（title/severity/dueDate/占位用户）在开事务前（仿 review.ts）；
  * projectId/assigneeId 存在性校验在事务内。
@@ -341,7 +341,7 @@ export async function createIssue(
     throw new QualityIssueError("严重度取值非法");
   }
 
-  // dueDateIso：可空；非空时须可解析为日期，否则「截止日期格式非法」
+  // dueDateIso：可空；非空时须可解析为日期，否则“截止日期格式非法”
   let dueDate: Date | null = null;
   const dueRaw = (input.dueDateIso ?? "").trim();
   if (dueRaw) {

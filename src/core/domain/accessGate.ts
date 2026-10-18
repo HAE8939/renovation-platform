@@ -1,7 +1,7 @@
 /**
  * accessGate.ts —— 内测期最小访问保护的口径单点（M13-c）
  *
- * 为什么走反代口令而不是平台内登录：契约 §7 明写「不在第一个模块阶段做重型权限中台」，
+ * 为什么走反代口令而不是平台内登录：契约 §7 明写“不在第一个模块阶段做重型权限中台”，
  * 而平台即将交给内部员工真实使用，零鉴权已从零成本留位变成现实风险
  * （docs/DEPLOYMENT_INTERNAL_AND_CLOUD.md 自己就要求"正式内测前需补最小访问保护"）。
  * 所以这里只做一道闸，不建会话、不建角色体系、不碰 P4 的 RBAC 计划。
@@ -31,7 +31,7 @@ export function gateEnabled(): boolean {
  * 只挑 /hr 与 /finance 上闸会给人虚假的安全感。
  */
 export function isPublicPath(pathname: string): boolean {
-  // /about 是公开「门面页」：只放不敏感的定位介绍 + 指向 /docs。完整文档站 /docs/* 含内部经营口径，
+  // /about 是公开“门面页”：只放不敏感的定位介绍 + 指向 /docs。完整文档站 /docs/* 含内部经营口径，
   // 刻意不进白名单 → 随全站受口令保护。/docs 不公开，故 /about 也不直连 /docs 的正文，只做引路。
   if (pathname === "/" || pathname === "/about") return true;
   // 错误上报必须可达，否则 app/error.tsx 的 digest 反查链路会被自己的闸掐断

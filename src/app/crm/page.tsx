@@ -14,7 +14,7 @@ export default async function CrmListPage({
 }: {
   searchParams: { view?: string; archived?: string };
 }) {
-  // M10-a 备料三：默认只看在用线索；?archived=1 切到「已作废」视图，用来恢复误作废的单子。
+  // M10-a 备料三：默认只看在用线索；?archived=1 切到“已作废”视图，用来恢复误作废的单子。
   const onlyArchived = searchParams?.archived === "1";
   const leads = await listLeads(onlyArchived ? { onlyArchived: true } : undefined);
   const view: ViewMode = searchParams?.view === "list" ? "list" : "board";
@@ -27,7 +27,7 @@ export default async function CrmListPage({
             <h1 className="text-[28px] font-semibold">商务线索</h1>
             <p className="mt-2 max-w-prose text-[15px] leading-relaxed text-secondary">
               从线索录入、跟进推进到签约建项的商务全链路。点击任意线索卡片可打开详情抽屉，
-              查看基础信息、跟进时间线与添加跟进；超 3 天未跟进的线索在「最后跟进」标红提示。
+              查看基础信息、跟进时间线与添加跟进；超 3 天未跟进的线索在“最后跟进”标红提示。
             </p>
           </div>
           <ViewToggle view={view} />

@@ -1,7 +1,7 @@
 /**
  * /api/client-errors —— 浏览器侧渲染错误转存服务端（M10-a 备料一）
  *
- * 为什么要有它：Next 生产构建把 RSC 渲染错误详情隐去、只给页面一个「错误编号 digest」，
+ * 为什么要有它：Next 生产构建把 RSC 渲染错误详情隐去、只给页面一个“错误编号 digest”，
  * 而详情落在服务端 stdout——本机 `next start` 没人盯着 stdout，等于现场丢了。
  * 前端 error.tsx 拿到 digest 后 POST 到这里，digest 与详情就能在同一份 JSONL 里对上。
  *

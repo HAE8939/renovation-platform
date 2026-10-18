@@ -37,7 +37,7 @@ export default async function FinancePaymentsPage({
           <h1 className="mt-3 text-[28px] font-semibold">付款计划</h1>
           <p className="mt-2 max-w-prose text-[15px] leading-relaxed text-secondary">
             按合同额生成五段付款计划（开工 / 水电完成 / 主体完工 / 竣工 / 保修金），
-            验收节点通过后对应段自动进入「可收款」态。
+            验收节点通过后对应段自动进入“可收款”态。
           </p>
         </header>
         <section className="rounded-card border border-line bg-surface px-8 py-12 text-center">
@@ -72,7 +72,7 @@ export default async function FinancePaymentsPage({
         <h1 className="mt-3 text-[28px] font-semibold">付款计划</h1>
         <p className="mt-2 max-w-prose text-[15px] leading-relaxed text-secondary">
           按合同额生成五段付款计划（开工 / 水电完成 / 主体完工 / 竣工 / 保修金），
-          验收节点通过后对应段自动进入「可收款」态。
+          验收节点通过后对应段自动进入“可收款”态。
         </p>
       </header>
 

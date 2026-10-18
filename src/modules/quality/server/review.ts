@@ -38,9 +38,9 @@ export type ReviewInput = ReviewApproveInput | ReviewRejectInput;
 
 /**
  * 审核节点（M7-b）：一个 $transaction 内原子完成 ——
- * ① 取占位审核人（开事务前只读，无则拒绝「未找到演示用户」）；
- * ② 退回时 reason 去空白非空（「退回原因不能为空」）、severity 枚举校验；
- * ③ 事务内取节点校验存在 + status==="submitted"（「仅待审核节点可审核」）；
+ * ① 取占位审核人（开事务前只读，无则拒绝“未找到演示用户”）；
+ * ② 退回时 reason 去空白非空（“退回原因不能为空”）、severity 枚举校验；
+ * ③ 事务内取节点校验存在 + status==="submitted"（“仅待审核节点可审核”）；
  * ④ assertNodeTransition(submitted, passed|returned) 兜底；
  * ⑤ approve=true → status=passed、reviewedBy/At（不动 returnReason）；
  *    approve=false → status=returned、returnReason、reviewedBy/At + 同事务建 Issue。

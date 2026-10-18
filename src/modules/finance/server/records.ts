@@ -11,10 +11,10 @@
  * max(0, contractAmount + changeTotal − received)（变更后应收含变更）。
  * 直读 ChangeOrder（budget 私有表经 quote→project），不 import budget 模块内部。
  *
- * 归档口径（M10-c，HAE 2026-10-13 拍板「钱按事实 · 事按可见性」）：
+ * 归档口径（M10-c，HAE 2026-10-13 拍板“钱按事实 · 事按可见性”）：
  * - **事实类一律照算**——已收、支出、合同额、变更、毛利/毛利率含已归档项目。
  *   归档只是可见性开关（AGENTS §4.3），不该回溯改写已经交付出去的对账数字：
- *   八月实收的五万，不会因为十一月点了「归档」而在报表里凭空消失。
+ *   八月实收的五万，不会因为十一月点了“归档”而在报表里凭空消失。
  * - **前瞻类排除已归档**——待收款与计划未付合计只算未归档项目。归档＝这个项目
  *   的经营事项已收场，不再挂账催收、不再出现在催款视野里。
  * - 两者口径不同是**有意**的，故必须让页面把它说清楚：结果带 `archivedFacts`
@@ -68,22 +68,22 @@ export interface FinanceSummary {
   unpaidPlanTotal: number;
   expenseTotal: number;
   grossProfit: number;
-  /** 毛利率（合同额未录入 → null，UI 显「—」） */
+  /** 毛利率（合同额未录入 → null，UI 显“—”） */
   marginRate: number | null;
   /** 毛利率色档（neutral = 不可算） */
   marginLight: "green" | "yellow" | "red" | "neutral";
 }
 
 /**
- * 已归档项目仍计入汇总的「历史事实」（M10-c）——供页面出一行诚实说明。
- * 不说明就等于让「待收款比已收款小得说不清」这种问题静默存在。
+ * 已归档项目仍计入汇总的“历史事实”（M10-c）——供页面出一行诚实说明。
+ * 不说明就等于让“待收款比已收款小得说不清”这种问题静默存在。
  */
 export interface ArchivedFacts {
   /** 当前筛选范围内已归档项目数（0 → 页面不出说明行） */
   projectCount: number;
-  /** 这些项目的历史已收（已计入上方「已收款」格） */
+  /** 这些项目的历史已收（已计入上方“已收款”格） */
   receivedTotal: number;
-  /** 这些项目的历史支出（已计入上方「总支出」格） */
+  /** 这些项目的历史支出（已计入上方“总支出”格） */
   expenseTotal: number;
 }
 
@@ -92,7 +92,7 @@ export interface ListRecordsResult {
   projectOptions: ProjectOption[];
   summary: FinanceSummary;
   archivedFacts: ArchivedFacts;
-  /** 单项目筛选且该项目已归档 → true（页面据此说明「前瞻数不计入」）。 */
+  /** 单项目筛选且该项目已归档 → true（页面据此说明“前瞻数不计入”）。 */
   filteredArchived: boolean;
 }
 
@@ -135,7 +135,7 @@ export async function listRecords(
     }),
     prisma.project.findMany({
       where: projectId ? { id: projectId } : {},
-      // status 必带：它是「事实照算 / 前瞻隐身」二分的分区依据（M10-c）
+      // status 必带：它是“事实照算 / 前瞻隐身”二分的分区依据（M10-c）
       select: { id: true, contractAmount: true, status: true },
     }),
     prisma.paymentNode.findMany({
@@ -189,7 +189,7 @@ export async function listRecords(
     }));
   }
 
-  // ── 归档分区（M10-c「钱按事实 · 事按可见性」）──
+  // ── 归档分区（M10-c“钱按事实 · 事按可见性”）──
   // 已归档项目的 id 集合：事实类（已收/支出/合同/变更/毛利）不看它，
   // 前瞻类（待收款、计划未付）只看非归档那一半。
   const archivedIds = new Set(
@@ -327,13 +327,13 @@ function validateRecordInput(input: RecordInput): {
 /**
  * 新建收支记录（M8-b）。
  * 守卫（纯输入校验在开事务前，存在性校验在事务内，仿 createIssue）：
- * - type ∈ {income, expense}（「收支类型非法」）；
- * - category ∈ categoriesFor(type)（「科目与收支类型不匹配」——防错账第一道闸）；
- * - amount 有限数且 > 0（「金额需为大于 0 的数字」；方向由 type 决定、不接受负数）；
- * - dateIso 可解析（「日期格式非法」）；
- * - 占位录入人 getFinanceUser()，null → 「未找到录入人，请先运行 seed 初始化用户」；
+ * - type ∈ {income, expense}（“收支类型非法”）；
+ * - category ∈ categoriesFor(type)（“科目与收支类型不匹配”——防错账第一道闸）；
+ * - amount 有限数且 > 0（“金额需为大于 0 的数字”；方向由 type 决定、不接受负数）；
+ * - dateIso 可解析（“日期格式非法”）；
+ * - 占位录入人 getFinanceUser()，null → “未找到录入人，请先运行 seed 初始化用户”；
  * - description 去空白、可空（存 ""）。
- * 事务内：project.findUnique 不存在 → 「项目不存在」。写 recordedBy=占位用户 id。
+ * 事务内：project.findUnique 不存在 → “项目不存在”。写 recordedBy=占位用户 id。
  */
 export async function createRecord(input: RecordInput): Promise<{ id: string }> {
   const { type, category, amount, date, description } = validateRecordInput(input);
@@ -368,7 +368,7 @@ export async function createRecord(input: RecordInput): Promise<{ id: string }> 
 
 /**
  * 编辑记录（M8-b，全字段覆盖式编辑）。
- * 守卫同 createRecord；额外：id 不存在 → 「记录不存在」。
+ * 守卫同 createRecord；额外：id 不存在 → “记录不存在”。
  * 不改 recordedBy（保留原录入人=创建者）；updatedAt 由 @updatedAt 自动。
  */
 export async function updateRecord(id: string, input: RecordInput): Promise<void> {
@@ -398,7 +398,7 @@ export async function updateRecord(id: string, input: RecordInput): Promise<void
 
 /**
  * 删除记录（M8-b，硬删——单用户无回收站，TASK §4-M8-b）。
- * id 不存在 → 「记录不存在」。删除不需要 getFinanceUser。
+ * id 不存在 → “记录不存在”。删除不需要 getFinanceUser。
  */
 export async function deleteRecord(id: string): Promise<void> {
   return prisma.$transaction(async (tx) => {

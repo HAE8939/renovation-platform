@@ -173,7 +173,7 @@ export async function createSubmission(
 
     if (!canSubmit(task.status)) {
       const label = DESIGN_TASK_STATUS_LABEL[task.status as DesignTaskStatus] ?? task.status;
-      throw new DesignSubmissionError(`当前任务状态为「${label}」，不可提交成果`);
+      throw new DesignSubmissionError(`当前任务状态为“${label}”，不可提交成果`);
     }
 
     const latest = await tx.taskSubmission.findFirst({

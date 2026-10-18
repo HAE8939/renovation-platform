@@ -47,12 +47,12 @@ import {
  * - 口径纪律：在建三态 / 签单月键 / 回款率与色档 / 风险红灯全部收敛在
  *   core/domain/{dashboard,health,ledger}，本文件不出现阈值字面量；
  *   回款率进度条宽度换算只在此处做一次，页面直接消费不再计算。
- * - 现金序列与毛利率排行同样「零写入、零新增查询、算式只在本文件一次」（M9-b-2b）。
+ * - 现金序列与毛利率排行同样“零写入、零新增查询、算式只在本文件一次”（M9-b-2b）。
  */
 
 /**
  * 日期展示：与 `projects/server/projectDetail.ts` 的 fmtDate 同款（zh-CN 数字三位，
- * 如「2026/10/11」）——驾驶舱的预计完工要和项目中心、排程页对得上，不另起一种样式。
+ * 如“2026/10/11”）——驾驶舱的预计完工要和项目中心、排程页对得上，不另起一种样式。
  */
 function fmtDate(d: Date): string {
   return d.toLocaleDateString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit" });
@@ -73,7 +73,7 @@ function fmtStamp(d: Date): string {
 export interface DashboardKpi {
   /** isInProgress(status) 计数（范围已排除 archived） */
   activeProjects: number;
-  /** 本月签单额（只计「签约建项」，按 createdAt 落本地日历月） */
+  /** 本月签单额（只计“签约建项”，按 createdAt 落本地日历月） */
   signedThisMonth: number;
   prevMonthSigned: number;
   momPct: number | null;
@@ -81,7 +81,7 @@ export interface DashboardKpi {
    *  不因归档消失（§4.3 钱按事实）。主查询 project.findMany 无 status 过滤，勿照旧注释加排除。 */
   collectionRate: number | null;
   collectionLight: CollectionLight;
-  /** 回款率进度条的 CSS 宽度（>1 钳满 100%）；rate 为 null → null（页面不渲条、显「—」）。算式只在此处一次。 */
+  /** 回款率进度条的 CSS 宽度（>1 钳满 100%）；rate 为 null → null（页面不渲条、显“—”）。算式只在此处一次。 */
   collectionBar: string | null;
   /**
    * 本月 vs 上月的对比条高度（CSS 百分比串，以两者较大者为 100%）。
@@ -93,11 +93,11 @@ export interface DashboardKpi {
 }
 
 /**
- * 项目健康度行（M10-b 起：从「只列在建」改为「列全部未归档项目」）。
+ * 项目健康度行（M10-b 起：从“只列在建”改为“列全部未归档项目”）。
  *
  * 为什么扩范围：原来这里只给在建项目（实测 2 条），页面右半因此大片空白，
  * 而老板看驾驶舱要的是"每一单现在怎样"，筹备中/已竣工同样是账上的一部分。
- * 排序＝在建优先、其余按编号，KPI「在建项目数」口径不变（仍 isInProgress 计数）。
+ * 排序＝在建优先、其余按编号，KPI“在建项目数”口径不变（仍 isInProgress 计数）。
  */
 export interface HealthRow {
   id: string;
@@ -107,10 +107,10 @@ export interface HealthRow {
   status: string;
   clientName: string | null;
   pm: string | null;
-  /** 计划完工日（zh-CN 三位）；null → 页面显「—」 */
+  /** 计划完工日（zh-CN 三位）；null → 页面显“—” */
   plannedEnd: string | null;
   progress: number;
-  /** 是否已有排程工序（false 时页面显灰「未排程」，不假绿） */
+  /** 是否已有排程工序（false 时页面显灰“未排程”，不假绿） */
   hasSchedule: boolean;
   lights: { schedule: Light; quality: Light; budget: Light };
   /** 累计变更预警（changeWatch.warn，用带符号变更原值判定） */
@@ -123,7 +123,7 @@ export interface HealthRow {
   profit: number;
   margin: number | null;
   marginLight: MarginLight;
-  /** 未录入支出 ⇒ 毛利率不可算（决策 15 同族），页面显「—」而非 100% */
+  /** 未录入支出 ⇒ 毛利率不可算（决策 15 同族），页面显“—”而非 100% */
   rankable: boolean;
   openIssues: number;
   pendingNodes: number;
@@ -143,11 +143,11 @@ export interface TodoGroup {
   count: number;
   href: string;
   items: TodoItem[];
-  /** 灰占位组（模块未上线）：页面渲占位文案 + 「未接入」徽标，不给链 */
+  /** 灰占位组（模块未上线）：页面渲占位文案 + “未接入”徽标，不给链 */
   placeholder?: boolean;
 }
 
-/** 归档参与量：页面据此出「哪些格子含它、为什么含」的说明行（M10-c）。 */
+/** 归档参与量：页面据此出“哪些格子含它、为什么含”的说明行（M10-c）。 */
 export interface ArchivedFacts {
   projectCount: number;
   income: number;
@@ -186,7 +186,7 @@ export interface DashboardFunnel {
   stages: FunnelStageRow[];
   /** 全部线索数（含 order 外的，若手测脏数据） */
   total: number;
-  /** 签约率 = signed / total；total 0 → null（UI 显「—」） */
+  /** 签约率 = signed / total；total 0 → null（UI 显“—”） */
   conversionRate: number | null;
 }
 
@@ -232,7 +232,7 @@ export interface DashboardCash {
   totalNet: number;
   /** "2026-05 ~ 2026-10"（升序键，最早在前） */
   rangeLabel: string;
-  /** false → 页面可显「无现金流」空态 */
+  /** false → 页面可显“无现金流”空态 */
   hasAnyCash: boolean;
 }
 
@@ -240,9 +240,9 @@ export interface DashboardCash {
  * 项目毛利率排行视图模型（M9-b-2b）。
  *
  * 范围＝主查询全部项目，**含已归档**（毛利与毛利率属事实族，§4.3；主查询刻意不带 status 过滤）。
- * 不筛在建——与「项目健康度表」只看未归档的运营口径不同，两者有意分叉。
- * 顺序：rankable 组按 rate 降序、同值按 code 升序；其后接「未录入支出」组、
- * 最后接「未录入合同额，不可算」组（后两组按 code 升序）。
+ * 不筛在建——与“项目健康度表”只看未归档的运营口径不同，两者有意分叉。
+ * 顺序：rankable 组按 rate 降序、同值按 code 升序；其后接“未录入支出”组、
+ * 最后接“未录入合同额，不可算”组（后两组按 code 升序）。
  */
 export interface MarginRankRow {
   id: string;
@@ -306,10 +306,10 @@ export async function getDashboardOverview(
     payList,
     leads,
   ] = await Promise.all([
-    // 主查询：全部项目（**含已归档**）。M10-c 口径「钱按事实 · 事按可见性」——
+    // 主查询：全部项目（**含已归档**）。M10-c 口径“钱按事实 · 事按可见性”——
     // 已发生的（已收/支出/合同额/变更/毛利/毛利率）不因归档而消失，否则归档一次，
     // 历史月份的现金线与回款率会凭空少一截，已经交付出去的对账数字变得不可信。
-    // 「还要做什么」（风险、待办、健康表）另用 liveRows 收窄。
+    // “还要做什么”（风险、待办、健康表）另用 liveRows 收窄。
     prisma.project.findMany({
       include: {
         client: { select: { name: true } },
@@ -441,7 +441,7 @@ export async function getDashboardOverview(
     projects.map((p) => ({
       contractAmount: p.contractAmount,
       createdAt: p.createdAt,
-      signed: p.lead !== null, // lead 非空即「由签约建项而来」
+      signed: p.lead !== null, // lead 非空即“由签约建项而来”
     })),
     now
   );
@@ -556,12 +556,12 @@ export async function getDashboardOverview(
 
   // ── 项目毛利率排行（M9-b-2b）──────────────────────────────────────────────
   // 范围＝主查询全部项目，**含已归档**（毛利与毛利率属事实族，§4.3；主查询刻意不带 status 过滤）。
-  // 不筛在建——与「项目健康度表」只看未归档的运营口径不同，两者有意分叉。
+  // 不筛在建——与“项目健康度表”只看未归档的运营口径不同，两者有意分叉。
   // 灰态剔除规则已拍板：只录合同额、没录任何支出的项目按公式恰得 100%，
   // 摆进榜首必误导 → 不入榜、率不展示（light 字段留着给巡检用，页面灰态不渲色点）。
   // 三档 tier（优先级从高到低）：0 rankable / 1 未录入支出 / 2 不可算。
   // 一次 sort 做完：tier 升序；rankable 组 rate 降序、同值 code 升序；
-  // tier 1 的率恒为恰值 1（支出为 0）、tier 2 的率全为 null，故「rate 降序」
+  // tier 1 的率恒为恰值 1（支出为 0）、tier 2 的率全为 null，故“rate 降序”
   // 这把次级键在这两组内不生效，自然落到 code 升序。
   type MarginTierRow = MarginRankRow & { tier: 0 | 1 | 2 };
   const marginTierRows: MarginTierRow[] = rows.map((r) => {

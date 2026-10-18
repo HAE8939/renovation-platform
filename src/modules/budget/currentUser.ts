@@ -2,7 +2,7 @@ import prisma from "@/core/db";
 import { USER_ROLE } from "@/core/domain/types";
 
 /**
- * 预算模块占位「当前用户」（M9-a，仿 finance/currentUser.ts）。
+ * 预算模块占位“当前用户”（M9-a，仿 finance/currentUser.ts）。
  *
  * P4 接登录后替换为 session 取当前用户；本期变更单 createdBy 仅记事实、
  * 不做权限（TASK_M9 §0 红线：审批流/角色过滤一律不做）。

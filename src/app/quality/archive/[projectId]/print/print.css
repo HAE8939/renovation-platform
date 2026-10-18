@@ -80,7 +80,7 @@
     margin: 16mm 14mm;
   }
 
-  /* 标题不与后文分离：仅页面/节级标题，避免「时间轴明细」成孤行 */
+  /* 标题不与后文分离：仅页面/节级标题，避免“时间轴明细”成孤行 */
   .print-sheet h1,
   .print-sheet h2 {
     break-after: avoid;

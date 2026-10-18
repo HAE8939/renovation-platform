@@ -26,7 +26,7 @@ await withPlatform("s9-m10a", 9369, async ({ br, db, rep, go, srv }) => {
     rep.assert(!!logs.find((l) => l.action === "project.archive")?.before, "流水", "流水记下归档前状态（恢复要用）", String(logs.find((l) => l.action === "project.archive")?.before));
     await go("/dashboard");
     const afterKpi = await br.evaluate(`window.__A.afterNumber("在建项目数")`);
-    rep.assert(Number(afterKpi) === Number(before) - 1, "口径", "驾驶舱「在建项目数」少 1（已归档不计）", `${before} → ${afterKpi}`);
+    rep.assert(Number(afterKpi) === Number(before) - 1, "口径", "驾驶舱“在建项目数”少 1（已归档不计）", `${before} → ${afterKpi}`);
     await go("/projects?view=table");
     await br.clickInRow(p.code, "恢复");
     await br.settle(1200);
@@ -50,7 +50,7 @@ await withPlatform("s9-m10a", 9369, async ({ br, db, rep, go, srv }) => {
     await go("/crm");
     rep.assert(!(await br.hasText(lead.name)), "UI", "作废后看板里看不到该线索");
     await go("/crm?view=list&archived=1");
-    rep.assert(await br.hasText(lead.name), "UI", "「已作废」视图能查到（否则无法恢复）");
+    rep.assert(await br.hasText(lead.name), "UI", "“已作废”视图能查到（否则无法恢复）");
     await br.clickInRow(lead.name, "恢复");
     await br.settle(1400);
     const l3 = await db.lead.findUnique({ where: { id: lead.id } });
@@ -65,14 +65,14 @@ await withPlatform("s9-m10a", 9369, async ({ br, db, rep, go, srv }) => {
         const r = [...document.querySelectorAll('tr')].find(x=>A.norm(x.innerText).includes(${JSON.stringify(signed.name)}));
         return r ? A.norm(r.innerText) : null;
       })()`);
-      rep.assert(!/作废/.test(hint || "") || /项目中心/.test(hint || ""), "GUARD", "已签约线索不给「只作废线索」的入口（会断项目来源）", String(hint).slice(0, 70));
+      rep.assert(!/作废/.test(hint || "") || /项目中心/.test(hint || ""), "GUARD", "已签约线索不给“只作废线索”的入口（会断项目来源）", String(hint).slice(0, 70));
     }
     await go("/dashboard");
     rep.ok("口径", "漏斗对账基线（作废前后 stage 分布）", funnel0.includes("商务漏斗") ? "漏斗在位" : "未见漏斗");
   });
 
   /* ── 备料二 · 操作流水内容质量 ── */
-  await rep.scenario("K3 改一笔台账 → 流水里有「从多少改到多少」", async () => {
+  await rep.scenario("K3 改一笔台账 → 流水里有“从多少改到多少”", async () => {
     await go("/finance");
     await br.clickS("新建记录").catch(() => br.clickS("新建收支记录"));
     await br.settle(1000);
@@ -95,7 +95,7 @@ await withPlatform("s9-m10a", 9369, async ({ br, db, rep, go, srv }) => {
     await br.settle(2200);
     const row = await db.operationLog.findFirst({ where: { action: "record.update", entityId: rec.id }, orderBy: { at: "desc" } });
     rep.assert(!!row, "流水", "改动写入流水一条", row ? row.summary : "没有");
-    rep.assert(/→/.test(row?.summary || ""), "流水", "摘要含「旧 → 新」可读变化", String(row?.summary));
+    rep.assert(/→/.test(row?.summary || ""), "流水", "摘要含“旧 → 新”可读变化", String(row?.summary));
     rep.assert(!!row?.actor, "流水", "记了操作人（P4 前是占位用户）", String(row?.actor));
     rep.eq(row?.projectId, rec.projectId, "流水", "挂上 projectId，可按项目回放", String(row?.projectId));
     rep.note("HAE", "测试记录留在副本库", "验收流·流水可查性——每个套件开跑前重灌副本库，不会污染实库");
@@ -124,7 +124,7 @@ await withPlatform("s9-m10a", 9369, async ({ br, db, rep, go, srv }) => {
     })()`);
     rep.assert(!!panel, "UI", "面板打开");
     rep.assert((panel?.groups || []).length > 0, "UI", "至少一组待办", (panel?.groups || []).join(" / "));
-    rep.assert((panel?.links || 0) >= (panel?.groups || []).length, "UI", "每组都带「查看全部」深链", `links=${panel?.links}`);
+    rep.assert((panel?.links || 0) >= (panel?.groups || []).length, "UI", "每组都带“查看全部”深链", `links=${panel?.links}`);
     const badge = await br.evaluate(`(() => {const A=window.__A;const b=[...document.querySelectorAll('button')].find(e=>A.norm(e.innerText).startsWith('通知'));return b?A.norm(b.innerText):null})()`);
     rep.assert(/^通知/.test((badge || "").trim()) && /\d/.test(badge || ""), "UI", "按钮上有未读角标", JSON.stringify(badge));
     await br.evaluate(`document.querySelector('[role=dialog] button')?.click()`);
@@ -140,7 +140,7 @@ await withPlatform("s9-m10a", 9369, async ({ br, db, rep, go, srv }) => {
       return cards.map(c=>A.norm(c.innerText).slice(0,26));
     })()`);
     const withGlyph = (icons || []).filter((t) => /^[0-9]{2}\s*[^\x00-\xff]{1}\s/.test(t));
-    rep.eq(withGlyph.length, 0, "UI", "卡片文本形如「01 数据驾驶舱」，中间没有单字图标", (icons || []).slice(0, 3).join(" | "));
+    rep.eq(withGlyph.length, 0, "UI", "卡片文本形如“01 数据驾驶舱”，中间没有单字图标", (icons || []).slice(0, 3).join(" | "));
   });
 
   await rep.scenario("U2 侧栏固定不随主体滚动", async () => {
@@ -176,7 +176,7 @@ await withPlatform("s9-m10a", 9369, async ({ br, db, rep, go, srv }) => {
   await rep.scenario("U4 设置页标题与四色一一对应", async () => {
     await go("/settings");
     const t = await br.text();
-    rep.assert(t.includes("主题") && !t.includes("强调色主题"), "UI", "标题已是「主题」，旧长句说明已去掉");
+    rep.assert(t.includes("主题") && !t.includes("强调色主题"), "UI", "标题已是“主题”，旧长句说明已去掉");
     rep.assert(!t.includes("纸底、灰阶、描边、圆角一律不动"), "UI", "技术口径说明文字已删");
     const chips = await br.evaluate(`(() => {
       const A = window.__A;

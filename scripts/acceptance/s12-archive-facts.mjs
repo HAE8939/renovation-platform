@@ -1,5 +1,5 @@
 /**
- * s12-archive-facts.mjs —— 「钱按事实 · 事按可见性」在驾驶舱上的闭环（M10-c 收口 + M10-b 对齐）
+ * s12-archive-facts.mjs —— “钱按事实 · 事按可见性”在驾驶舱上的闭环（M10-c 收口 + M10-b 对齐）
  *
  * 这条套件钉的是 M10-c 那批留在纸上没合上的另一半：
  * 归档一个**有历史收支**的项目之后——
@@ -72,7 +72,7 @@ await withPlatform("s12-archive-facts", 9376, async ({ br, db, rep, go, shot }) 
   rep.ok("BASE", "归档前基线", `签单 ${before.signed} · 率 ${before.rate}% · 表 ${before.rows} 行 · 待办 ${before.todos} · 说明行 ${before.note ? "有" : "无"}`);
   rep.assert(before.note === null, "UI", "无归档时页面不加任何口径说明（不制造噪声）");
 
-  await rep.scenario("AR1 归档确认框如实列出未闭环事项（HAE 拍板「允许但提示」）", async () => {
+  await rep.scenario("AR1 归档确认框如实列出未闭环事项（HAE 拍板“允许但提示”）", async () => {
     await go("/projects?view=table");
     br.lastDialog = null;
     await br.clickInRow(target.code, "归档");
@@ -80,8 +80,8 @@ await withPlatform("s12-archive-facts", 9376, async ({ br, db, rep, go, shot }) 
     const msg = br.lastDialog?.message ?? "";
     rep.ok("DIAG", "确认框原文（Chrome 对长文案有截断，先看全貌再判）", JSON.stringify(msg).slice(0, 400));
     rep.assert(/确认归档/.test(msg), "UI", "确认框出现且点名项目", msg.slice(0, 40));
-    rep.assert(/已收、支出、合同额、毛利/.test(msg), "UI", "说清「钱仍照常计入报表」");
-    rep.assert(/改变的是「还要做什么」，不是「发生过什么」/.test(msg), "UI", "一句话口径进确认框");
+    rep.assert(/已收、支出、合同额、毛利/.test(msg), "UI", "说清“钱仍照常计入报表”");
+    rep.assert(/改变的是“还要做什么”，不是“发生过什么”/.test(msg), "UI", "一句话口径进确认框");
     if (meta.unpaid > 0) {
       rep.assert(new RegExp(`${meta.unpaid} 段款未收`).test(msg), "UI", `列出未收款段 ${meta.unpaid} 段`, (msg.match(/注意：[^\n]*/) || ["未列出"])[0]);
     }
@@ -97,7 +97,7 @@ await withPlatform("s12-archive-facts", 9376, async ({ br, db, rep, go, shot }) 
     rep.eq(after.cashTotal, before.cashTotal, "钱按事实", "近 6 个月现金合计未因归档而变化");
     rep.eq(after.rows, before.rows - 1, "事按可见性", "项目健康度表少一行", `${before.rows} → ${after.rows}`);
     rep.assert(after.todos <= before.todos - (meta.unpaid + meta.open), "事按可见性",
-      "「需要你处理」按该项目的未闭环事项数收窄", `${before.todos} → ${after.todos}（应至少减 ${meta.unpaid + meta.open}）`);
+      "“需要你处理”按该项目的未闭环事项数收窄", `${before.todos} → ${after.todos}（应至少减 ${meta.unpaid + meta.open}）`);
     const wantIncome = "¥" + (meta.income / 100).toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     rep.assert(!!after.note && after.note.includes(wantIncome), "UI",
       `说明行出现且带上归档项目的历史已收 ${wantIncome}`, (after.note || "无说明行").slice(0, 140));
@@ -108,7 +108,7 @@ await withPlatform("s12-archive-facts", 9376, async ({ br, db, rep, go, shot }) 
     await go("/finance");
     const recv = await moneyNear(br, "已收款");
     const wantRecv = (await db.financeRecord.aggregate({ where: { type: "income" }, _sum: { amount: true } }))._sum.amount;
-    rep.eq(recv, (Math.round(Number(wantRecv || 0) * 100) / 100).toFixed(2), "钱按事实", "台账「已收款」含已归档项目的历史收入", String(recv));
+    rep.eq(recv, (Math.round(Number(wantRecv || 0) * 100) / 100).toFixed(2), "钱按事实", "台账“已收款”含已归档项目的历史收入", String(recv));
     const unpaidNow = await moneyNear(br, "待收款");
     // 待收款 = Σ max(0, 合同额 + 累计变更 − 已收)，且只算未归档项目（ledger.receivable 同口径）
     const liveSum = await db.project.findMany({
@@ -124,7 +124,7 @@ await withPlatform("s12-archive-facts", 9376, async ({ br, db, rep, go, shot }) 
       const chg = p.quotes.reduce((t, q) => t + q.changes.reduce((u, c) => u + cents(c.amount), 0), 0);
       return s + Math.max(0, cents(p.contractAmount) + chg - inc);
     }, 0) / 100;
-    rep.eq(unpaidNow, wantUnpaid.toFixed(2), "事按可见性", "「待收款」只算未归档项目", `页面 ${unpaidNow} · 应 ${wantUnpaid.toFixed(2)}`);
+    rep.eq(unpaidNow, wantUnpaid.toFixed(2), "事按可见性", "“待收款”只算未归档项目", `页面 ${unpaidNow} · 应 ${wantUnpaid.toFixed(2)}`);
   });
 
   await rep.scenario("AR4 恢复归档：一切分毫回来，且全程没动过钱", async () => {

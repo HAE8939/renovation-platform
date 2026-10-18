@@ -72,7 +72,7 @@ export async function createProjectAction(
       entity: "project",
       entityId: id,
       projectId: id,
-      summary: `新建项目「${text("name")}」（编号 ${text("code") || "自动"}）`,
+      summary: `新建项目“${text("name")}”（编号 ${text("code") || "自动"}）`,
       after: `面积 ${area}㎡`,
     });
     return { ok: true, projectId: id };
@@ -213,7 +213,7 @@ export async function createCategoryAction(
   formData: FormData
 ): Promise<CatalogFormState> {
   const name = String(formData.get("name") ?? "").trim();
-  return runCatalogWrite(() => createCategory(name), { action: "catalog.category.create", summary: `新增科目「${name}」`, after: name });
+  return runCatalogWrite(() => createCategory(name), { action: "catalog.category.create", summary: `新增科目“${name}”`, after: name });
 }
 
 /** 重命名科目。 */
@@ -223,7 +223,7 @@ export async function updateCategoryAction(
 ): Promise<CatalogFormState> {
   const id = String(formData.get("id") ?? "").trim();
   const name = String(formData.get("name") ?? "").trim();
-  return runCatalogWrite(() => updateCategory(id, name), { action: "catalog.category.rename", entityId: id, summary: `科目改名 → 「${name}」`, after: name });
+  return runCatalogWrite(() => updateCategory(id, name), { action: "catalog.category.rename", entityId: id, summary: `科目改名 → “${name}”`, after: name });
 }
 
 /** 删除科目，连带删掉其下科目项；已生成的报价是快照，不受影响。 */
@@ -236,7 +236,7 @@ export async function deleteCategoryAction(
   return runCatalogWrite(() => deleteCategory(id), {
     action: "catalog.category.delete",
     entityId: id,
-    summary: `删除科目「${cat?.name ?? id}」${cat ? `（连带删 ${cat.items.length} 个科目项）` : ""}`,
+    summary: `删除科目“${cat?.name ?? id}”${cat ? `（连带删 ${cat.items.length} 个科目项）` : ""}`,
     before: cat?.name ?? undefined,
   });
 }
@@ -262,7 +262,7 @@ export async function createItemAction(
   return runCatalogWrite(() => createItem(categoryId, it), {
     action: "catalog.item.create",
     entityId: categoryId,
-    summary: `新增科目项 ${it.code}「${it.name}」（默认单价 ${moneyText(it.defaultPrice)}/${it.unit}）`,
+    summary: `新增科目项 ${it.code}“${it.name}”（默认单价 ${moneyText(it.defaultPrice)}/${it.unit}）`,
     after: `${it.code} ${it.name}`,
   });
 }
@@ -278,7 +278,7 @@ export async function updateItemAction(
   return runCatalogWrite(() => updateItem(id, it), {
     action: "catalog.item.update",
     entityId: id,
-    summary: `改科目项 ${it.code}「${it.name}」：${diffText([["默认单价", oldItem?.defaultPrice, it.defaultPrice], ["名称", oldItem?.name, it.name], ["编号", oldItem?.code, it.code]])}`,
+    summary: `改科目项 ${it.code}“${it.name}”：${diffText([["默认单价", oldItem?.defaultPrice, it.defaultPrice], ["名称", oldItem?.name, it.name], ["编号", oldItem?.code, it.code]])}`,
     before: oldItem ? `${oldItem.code} 单价 ${moneyText(oldItem.defaultPrice)}` : undefined,
     after: `${it.code} 单价 ${moneyText(it.defaultPrice)}`,
   });
@@ -294,7 +294,7 @@ export async function deleteItemAction(
   return runCatalogWrite(() => deleteItem(id), {
     action: "catalog.item.delete",
     entityId: id,
-    summary: `删除科目项 ${oldItem ? `${oldItem.code}「${oldItem.name}」` : id}`,
+    summary: `删除科目项 ${oldItem ? `${oldItem.code}“${oldItem.name}”` : id}`,
     before: oldItem?.name ?? undefined,
   });
 }
@@ -461,7 +461,7 @@ export async function changeStatusFormAction(formData: FormData) {
 
 /**
  * 撤销确认（§4.6 补口）：把客户已确认的变更退回 pending，金额即时从经营口径摘出，留流水。
- * 与 setChangeStatusAction 分开写，是为了让流水的 action 名能明确区分「提交确认」与「撤销确认」——
+ * 与 setChangeStatusAction 分开写，是为了让流水的 action 名能明确区分“提交确认”与“撤销确认”——
  * 二者都落到 pending 态，但业务含义相反（一个是往口径里放钱的前一步，一个是把钱拿出来）。
  */
 export async function revokeChangeConfirmAction(projectId: string, changeId: string) {
@@ -506,7 +506,7 @@ export async function createChangeAction(
       action: "change.create",
       entity: "changeOrder",
       projectId,
-      summary: `新建变更单「${ci.title}」 ${ci.amount >= 0 ? "+" : ""}${moneyText(ci.amount)}`,
+      summary: `新建变更单“${ci.title}” ${ci.amount >= 0 ? "+" : ""}${moneyText(ci.amount)}`,
       after: `${ci.kind} ${moneyText(ci.amount)}`,
     });
     revalidatePath(`/budget/${projectId}/changes`);
@@ -570,7 +570,7 @@ export async function deleteChangeAction(
       entity: "changeOrder",
       entityId: changeId,
       projectId,
-      summary: `删除变更单「${oldChange?.title ?? changeId}」${oldChange ? `（${moneyText(oldChange.amount)}）` : ""}`,
+      summary: `删除变更单“${oldChange?.title ?? changeId}”${oldChange ? `（${moneyText(oldChange.amount)}）` : ""}`,
       before: oldChange ? `${oldChange.title} ${moneyText(oldChange.amount)}` : undefined,
     });
     revalidatePath(`/budget/${projectId}/changes`);

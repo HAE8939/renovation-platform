@@ -5,10 +5,10 @@ import { computeProjectActualEnd } from "@/core/domain/health";
 /**
  * 核心域 · 项目实际完工日集成器（core/domain，M15 断点④）。
  *
- * 一句话：把「所有工序都 completed」这一事实回写成 `Project.actualEndDate`，
+ * 一句话：把“所有工序都 completed”这一事实回写成 `Project.actualEndDate`，
  * 让工期红灯（core/domain/health.scheduleLight 读 actualEndDate）与保修金基准
  * （modules/finance/server/payments.buildProjectPaymentPlan 的 warrantyBase）不再
- * 静默回落到「计划完工日 endDate」——那正是 §8.2 点名的断点。
+ * 静默回落到“计划完工日 endDate”——那正是 §8.2 点名的断点。
  *
  * 与 acceptance.ts 同一套纪律：
  *  - 传入 externalTx 复用其事务（进度联动的 updateTaskProgress 场景，工序与完工日同事务）；

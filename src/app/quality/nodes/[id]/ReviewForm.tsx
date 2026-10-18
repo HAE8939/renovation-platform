@@ -24,7 +24,7 @@ function ReviewSubmitButton({
 
 /**
  * 节点审核操作区（M7-b）：仅 status==="submitted" 且占位审核用户存在时渲染。
- * 「通过」直接确认（文案说明后态）；「退回」内联展开：原因 textarea（必填）
+ * “通过”直接确认（文案说明后态）；“退回”内联展开：原因 textarea（必填）
  * + 严重度 select（轻微/一般/严重，默认一般）+ [确认退回]。
  * 前端拦 + 后端再拦双保险（reviewNode 服务层守卫）。
  * 审核人 = 占位当前用户 kind="review"（PM，缺则 inspector）。
@@ -71,7 +71,7 @@ export function ReviewForm({
       {mode === "approve" && (
         <div className="space-y-4">
           <p className="text-[13px] leading-relaxed text-primary">
-            确认通过此验收节点？通过后节点状态将转为「已通过」，并作为付款段解锁依据，见付款计划。
+            确认通过此验收节点？通过后节点状态将转为“已通过”，并作为付款段解锁依据，见付款计划。
           </p>
           <div className="flex flex-wrap items-center gap-4">
             <ReviewSubmitButton

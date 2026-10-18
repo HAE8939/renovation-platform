@@ -120,10 +120,10 @@ export interface HubFinance {
   receivedTotal: number;
   expenseTotal: number;
   grossProfit: number;
-  /** 毛利率（合同额未录入 → null，UI 显「—」不造 0%） */
+  /** 毛利率（合同额未录入 → null，UI 显“—”不造 0%） */
   marginRate: number | null;
   marginLight: "green" | "yellow" | "red" | "neutral";
-  /** 已收/(合同额+变更)（分母≤0 → null，UI 显「未录入合同额」不假绿） */
+  /** 已收/(合同额+变更)（分母≤0 → null，UI 显“未录入合同额”不假绿） */
   paidPct: number | null;
   /** 预算灯（health.budgetLight，合同执行/收款进度） */
   budgetLight: Light;

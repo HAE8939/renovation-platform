@@ -27,7 +27,7 @@ export interface NodeListItem {
   name: string; // 节点名 = 工序名快照
   order: number;
   status: string;
-  displayLabel: string; // 含「整改中」/「待重新提交」派生文案
+  displayLabel: string; // 含“整改中”/“待重新提交”派生文案
   submitterName: string | null;
   submittedAt: Date | null;
   checkPassed: number; // result=="pass" 计数
@@ -200,7 +200,7 @@ export interface NodeDetail {
   name: string;
   order: number;
   status: string;
-  displayLabel: string; // 含「整改中」/「待重新提交」派生文案
+  displayLabel: string; // 含“整改中”/“待重新提交”派生文案
   submitNote: string;
   submittedByName: string | null;
   submittedAt: Date | null;
@@ -346,12 +346,12 @@ export interface SubmitNodeInput {
 
 /**
  * 提交验收（M7-b）：一个事务内原子完成 ——
- * ① 取占位提交人（开事务前只读，无则拒绝「未找到演示用户」）；
+ * ① 取占位提交人（开事务前只读，无则拒绝“未找到演示用户”）；
  * ② 事务内取节点校验存在 / canSubmitNode（pending|returned 可提交）；
  * ③ returned 重提 → 读关联问题，canResubmitAfterReturn 不过则报
- *   「存在未整改问题，整改完成后可重新提交」；
- * ④ checks 全覆盖：按 id 对照节点检查项，缺报「还有 N 项未检」，
- *   多余 id 报「检查项不匹配」（空清单工序可提交）；
+ *   “存在未整改问题，整改完成后可重新提交”；
+ * ④ checks 全覆盖：按 id 对照节点检查项，缺报“还有 N 项未检”，
+ *   多余 id 报“检查项不匹配”（空清单工序可提交）；
  * ⑤ assertNodeTransition(from,"submitted") 兜底；
  * ⑥ 逐项 updateMany 写 result/note；节点 status→submitted、submitNote、
  *   submittedBy/submittedAt。

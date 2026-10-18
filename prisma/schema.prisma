@@ -79,7 +79,7 @@ model Project {
   pm             String?
   status         String    @default("draft") // draft / design / in_progress / acceptance / completed / archived
   startDate      DateTime?
-  endDate        DateTime? // 计划/预计完工（B3「工期止」即此）
+  endDate        DateTime? // 计划/预计完工（B3“工期止”即此）
   contractAmount Float     @default(0) // 合同额；0=未录入（哨兵，budgetLight/毛利遇 0 走中性）
   houseType      String? // 户型
   style          String? // 风格偏好
@@ -520,7 +520,7 @@ model Issue {
 // ─────────────────────────────────────────────────────────────
 // 财务管控模块自有实体 (modules/finance) — M8-a
 // 收支记录与付款段均经 projectId 外键引用共享 core/domain Project。
-// 付款段的「解锁/可收款」态【不落库】：读取时由 finance/payment.ts 纯函数派生（决策①）。
+// 付款段的“解锁/可收款”态【不落库】：读取时由 finance/payment.ts 纯函数派生（决策①）。
 // paid/paidAt/paidBy 是唯一落库的执行事实（人工标记），不自动生 FinanceRecord（决策②）。
 // ─────────────────────────────────────────────────────────────
 
@@ -532,7 +532,7 @@ model FinanceRecord {
   category    String // contract | change | refund | material | labor | other
   amount      Float // 恒为正数；方向由 type 决定（免符号歧义）
   date        DateTime // 发生日期
-  description String   @default("") // 摘要，如「泥工班组第二期人工」
+  description String   @default("") // 摘要，如“泥工班组第二期人工”
   recordedBy  String? // ★ userId（占位当前用户，P4 接登录）
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -550,7 +550,7 @@ model PaymentNode {
   id            String    @id @default(cuid())
   projectId     String
   order         Int // 1..5
-  name          String // 段名快照，如「水电完成款」
+  name          String // 段名快照，如“水电完成款”
   percent       Float // 比例快照（30 = 30%），展示用
   amountDue     Float // ★ 应收金额快照（生成时合同额 × 比例，尾差归末段）
   trigger       String // none | stages | all  —— 解锁依赖的验收条件
@@ -573,7 +573,7 @@ model PaymentNode {
 // ─────────────────────────────────────────────────────────────
 // 预算模块自有实体（M9-a 变更单）— ChangeOrder
 // 变更单挂报价单级（PLAN §7-2：禁挂 QuoteItem——报价整表替换会孤儿化）。
-// 金额带符号：正=增加、负=减少（v5.1 §6.7.2「金额变化（正数=增加，负数=减少）」）。
+// 金额带符号：正=增加、负=减少（v5.1 §6.7.2“金额变化（正数=增加，负数=减少）”）。
 // 变更单走草稿→待确认→客户已确认/已驳回；只有客户已确认进入金额口径。
 // 附件通过共享 FileAsset 以 ownerType/ownerId 关联，保持可移植。
 // ─────────────────────────────────────────────────────────────
@@ -672,9 +672,9 @@ model PlatformSetting {
 }
 
 // ─────────────────────────────────────────────────────────────
-// M10-a 备料一 · 操作流水（OperationLog）—— 「这个数是谁、什么时候、改成了什么」的可回放答案
+// M10-a 备料一 · 操作流水（OperationLog）—— “这个数是谁、什么时候、改成了什么”的可回放答案
 // 立表原因（2026-10-13 与 HAE 确认）：平台将交给内部员工真实使用，逻辑问题只能在使用过程中暴露；
-// 而员工口头描述「上周还不是这样」时，我们此前**没有任何办法**重建现场——只有 FinanceRecord.recordedBy、
+// 而员工口头描述“上周还不是这样”时，我们此前**没有任何办法**重建现场——只有 FinanceRecord.recordedBy、
 // AcceptanceNode.reviewedBy 这类零散字段，没有统一流水。本表是那条问题的总兜底，不是审批流（无审批语义）。
 // 纪律三条：
 // ① **best-effort 写入**：记流水失败绝不允许拖垮业务写入（服务层 try/catch 后转 telemetry 报错，不抛给调用方）。
@@ -690,7 +690,7 @@ model OperationLog {
   action    String // 机器名：quote.save / record.create / plan.markPaid / lead.sign / node.review / project.archive …
   entity    String // 实体类型：project / quote / financeRecord / paymentNode / lead / node / issue / fieldDef / schedule …
   entityId  String? // 实体 id；模板类操作等无单行主体时可空
-  projectId String? // ★ 尽量挂主脊：支撑「按项目看这一单都发生过什么」（不建外键——流水要能留住已删对象的记录）
+  projectId String? // ★ 尽量挂主脊：支撑“按项目看这一单都发生过什么”（不建外键——流水要能留住已删对象的记录）
   summary   String // 中文一句话，给业务同事看（不是给程序看）
   before    String? // 变更前关键值（纯文本；null=新建类操作）
   after     String? // 变更后关键值（纯文本；null=删除类操作）
@@ -707,7 +707,7 @@ model OperationLog {
 // ─────────────────────────────────────────────────────────────
 // M10-a 备料三 · 线索作废位（Lead.archived）
 // 与项目侧的区别：Project 早已有 status="archived"（全司口径本来就排除它），缺的只是入口；
-// Lead 只有 stage（商务阶段），没有「这条不做了/录错了」的位——签约不可逆 + 无删除入口，
+// Lead 只有 stage（商务阶段），没有“这条不做了/录错了”的位——签约不可逆 + 无删除入口，
 // 误建线索只能永久留在漏斗里污染阶段存量与签约率。故补作废位，语义＝**从漏斗与统计里摘出去、可恢复**。
 // 不做硬删：线索可能已回写 projectId（签约过），删线索会切断项目↔线索的 1-1 溯源（§4.1）。
 // ─────────────────────────────────────────────────────────────

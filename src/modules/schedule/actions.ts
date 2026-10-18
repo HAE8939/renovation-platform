@@ -135,7 +135,7 @@ export async function updateTaskProgressAction(
       entity: "scheduleTask",
       entityId: taskId,
       projectId: taskOld?.projectId ?? null,
-      summary: `工序「${taskOld?.name ?? taskId}」进度 ${taskOld?.progress ?? 0}% → ${progress}%${nodeNow ? `（验收节点 ${nodeNow.status}）` : ""}`,
+      summary: `工序“${taskOld?.name ?? taskId}”进度 ${taskOld?.progress ?? 0}% → ${progress}%${nodeNow ? `（验收节点 ${nodeNow.status}）` : ""}`,
       before: `${taskOld?.progress ?? 0}%`,
       after: `${progress}%`,
     });

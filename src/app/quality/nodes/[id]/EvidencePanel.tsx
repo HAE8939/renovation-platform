@@ -81,7 +81,7 @@ export function EvidencePanel({
                     action={deleteAction}
                     className="mt-2"
                     onSubmit={(event) => {
-                      if (!window.confirm(`确认删除证据「${item.originalName}」？`)) event.preventDefault();
+                      if (!window.confirm(`确认删除证据“${item.originalName}”？`)) event.preventDefault();
                     }}
                   >
                     <input type="hidden" name="evidenceId" value={item.id} />

@@ -45,7 +45,7 @@ export interface LeadListItem {
 /**
  * 列出线索（按更新时间倒序）。
  * M10-a 备料三：默认**不含已作废**——作废的语义就是"从漏斗与看板里摘出去"。
- * 要恢复必须能看到，故留 `includeArchived` 开关给「已作废」筛选用，不做隐式全量返回。
+ * 要恢复必须能看到，故留 `includeArchived` 开关给“已作废”筛选用，不做隐式全量返回。
  */
 export async function listLeads(opts?: { includeArchived?: boolean; onlyArchived?: boolean }): Promise<LeadListItem[]> {
   const leads = await prisma.lead.findMany({
@@ -107,16 +107,16 @@ export async function createLead(input: CreateLeadInput): Promise<{ id: string; 
 
 /**
  * 推进线索阶段。非法/末态直接抛错，由调用方（Server Action）捕获回文案。
- * 非相邻目标（回退/跳阶）直接抛错——与 UI 的『仅向前相邻推进』对齐（M8.5）。
+ * 非相邻目标（回退/跳阶）直接抛错——与 UI 的‘仅向前相邻推进’对齐（M8.5）。
  */
 export async function advanceStage(leadId: string, stage: LeadStage): Promise<void> {
   if (!LEAD_STAGE_ORDER.includes(stage)) {
     throw new LeadValidationError(`未知阶段：${stage}`);
   }
-  // §4-14 收紧：signed 只能经「签约建项」（signLead：建项目 + 按手机号归并 Client + 回写 projectId）
-  // 落定，通用推进不得直达——否则会出现「线索已签约却无项目」的悬空态（双路径语义重叠）。
+  // §4-14 收紧：signed 只能经“签约建项”（signLead：建项目 + 按手机号归并 Client + 回写 projectId）
+  // 落定，通用推进不得直达——否则会出现“线索已签约却无项目”的悬空态（双路径语义重叠）。
   if (stage === "signed") {
-    throw new LeadValidationError("已签约须经「签约建项」完成（会同时建项目并归并客户），不支持直接推进");
+    throw new LeadValidationError("已签约须经“签约建项”完成（会同时建项目并归并客户），不支持直接推进");
   }
   const lead = await prisma.lead.findUnique({ where: { id: leadId } });
   if (!lead) throw new LeadValidationError("线索不存在");
@@ -125,7 +125,7 @@ export async function advanceStage(leadId: string, stage: LeadStage): Promise<vo
     throw new LeadValidationError("该线索已到末态（已签约），无法继续推进");
   }
   if (stage !== next) {
-    throw new LeadValidationError(`仅支持推进到下一阶段（下一阶段应为「${LEAD_STAGE_LABEL[next]}」）`);
+    throw new LeadValidationError(`仅支持推进到下一阶段（下一阶段应为“${LEAD_STAGE_LABEL[next]}”）`);
   }
   await prisma.lead.update({
     where: { id: leadId },
@@ -162,7 +162,7 @@ export interface SignLeadResult {
  * 事务内执行；幂等：若 lead 已签约（projectId 存在）直接返回不重复建。
  *
  * 归并口径（TASK_M3_CRM §4，用户 2026-10-09 拍板）：
- *  - 归并键 = 手机号，有意取代旧「按客户名 upsert」，避免同名不同人被并。
+ *  - 归并键 = 手机号，有意取代旧“按客户名 upsert”，避免同名不同人被并。
  *  - 命中既有 Client → 复用、不覆盖其 name（保守，防串改共享主数据）。
  *  - 未命中 → 新建 Client（name=lead.name, phone=lead.phone）。
  */
@@ -320,7 +320,7 @@ export async function addFollowUp(leadId: string, input: AddFollowUpInput): Prom
  * 已签约项目的来源查不到；且 SQLite 无回收站。故只置位、可恢复。
  *
  * 已签约（stage=signed 且已回写 projectId）的线索**不允许只作废线索**——那会让项目失去来源，
- * 要清掉得走「项目归档」，两边状态保持一致。这条守卫是本函数唯一的业务规则。
+ * 要清掉得走“项目归档”，两边状态保持一致。这条守卫是本函数唯一的业务规则。
  */
 export async function setLeadArchived(
   leadId: string,

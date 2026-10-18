@@ -5,7 +5,7 @@ import { Card } from "@/core/ui";
 /**
  * docs/ui.tsx —— 文档站正文的排版原语（服务端组件，无交互）。
  * 全部落在 AGENTS §6 令牌阶梯内：字号仅 12/13/15/17/20/28，间距仅 4/8/12/16/24/32/48（+长页 section 64/96），
- * 默认无阴影，层级靠字重与对比度。警示块用「卡纸 + 左 3px 低饱和色条」，不整块染色（MT-VL §8 实跑校正后的口径）。
+ * 默认无阴影，层级靠字重与对比度。警示块用“卡纸 + 左 3px 低饱和色条”，不整块染色（MT-VL §8 实跑校正后的口径）。
  */
 
 /**
@@ -131,7 +131,7 @@ function renderCell(s: string): ReactNode {
 
 /**
  * 精简表格：入参是纯字符串二维数组，`反引号` 段自动渲染为内联代码；
- * numCols / codeCols 控制列样式，statusCol 按「已上线/进行中/未开放」给状态列上色。
+ * numCols / codeCols 控制列样式，statusCol 按“已上线/进行中/未开放”给状态列上色。
  */
 export function DocsTable({
   head,

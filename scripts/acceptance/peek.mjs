@@ -25,7 +25,7 @@ try {
       const fields = uniq([...document.querySelectorAll('input,select,textarea')].map(e=>{
         const kind = e.tagName.toLowerCase()+':'+(e.type||'')+':'+(e.name||'-');
         const lab = A.labelOf(e).split('|').filter(Boolean)[0] || '';
-        return kind+' 「'+lab.slice(0,40)+'」';
+        return kind+' “'+lab.slice(0,40)+'”';
       }));
       const tables = [...document.querySelectorAll('table')].map((t,i)=>'表'+i+' 头：'+[...t.querySelectorAll('thead th')].map(x=>A.norm(x.innerText)).join(' · ')+'（'+t.querySelectorAll('tbody tr').length+' 行）');
       const forms = [...document.querySelectorAll('form')].length;
