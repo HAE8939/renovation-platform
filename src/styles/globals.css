@@ -42,6 +42,16 @@ td.num,
   outline-offset: 2px;
 }
 
+/* 浮层遮罩（V0.3 L1 · Modal / Drawer 共用）：墨色压暗 42%，非纯黑、非投影。
+   刻意不用 color-mix()——旧 Safari(<16.2) 上它使整条背景声明作废、遮罩变透明，
+   同因见下面 .splash::before 的说明。层级仍靠底色差与描边，不消耗阴影预算（§6.2）。 */
+.overlay-veil {
+  position: absolute;
+  inset: 0;
+  background: var(--text-primary);
+  opacity: 0.42;
+}
+
 /* 表单控件去掉浏览器默认外观，交给组件控制 */
 input,
 select,
@@ -83,10 +93,25 @@ button {
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background:
-    radial-gradient(120% 90% at 50% 12%, color-mix(in srgb, var(--accent-tint) 62%, transparent) 0%, transparent 58%),
-    var(--canvas);
+  /* 纸底**单独一条声明**，不与柔光共用 background 简写 —— 见下面 ::before 的说明。 */
+  background-color: var(--canvas);
   transition: opacity 420ms ease, transform 420ms ease;
+}
+/* 顶部柔光：独立一层，只用 var(--accent-tint) + opacity，**不用 color-mix()**。
+   2026-10-18 iPad 实见的 bug：color-mix() 需 Safari 16.2+，旧 iPad（iPadOS 15）上它不是
+   在解析期被丢弃，而是因值里含 var() 在**计算值阶段**才判无效 → 整条 background 一起作废
+   → 连写在同一条里的纸底也保不住，首屏变透明、直接透出下面的模块列表。
+   含 var() 的值救不回来（“前面再写一条兜底声明”对 IACVT 无效），只能把两层拆开。
+   opacity .62 与原 color-mix(tint 62%, transparent) 叠在同一米纸底上**合成结果逐像素等价**；
+   z-index:-1 让它落在 .splash 自己的纸底之上、文字之下（.splash 有 z-index:70，已成层叠上下文）。 */
+.splash::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(120% 90% at 50% 12%, var(--accent-tint) 0%, transparent 58%);
+  opacity: 0.62;
 }
 .splash[data-leaving="1"] {
   opacity: 0;

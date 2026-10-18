@@ -13,7 +13,7 @@ export interface DrawerProps {
 /**
  * 右侧滑出抽屉（V0.3 · 无阴影 / 单点钴蓝 / L1–L3 层级令牌）。
  * 复用 Modal 的遮罩与浮层令牌：
- * - L1 遮罩：纸感墨色压暗（color-mix + text-primary），非投影、非纯黑。
+ * - L1 遮罩：纸感墨色压暗，走 `.overlay-veil`（纯色 var + opacity），非投影、非纯黑。
  * - L3 浮层：surface 卡纸 + 1px 气声描边；层级靠底色差与描边，不靠投影。
  * 行为：Esc 关闭、点遮罩关闭、标题栏关闭按钮。宽度约 480px，移动端全宽。
  */
@@ -38,7 +38,7 @@ export function Drawer({ open, onClose, title, children }: DrawerProps) {
     >
       {/* L1 遮罩 */}
       <div
-        className="absolute inset-0 bg-[color-mix(in_srgb,var(--text-primary)_42%,transparent)]"
+        className="overlay-veil"
         onClick={onClose}
       />
       {/* L3 浮层：右侧滑出面板 */}

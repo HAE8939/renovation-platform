@@ -11,7 +11,9 @@ export interface ModalProps {
 
 /**
  * 浮层对话框（V0.3 · 无阴影 / 单点钴蓝 / L1–L3 层级令牌）。
- * - L1 遮罩：纸感墨色压暗（color-mix + text-primary），非投影、非纯黑。
+ * - L1 遮罩：纸感墨色压暗，走 `.overlay-veil`（纯色 var + opacity），非投影、非纯黑。
+ *   不用 color-mix()：旧 Safari(<16.2) 上该值在计算值阶段判无效，整条背景声明一起作废、
+ *   遮罩静默变透明（2026-10-18 iPadOS 15 实见首屏因此丢底，同因收口）。
  * - L3 浮层：surface 卡纸 + 1px 气声描边 + 10px 圆角；层级靠底色差与描边，不靠投影。
  * 行为：Esc 关闭、点遮罩关闭、标题栏关闭按钮。
  */
@@ -36,7 +38,7 @@ export function Modal({ open, onClose, title, children }: ModalProps) {
     >
       {/* L1 遮罩 */}
       <div
-        className="absolute inset-0 bg-[color-mix(in_srgb,var(--text-primary)_42%,transparent)]"
+        className="overlay-veil"
         onClick={onClose}
       />
       {/* L3 浮层 */}
