@@ -107,16 +107,22 @@ ssh -p 10000 -o StrictHostKeyChecking=accept-new NAS_USER@192.168.1.135 \
 
 #### 第 2 步 · 三件套就地兜底去 CR + 校验为 0（**校验不过就别 build**）
 ```bash
+ssh -p 10000 NAS_USER@192.168.1.135 'sudo -n sh -s' <<'EOF'
+cd /opt/renovation-platform || exit 1
+fail=0
 for f in deploy/nas-deploy.sh Dockerfile Caddyfile; do
-  ssh -p 10000 NAS_USER@192.168.1.135 \
-    "sudo tr -d '\r' < '/opt/renovation-platform/$f' > '/opt/renovation-platform/$f.lf' && sudo mv '/opt/renovation-platform/$f.lf' '/opt/renovation-platform/$f'"
+  p="./$f"
+  tr -d '\r' < "$p" > "$p.lf" && mv "$p.lf" "$p"
+  n=$(tr -cd '\r' < "$p" | wc -c)
+  printf '%-24s CR=%s\n' "$f" "$n"
+  [ "$n" = "0" ] || fail=1
 done
-# 期望三个都是 0
-for f in deploy/nas-deploy.sh Dockerfile Caddyfile; do
-  printf '%s CR=' "$f"; ssh -p 10000 NAS_USER@192.168.1.135 \
-    "sudo tr -cd '\r' < '/opt/renovation-platform/$f' | wc -c"
-done
+[ "$fail" = 0 ] && echo CR_OK || echo CR_BAD
+exit $fail
+EOF
 ```
+> **2026-10-20 实见修正**：本步早先写法是 `ssh … "sudo -n tr -d '\r' < '$f' > '$f.lf' && sudo -n mv …"`，**必挂**——`<` 与 `>` 的重定向由**远端登录 shell（普通用户）**先执行，写不进 root 属主的 `/opt/renovation-platform/`，报 `bash: …nas-deploy.sh.lf: Permission denied`。修法＝把整段脚本塞进 `sudo -n sh -s` 的 **stdin**，让重定向发生在 root 进程内。注意 heredoc 用 `<<'EOF'`（引号防本地展开），且 **ssh 别加 `-n`**（`-n` 会把 stdin 接到 /dev/null，脚本就传不过去了）。
+> 另：只要第 1 步 `git archive` 带了 `-c core.autocrlf=false -c core.eol=lf`，三件套本来就是 CR=0——这一步是兜底，别省。
 
 #### 第 3 步 · 后台启动部署（**必须 `setsid --fork` 脱离会话；独占时间戳日志，别复用 `deploy8.log`**）
 ```bash
