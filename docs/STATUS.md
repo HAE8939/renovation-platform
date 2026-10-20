@@ -1,7 +1,9 @@
 # 项目状态 — renovation-platform
 
-> 更新：**2026-10-15（M13 体检收口 + 内网 NAS 内测已上线）** · 维护：集成者
-> 当前状态：**M1–M9 已完成，M10-a/b/c 已完成，M11-A/B/C/D 已完成，M12-a 人员工控已合入，M13 体检收口已合入（契约升 v0.5），内测已部署到极空间 NAS 并实测通过**。本页顶部摘要与底部交接以当前代码和最近验收记录为准。
+> 更新：**2026-10-20（冻结轮：项目暂停开发，文档与门禁收口）** · 维护：集成者
+> **本轮做了什么**：项目停滞一段时间，把仓库整理成可直接上传 GitHub 并可冷启动恢复的冻结点。三件事——① **补抓并修好一道会过期的门禁守卫**（`verify-quality-flow` 初态守卫硬编码节点数 22，而 seed 里 001 的完工态按今天推导，节点数只增不减：10-18 是 22、10-20 已 23，于是干净 seed 被误报成"上次残留"，且症状与残留逐字相同；改判据为与日期无关的不变量（seed 恒 1 条 open 问题），改后 94 项全过、脏库照样拒，教训入册契约 §8）；② **文档追上实现**（`README.md` 自 M8 后从未更新，已按现状重写；本页补 M10→M15 里程碑表与 21 道门禁清单；契约 §8 门禁数字由"12 道 675 / 5 道 238"更正为实测 **13 道 753 / 8 道 358**；`.env.example` 原先只有 `DATABASE_URL` 一个键，补齐 6 个真实读取的变量并写明默认值与读侧文件）；③ **新增停滞交接文档 `docs/HANDOFF_PAUSE_2026-10-20.md`**（当前状态 / 未闭环 / 单机资产风险 / 恢复第一步）。
+> **冻结点实测（2026-10-20，全部本机真跑，非引用旧记录）**：`pnpm verify:integration` **21 道门禁 · 1111 项 · 0 失败** · `npx tsc --noEmit` 0 错 · `pnpm lint` 零警告零错误 · `pnpm build` 绿 · 工作树整理前干净（0 未跟踪 / 0 修改）· 全仓无 `.env`/`dev.db`/凭据入库（`git ls-files` 扫过）。**NAS 线上核实**：`http://192.168.1.135:8181` 已在跑最新代码——`/pano` 200 且是真内容、首页侧栏已挂入口、`.splash` 的底色已拆成独立 `background-color`（首屏修复在线），故本轮**无需重新部署**。
+> 当前状态：**M1–M9 已完成，M10-a/b/c 已完成，M11-A/B/C/D 已完成，M12-a 人员工控已合入，M13 体检收口已合入（契约升 v0.5），M14 变更单撤销确认已合入，M15 主脊三断点 + M15-a 全景管理已合入（契约升 v0.6），内测已部署到极空间 NAS 并实测通过**。本页顶部摘要与底部交接以当前代码和最近验收记录为准。
 > **部署轮（2026-10-15）**：平台已在 `http://192.168.1.135:8181` 运行（`renovation-app` 不对外发布端口 + `renovation-caddy` 口令入口，两容器稳定 healthy）。验收：14 个业务页带口令全 200、无口令/错口令全 401、容器内绕过反代无身份头 401 带头 200、空库 bootstrap 得 1 组织 + 1 boss + 零演示数据、重启后数据与 14 条迁移计数不变。**首次部署连续失败四轮、七个根因全部是 x64/Windows 本机照不出来的**（本机 913 项门禁与 build 全绿照样通过）——pnpm 11 需 Node 22 的 `node:sqlite`、arm64 的 Prisma OpenSSL 引擎要装 openssl 且显式 `binaryTargets`、构建期必须先建表否则 root layout 抛 P2021、`.env` 里的 bcrypt 哈希不能被 shell `source`、Caddyfile 的 `basic_auth` 必须用块形式、`docker run` 不会自动注册 compose 式网络别名；其中两项还互相掩盖。逐条记录见契约新增 **§7.2**（该机型环境事实：aarch64、无 compose、docker 需 sudo、`scp` 不可用因 sshd 关了 sftp、`/tmp` 会被周期性清空）与 `docs/HEALTH_CHECK_2026-10-14.md` §12、commit `ed8c151`。因该机无 compose 且官方 compose 镜像是 amd64 v1，新增 **`deploy/nas-deploy.sh`**（纯 docker CLI，与 `compose.internal.yml` 等价）作为该环境部署入口。
 > **M13（体检轮）＝对 codex 四个提交（`f90ea94`/`df512c9`/`21db1cc`/`ad8809c`）做系统性体检后的全量修复**。体检过程与逐条证据见 `docs/HEALTH_CHECK_2026-10-14.md`；修完的净结果：
 >
@@ -30,9 +32,11 @@
 
 ## 0. 一句话
 
+> **2026-10-20 冻结告示**：下面这段话写于 M9 收口那一刻，它的"下一步 = P3/P4"判断已被后来的 M10→M15（含内网 NAS 内测上线、M14 撤销确认、M15-a 全景模块、口令取消）部分取代——**行动以 `docs/HANDOFF_PAUSE_2026-10-20.md` 与本节顶部摘要为准**。项目自 2026-10-20 起暂停开发，代码冻结在 `master`。
+
 **M1a 平台壳 + M1b 预算模块 + M2-A 主脊 schema + M3 商务线索 + M4 项目中心 + M5 设计管理 + M6 时间管控 + M7 质量管控 + M8 财务基础（四单元 a 基座 / b 台账写入 / c 付款计划含 M7→段解锁回环 / d 项目中心接线+视觉收口，端到端门禁 54→55）＋ **M8.5 修复批** ＋ **M9-a 变更单（端到端门禁 76）** ＋ **M9-b-1 数据驾驶舱骨架（新纯函数门禁 43）** ＋ **M9-b-2a 商务漏斗＋seed 补线索（M3-e 清账，dashboard 门禁 43→58）** ＋ **M9-b-2b 月度现金折线＋项目毛利率排行（dashboard 门禁 58→86）** ＋ **M9-c EAV 自定义字段（新纯函数门禁 89，schema 第 7 条迁移）** ＋ **M9-d 主题切换＋Logo 最简版（新纯函数门禁 26，schema 第 8 条迁移）** ＋ **M9-e 收口附批（令牌/reduced-motion/§4-14 收紧/§4-15 main 嵌套/§4-16 毛利卡降级；crm 门禁 11→19）**全部合入并通过门禁；schema 8 条迁移、旧数据零破坏。全案按 `PLAN_FULL_SERVICE_V1.md` v1.2 路线 B 推进；**M9 五单元全部完成：a 变更单 ✅ / b 驾驶舱 ✅（b-1 骨架 · b-2a 漏斗 · b-2b 两图）/ c EAV 自定义字段 ✅（c-1 定义与值 · c-2 列表筛选）/ d 主题+Logo ✅（d-1 四套 accent 全站切换 · d-2 Logo 最简版）/ e 收口附批 ✅**。下一步 → P3 部署阿里云 / P4 登录多用户（均按用户指示暂缓，"先本地跑成功"）。**
 
-## 1. 已完成（截至 M9-c；清单外的演化用 `git log --oneline` 自查）
+## 1. 已完成（M1a→M9-e 逐单元明细 + M10→M15 索引见本节末补登表；更早的演化用 `git log --oneline` 自查）
 
 | 里程碑 | 内容 | 验证 |
 |---|---|---|
@@ -80,11 +84,49 @@
 
 **路由（M9-d 后共 27 条动态页 + 平台设置页）**：`/`、**`/dashboard`（M9-b-1 驾驶舱）**、**`/fields`（M9-c 自定义字段定义）**、**`/settings`（M9-d 平台设置：主题 + Logo，非 registry 模块、唯一入口顶栏「设置」）**、`/budget`、`/budget/[projectId]`、`/budget/[projectId]/{print,stats,settings}`、`/budget/catalog`、`/crm`、`/projects`、`/projects/[id]`、`/design`、`/design/[id]`、`/schedule`、`/schedule/[projectId]`、`/schedule/templates`、`/quality`、`/quality/nodes/[id]`、`/quality/issues`、`/quality/archive`、`/quality/archive/[projectId]`、`/quality/archive/[projectId]/print`、`/finance`、`/finance/payments`（深链：`?scope=`、`?view=`、`?month=`、`?tab=`、`?taskId=`、`?projectId=`、`?cfv=`/`?cfvto=` 见各模块）。
 
-**schema**：10 条迁移（M10-a 加 `operation_logs` 表 + `leads.archived/archivedAt`）。**路由**：27 条动态页 + `/settings` + 两个 API 端点（`/api/notifications`、`/api/client-errors`）。
+**M10 → M15 里程碑补登（2026-10-20 冻结轮）**——上表停在 M9-e 整整五个里程碑，与实现脱节（契约 §0 那条"代码已有的必须回写"教训的同族复发）。逐条明细早各有专文，此处只补索引，不重复正文：
+
+| 里程碑 | 内容 | 提交 / 真源 |
+|---|---|---|
+| **M10-a** | 上线前三备料：`telemetry.ts` 错误现场（42 处 catch 收口 + `/api/client-errors` 收 digest）、`OperationLog` 表（第 10 迁移）+ `recordOperation()` 唯一入口 + 动作层约 20 处埋点、归档/作废可逆（项目复用 `status="archived"` + 线索 `archived` 位） | `f07f86c` · `docs/TASK_M10A.md` · 契约 §4.3/§4.4/§4.5 |
+| **M10-b** | 启动页首屏 `HeroSplash`（V0.3 §Benchmark ≠ Style 红线的**成文例外**，只锁 `.splash-*` 作用域、配色仍吃 CSS 变量、`prefers-reduced-motion` 不豁免）+ 驾驶舱改版落地（签单额主级、健康矩阵全在册项目、服务层 `kpi.momBar`） | `3c443e0` · `2116005` · 契约 §6.3 · `docs/preview/dashboard-v2.html` |
+| **M10-c** | 归档口径收口为**钱按事实 · 事按可见性**二分（事实类照算含已归档、前瞻类排除），两族不同→页面必须自己说出来；归档确认框如实列未闭环事项 | `665a791` · `docs/TASK_M10C.md` · 契约 §4.3（v0.4） |
+| **M11 A/B/C/D** | 质量页可搜索项目筛选、项目动态页 `/projects/[id]/activity`、报价汇总条阶梯收口 + fields 死码、**验收节点级证据图片上传**（JPG/PNG、单张 ≤5 MB、每节点 9 张、上传者自删、写流水） | `docs/TASK_M11.md` |
+| **M12-a** | 人员工控模块（第 10 个业务模块之前是第 9 个）：人员档案 + `ProjectMember` 项目责任矩阵 + 工时；`ProjectMember` 后下沉 `modules/hr/server/members.ts` 补存在性校验 | `20261014055718_m12_hr_project_members` · `docs/TASK_M12_HR.md` · `PRODUCT_BOUNDARY_M12.md` |
+| **M13** | 对 codex 四提交做系统性体检后的全量修复：B-1 变更单金额静默消失（`m13b` 幂等回填）、B-2 零鉴权三层、令牌 87 处越界归位 + `verify-tokens`、归档链路 3 项、口径同源 2 项、分层 8 项、`run-gates.mjs` 自动发现门禁；契约升 v0.5 | `docs/HEALTH_CHECK_2026-10-14.md` |
+| **M13 部署轮** | 极空间 NAS（aarch64、无 compose、`scp` 不可用）内网内测部署跑通：`deploy/nas-deploy.sh` 纯 docker CLI + 七条反直觉环境事实入册契约 §7.2 | `ed8c151` · `INTERNAL_DOCKER_RUNBOOK.md` · `NAS_DEPLOY_PLAYBOOK.md` |
+| **M14** | 变更单**撤销确认**受控出口 `revokeChangeConfirm`（`client_confirmed → pending`，即时摘出金额口径 + 清 `confirmedAt/By/Note` + 独立流水 `change.revoke_confirm`），补掉 m13b 回填后"录错无从纠正"的死路 | `739aac6` · 契约 §4.6 末段 |
+| **M15 主脊三断点** | ① 设计任务建单与指派（新 `verify-design-flow` 27）② **完工日回填**（`m14_backfill_actual_end` 迁移；**本轮那道门禁守卫的节点数就是被它和日历一起推过 22 的**）③ 报价确认/锁定/税率写路径（新 `verify-quote-flow` 21） | `0c3ba4f` · `20261017090000_m14_backfill_actual_end` |
+| **M15-a** | 全景管理模块（第 10 个）：MT-Pano 导出**整目录**挂 `/uploads/pano/<dirName>/`，库里只存登记；`dirName` 唯一锚不可改、解除登记不删文件、归纳页按 §4.3 可见性过滤、对内网托管不预留 `shareUrl` | `43c6969` · `20261018111756_m15_pano_tour` · `docs/PANO_MODULE.md` · 契约 §4.7/§4.8 |
+| 同期 | 平台说明文档站 `/docs`（11 页，`/about` 降为公开门面页）· **取消口令保护**（内网测试期，用户拍板，三层保护的还原路径留在契约 §7.1 与 git 历史）· `.gitattributes` 锁 `.sh`/`Dockerfile`/`Caddyfile` 为 LF · 全站直角引号清扫 · 旧 iPad 首屏丢底修复 | `dea0264` `c1a8992` `c6c5df9` `b8a2d70` `e522012` · 契约 §6.4 |
+
+**总量（2026-10-20 实测，非引用旧记录）**：**10 个业务模块** + `/settings` + `/docs` 文档站（11 页）；`src/app` 下 **44 个 `page.tsx`** + **3 个 API 端点**（`/api/health`、`/api/notifications`、`/api/client-errors`）；**schema 16 条迁移 / 31 个 model**（M10-a `operation_logs` + `leads.archived` → M12 `project_members` → m13 `change_orders.status` → m13b 回填 → m14 完工日回填 → m15 `PanoTour`）。
 
 **数据基线**：4 科目 / 16 模板项 / 16 报价明细；直接费 ¥60,185.20 · 税 ¥1,805.56 · 总价 ¥61,990.76 · 单方 ¥482.04/㎡（128.6㎡）。**排程**：33 行工序模板（11 工序 × 3 档 = 54/76/107 天）+ 演示 4 项目（001 中段 46% / 002 落后剩 6 天 / 003 超期竣工 7 天 / 004 未排程=生成流程手测位）。**质量**：35 条检查项（11 工序）+ 22 验收节点（003=11：2 通过·1 退回(整改中)·8 待提交；002=6：1 通过·1 待审核·4 待提交；001=5 待提交；004=0）+ 1 条问题（待整改，关联 003 泥工节点）。**财务（M8-a seed + M9-a 变更 + M9-b-2b 变更款）**：合同额 001 ¥62,000 / 002 ¥160,000 / 003 ¥128,000（004 留 0=未录入位）+ 15 付款段（五段 30/20/30/15/5，Σ 恰等合同额）+ **13 笔收支**（4 income 合同款 ¥130,600 · **2 income 变更款 ¥6,000**（001 +3,200 @2026-10-11 / 002 +2,800 @2026-09-06）· 7 expense ¥239,300）+ 三处标记已付；变更单 2 条（001 upgrade +3,200 触发 5% 预警 / 002 process +2,800 不预警）；单项目毛利率（合同+变更−支出）001 ¥24,900 **38.2%** 绿 / 002 ¥62,800 **38.6%** 绿 / 003 ¥29,000 **22.7%** 黄（**全部项目口径含 HAE 手测签约与 seed 签约位，故 `/finance` 汇总＝合同 ¥1,006,000 · 已收 ¥136,600 · 待收 ¥875,400 · 毛利 ¥772,700 · 率 76.3%**）。**线索与驾驶舱（M9-b-2a + M9-b-2b seed 后）**：7 项目（演示 4 + 手测签约 `RP-2026-005` ¥380,000 / `006` ¥100,000 + seed 上月签约位 `007` ¥176,000）· 11 线索（阶段 `leads:2 contacted:2 confirmed:2 quoted:2 signed:3`）· 驾驶舱真值＝本月签单 **¥480,000** / 上月 **¥176,000** → 环比 **+172.7%** · 全司回款率 **13.5%**（136,600/1,012,000，含 2 笔变更款后由 12.9% 上浮）· 风险项 **3**（工期 1 · 质量 1 · 变更 1）· 签约率 **27.3%** · **现金折线**（近 6 个月 2026-05~10）＝收款 0/0/0/**112,000**/**21,400**/**3,200**、支出 0/0/0/**120,000**/**103,500**/**15,800**、净额 −8,000 / −82,100 / −12,600、合计 136,600 · 239,300 · **−102,700**（5~7 月为**真实现金流空白**：演示项目最早 2026-08-02 开工，见决策 16）· **毛利率排行**＝002 38.6% > 001 38.2% > 003 22.7% 入榜，005/006/007 灰态「未录入支出」、004「未录入合同额，不可算」（决策 15）。**自定义字段（M9-c seed）**：4 定义（`survey_date` 日期 / `warranty_years` 数字**必填** / `appliance_scope` 单选三项 / `handover_note` 多行）+ 12 值行（001/002/003 各 4，**004 全空＝必填与空态演示位**）；筛选实测「保修年限 ≥3」命中 1（003）、「备注包含「家电」」命中 2、复尺区间 2026-08-01~09-30 命中 2。
 
-## 2. 门禁与工具链（十四个脚本；四个「隔离库集成门禁」会改库，跑前须重置该库）
+## 2. 门禁与工具链
+
+**权威清单（2026-10-20 冻结轮实测，`node scripts/run-gates.mjs --integration` 一次跑完）**：21 道 · 1111 项 · 0 失败。其中纯函数 13 道 / 753 项，隔离库集成 8 道 / 358 项（驱动器**自己**为每道集成门禁 reset 一个 `_scratch/*.db`，不碰 `dev.db`，也不需要人手动先 reset）。
+
+| 纯函数门禁 | 项 | 隔离库集成门禁 | 项 |
+|---|---:|---|---:|
+| `verify-quote.mjs` | 89 | `verify-finance-flow.mts` | 100 |
+| `verify-finance.mjs` | 135 | `verify-quality-flow.mts` | 94 |
+| `verify-fields.mjs` | 89 | `verify-pano-flow.mts` | 59 |
+| `verify-dashboard.mjs` | 86 | `verify-design-flow.mts` | 27 |
+| `verify-quality.mjs` | 108 | `verify-quote-flow.mts`（M15 断点③ 报价确认/锁定/税率写路径） | 21 |
+| `verify-schedule.mjs` | 63 | `verify-schedule-gen.mts` | 31 |
+| `verify-theme.mjs` | 31 | `verify-sign.mts` | 12 |
+| `verify-design.mjs` | 36 | `verify-evidence-flow.mts`（M11-D 验收证据图片） | 14 |
+| `verify-crm.mjs` | 19 | | |
+| `verify-health.mjs` | 20 | | |
+| `verify-tokens.mjs`（§6 令牌阶梯 + §6.2/§6.3/§6.1/§1 视觉红线机器化） | 10 | | |
+| `verify-pano.mjs`（§4.7 全景口径：目录名安全/越界/可见性/排序/封面） | 62 | | |
+| `verify-hr.mjs`（责任角色稳定键与中文标签） | 5 | | |
+
+**下面这张老表**是逐条门禁的"为什么存在"档案，各行里的数字是**它被写进 STATUS 那一刻**的断言数，会随门禁演化过期（例如 quote 写 79、今日实为 89；schedgen 写 27、今日 31）——**以顶部那张为准**，老表只作背景与踩坑出处，别再当清单用。
+
+（老表：十四个脚本；四个隔离库集成门禁会改库，跑前须重置该库）
 
 | 脚本 | 拦什么 | 备注 |
 |---|---|---|
@@ -221,7 +263,9 @@
 - **规格自相矛盾只能被测试撞破，不会被「读一遍」发现**（2026-10-11 M9-c 实见）：我给 `parseFilterParam` 同时定了两条规则——「按前两个冒号切、第三段之后全归 raw2」与「值含冒号不误切（`cf3:2026-01-05 10:00`）」，**两条不可能同时成立**。写完冒烟脚本跑第一条用例即撞破，改为**双参数名**（`?cfv=<key>:<下界或唯一值>` / `?cfvto=<key>:<上界>`，每段只切第一个冒号）。同轮另两处同类漏：深链用 cuid 导致链接不可读（改 `key`）、`buildFiltersFromParams` 只遍历下界导致**只填上界的条件静默失效**（补两端并集）。教训：**口径函数写完立刻配 5 分钟冒烟脚本（不是门禁），比先写门禁再实现更早撞破设计错**。
 - **Loomy（讯飞 `opencode serve`）跑长批会中途断流，且断流是静默的**（2026-10-11 M9-b-1 首用实见，前两轮白跑）：派工卡让它「先读 5 个母版文件」（STATUS 185 行 + TASK_M9 300 行 + verify-finance 532 行…），上下文涨到 ~104K tok、15 步仍在探索，随后 `opencode run` 在一个 `step_start` 之后**无声退出**（exit 0、**一个文件都没落**、session 里最后一条 assistant 消息缺 `time.completed`＝被中途杀）。另：`--dir` 与 Loomy 自身 workspace 不同时，其 serve 子进程会换端口重启（实测 4189→4355→4522→4904），在飞的流随宿主进程一起死。**正解（本轮改法后一次跑通，8 文件零半成品）**：① 一个界面单元**再拆两轮**，每轮只交付 2~4 个文件；② 派工卡**自带全部所需事实**（内联 prisma 字段与关系名、core 函数签名、色点 class、门禁骨架只指一个 ≤100 行母版），并明写「不要去读 STATUS.md / TASK_M9.md」；③ 跑批期间**绝不再对 Loomy 端口发探测请求**（`--health` / `--list-models` / `curl /session` 都可能牵动 serve），守候只看工作区文件与自己的 out.log；④ session 存磁盘，serve 重启后 `--session <id>` 可续跑，但**别指望在飞的回合能活下来**；⑤ `--text` 模式输出攒到结束才落盘（同 codebuddy `-p`），中途 0 字节≠卡死。
 
-## 6. 并行执行规约（当前生效）
+- **门禁里硬编码"随日历漂移的基线数"，会把干净库误判成残留，且提示语把人往错方向推**（2026-10-20 冻结轮实见，代价=一轮排查 + 一道门禁自 10-17 起事实上跑不动）：`verify-quality-flow` 的初态守卫写 `节点 !== 22 即视为上次残留`，可 seed 里 001 的完工态是**按今天推导**的（`seed.ts` 的 `deriveState`：`plannedEnd < 今日0点 → completed`），节点数只增不减——10-10 写守卫那天 22，10-18 那次全绿还是 22，10-20 已 23。误报的文案与真残留**逐字相同**，照着提示 `migrate reset` 只会越 reset 越红（reset 恰恰把库刷成新的易腐基线）。**正解＝换判据而不是换数字**：改用与日期无关的不变量（seed 恒 1 条 open 问题，而本脚本任何一次运行都会新建问题或把它推进到 rectified/closed），节点数降级为信息打印。**推论**：`seed.ts` 里凡"按今天自洽"的演示数据，其**行数都是易腐的**，任何门禁与文档都不该钉死它们（本轮同时把 §2 老表标注为"各行数字是写入那一刻的档案"）。两面都验过：改后 94 项全过；同库直接重跑仍被拒（`问题 4/1，其中 open 2/1`）。教训入册契约 §8。
+
+## 6. 并行执行规约（M5~M9 期间生效；2026-10-20 起项目停滞，码农手派工通道暂不适用，恢复开发时先读契约再重建）
 
 - 主仓 `renovation-platform`（master）＝ 集成者地盘：门禁、截图、合并、契约。
 - `renovation-b1`（分支 `feat/m1b-b1`）＝ M1b 三件轨道的工作树，**已全部并入 master 并于 10-09 17:16 清理删除**，分支保留作历史。下一轮需要并行时按 §5 的准备序列重建。
@@ -231,7 +275,8 @@
 
 ## 7. 参考与产物位置
 
-- 契约：`AGENTS.md`（v0.1；**R1/R2 与 §9 目录约定尚未写入**，补丁文本见 `docs/PROPOSAL_M1.5.md`）。
+- 契约：`AGENTS.md`（**v0.6 · 2026-10-18**，含 §4.6 变更单确认门、§4.7 全景口径、§6.4 关键底色写法、§7.1 内测访问保护（2026-10-17 起口令已取消）、§7.2 NAS 环境事实、§8 门禁数字与"易腐基线"教训、§10 内容页口径）。
+- **冻结与恢复：`docs/HANDOFF_PAUSE_2026-10-20.md`**（2026-10-20 起项目停滞；恢复时先读它，再读本文件的顶部摘要）。
 - 设计真源：`E:\19 Python File\MT-Visual-Language\HAE Creator Design System V0.3.md`（一行指针，不在本仓复制）。
 - 决策与审计：`docs/PROPOSAL_M1.5.md`、`docs/REQUIREMENTS.md`、`docs/DESIGN_AUDIT_M1A.md`、`docs/BUILD_SPEC_M1.md`、**`docs/PLATFORM_EVOLUTION_V0.1.md`**（插件化话题单一裁决）、`docs/REVIEW_PLATFORM_2026-10-11.md` + `docs/REVIEW_EXTERNAL_2026-10-11.md`（整站审查：自包含简报 + 外部报告）、`docs/TASK_M8.5.md`（M8.5 执行记录与裁定）。
 - 全案计划真源：`docs/PLAN_FULL_SERVICE_V1.md`（v1.2，路线 B；整合 `Full-Service Project Management/` 三份妙搭资料）。
@@ -242,7 +287,7 @@
 - 本地产物（不入库）：`_scratch/logs/`、`_scratch/qa/`（截图与 PDF）、`_scratch/qa-tall/`（整页 tall 截图，目检两图用）、`_scratch/backup/dev.db.2026-10-11-M9b2b前`（本轮 seed 前备份）、`_scratch/m85_guards_check.mts`（M8.5 守卫验收脚本）、`_scratch/m9b_dash_check.mts`（M9-b-1/2a/2b 驾驶舱实值巡检·独立预言机，**现 77 项**）、`_scratch/m9b2a_state.mts`（线索/项目状态转储）、`_scratch/m9b2b_state.mts`（收支台账与施工期日期转储·本轮 seed 前定位真值用）、`_scratch/logs/oc_m9b2b_{A,A1,A2,B1,B2,C}_prompt.md`（**opencode 派工卡六张**，A＝首跑失败原卡留档）、`_scratch/logs/oc_m9b2b_*_out.jsonl`（各轮事件流·审计用）、`_scratch/logs/m9b2b_integration_gates.log` 与 `_scratch/logs/m9c_integration_gates.log`（四隔离库集成门禁重跑输出）、`_scratch/m9c_state.mts`（定义与值 + 十种筛选谓词真值转储）、`_scratch/m9c_field_check.mts`（**M9-c 实值巡检 91 项·独立预言机**）、`_scratch/m9c_write_check.mts`（**写入路径验收 12 项**：必填拦截 / 三类拒绝 / 未知 fieldId / 未提交即清空 / 三列互斥）、`_scratch/m9c_pid.mts`（项目 id 转储）、`_scratch/logs/oc_m9c_R1{a,b1,b}_prompt.md`（opencode 派工卡，R1b 为跑飞留档）、`_scratch/logs/loomy_m9b1{A,B}_prompt.md`（Loomy 两轮自包含派工卡）、`_scratch/logs/cb_m9b2a_prompt.md`（codebuddy M9-b-2a 派工卡）、`_scratch/m9d_theme_shot.mjs`（**M9-d 运行时四套真切换目检**：逐套改库起服务截图，跑完复位 cobalt）、`_scratch/qa-theme/`（四套 × 三页截图目检产物）、`_scratch/m9d_logo_check.mts`（**Logo 落盘核心逻辑验收 16 项**：命名防穿越 / 四类拒绝 / URL 净化 / 清理归零）、`_scratch/m9d_probe_run.mjs`（M9-d 375 探针 runner）。
 - 废弃分支（仅存档，勿参考勿 checkout）：`wip/m1b-a`、`feat/presentation`、`pre-m1b-checkpoint`。
 
-## 8. 下次接续（2026-10-13 M11 执行后）
+## 8. 下次接续（**2026-10-20 起项目冻结：先读 `docs/HANDOFF_PAUSE_2026-10-20.md`**；下面是 2026-10-13 M11 执行后的旧接续，仅作历史存档，勿据以行动）
 
 - **M10-a/b/c 已全部合入；M11-A/B/C/D 已完成，工作树状态以当前 `git status` 为准**。质量项目搜索、项目动态、报价汇总与 fields 死码四项已落地；M11-D 新增验收节点级证据图片上传（JPG/PNG、单张 5 MB、每节点 9 张、本地存储、上传人自删）。
 - **自定义字段已收回平台设置**：EAV 数据能力仍是平台原语，定义管理入口位于 `/settings#custom-fields`，不再注册为业务模块；旧 `/fields` 仅作兼容跳转。
