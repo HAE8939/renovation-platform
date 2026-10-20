@@ -29,6 +29,7 @@ import {
   QualityIssueError,
 } from "@/modules/quality/server/issues";
 import { getPlaceholderUser } from "@/modules/quality/currentUser";
+import { ISSUE_STATUS_ORDER } from "@/modules/quality/status";
 
 const results: { name: string; ok: boolean }[] = [];
 const chk = (name: string, ok: boolean, detail = "") => {
@@ -37,16 +38,23 @@ const chk = (name: string, ok: boolean, detail = "") => {
 };
 
 async function main() {
-  // 库初态守卫：本脚本会改库、不可重跑（见头注 ⚠）。检测演示基线
-  // （fresh seed = 22 节点 / 1 问题；基线随 seed 演化同步更新此两数），
-  // 不符即视为上次运行残留 → 明确提示先重置，避免一串误导性级联失败。
-  const [baselineNodes, baselineIssues] = await Promise.all([
+  // 库初态守卫：本脚本会改库、不可重跑（见头注 ⚠）。
+  // **判据只用问题数，不用节点数**——seed 里 001 的完工态是按【今天】推导的
+  // （`prisma/seed.ts` 的 `deriveState`：plannedEnd < 今日0点 → completed），
+  // 于是验收节点数随日历只增不减（2026-10-10 写这道守卫时是 22，2026-10-20 实测已 23）。
+  // 硬编码节点数必然过期，且过期后的症状与上次残留一模一样——实见它把一次干净
+  // seed 误报成残留，还顺着提示让人去 reset（越 reset 越红，白折腾一轮）。
+  // seed 只有 1 条 open 问题这一点与日期无关：本脚本每条主链用例都会新建问题，
+  // 或把这条演示问题推进到 rectified/closed，所以残留照样拦得住。节点数只打出来给人看。
+  const [baselineNodes, baselineIssues, baselineOpenIssues] = await Promise.all([
     prisma.acceptanceNode.count(),
     prisma.issue.count(),
+    prisma.issue.count({ where: { status: ISSUE_STATUS_ORDER[0] } }),
   ]);
-  if (baselineNodes !== 22 || baselineIssues !== 1) {
+  if (baselineIssues !== 1 || baselineOpenIssues !== 1) {
     console.error(
-      `✗ 库非初始态（节点 ${baselineNodes}/22 · 问题 ${baselineIssues}/1，疑为上次运行残留）。\n` +
+      `✗ 库非初始态（问题 ${baselineIssues}/1，其中 open ${baselineOpenIssues}/1 · ` +
+        `节点 ${baselineNodes} 仅作信息，不参与判定，疑为上次运行残留）。\n` +
         `  请先重置临时库再跑：\n` +
         `  DATABASE_URL="file:../_scratch/quality-flow.db" npx prisma migrate reset --force --skip-generate`
     );

@@ -287,11 +287,12 @@ background: radial-gradient(… color-mix(in srgb, var(--accent-tint) 62%, trans
 
 - 参考实现（**只作领域参考，禁止照抄数据/UI/文案**）：`docs/reference/renovation-budget-reference.html`。用来理解"装修预算报价"有哪些要素（科目/项目字段/SOP/材料/计算/打印）；界面与数据须原创、须遵循 §6 设计系统、须是 DB 驱动而非 localStorage。
 - 质量门槛（M13 起有明确命令，不再靠"记得跑"）：
-  - `pnpm verify` —— 纯函数门禁（12 道 / 675 项，2026-10-15 由 `scripts/run-gates.mjs` 实测）。改算法、口径、格式化、主题映射必跑。
-  - `pnpm verify:integration` —— 隔离库集成门禁（5 道 / 238 项，各自 `_scratch/*.db`，**不碰 `dev.db`**）。改 schema、迁移、服务层写入、跨页联动必跑。
+  - `pnpm verify` —— 纯函数门禁（13 道 / 753 项，2026-10-20 由 `scripts/run-gates.mjs` 实测）。改算法、口径、格式化、主题映射必跑。
+  - `pnpm verify:integration` —— 追加隔离库集成门禁（8 道 / 358 项，各自 `_scratch/*.db`，**不碰 `dev.db`**；驱动器自己 reset 每个库）。改 schema、迁移、服务层写入、跨页联动必跑。
   - `pnpm build` + `npx tsc --noEmit` + `pnpm lint` —— 构建与类型。`next build` 的 standalone 步骤只在容器里开（`BUILD_STANDALONE=1`，见 `next.config.mjs`）：Windows 非特权进程不能建 symlink，会让本机 build 在编译与页面生成全绿之后 EPERM 失败，从而把这条门槛本身弄没。
   - 无控制台报错、迁移+seed 能跑、计算正确、中文、响应式、打印友好；关键页 1:1 目检设计语言保真。
   - **口径变更必须同批改门禁断言**（§4.6 第一条纪律）。判据很简单：门禁没红而行为变了，就是断言没跟上——这跟"门禁红了"一样是交付未完成，不是"测试太严"。
+  - **门禁里不许硬编码"随日历漂移的基线数"**（2026-10-20 实见）。`verify-quality-flow` 的初态守卫写死 `节点 === 22`，而 seed 里 001 的完工态是**按今天推导**的（`plannedEnd < 今日 → completed`），节点数只增不减：写守卫那天 22，十天后 23。症状与"上次运行残留"**逐字相同**，于是干净 seed 被误判成残留，照提示去 reset 只会越 reset 越红。改法=换判据而非换数字：用与日期无关的不变量（seed 恒 1 条 open 问题，而任何一次运行都会新建问题或推进它）。同理 `seed.ts` 里凡"按今天自洽"的演示数据，其**行数都是易腐的**，门禁的残留判据必须避开它们。
   - 门禁清单由 `scripts/run-gates.mjs` 按 `verify-*.mjs` / `verify-*.mts` 自动发现，新脚本进目录即被跑到，不需要谁去记。
 - 不擅自扩大范围：只完成当前被要求的里程碑；保留扩展位但不提前实现未来模块。发现值得做但未被要求的（§4.6 的"撤销确认"、镜像瘦身等），**登记进报告并说明为何本轮不做**，不要沉默地顺手做掉，也不要沉默地略过。
 
